@@ -13,6 +13,8 @@ export const PRODUCT_OPTION_GROUPS = [
   },
 ];
 
+export const CREDIT_MONTH_OPTIONS = [3, 6, 9, 12];
+
 const createOptionId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -60,6 +62,11 @@ export const parseNumericPrice = (value) => {
 
   const numeric = Number(digits);
   return Number.isNaN(numeric) ? null : numeric;
+};
+
+export const parsePercentValue = (value) => {
+  const numeric = parseNumericPrice(value);
+  return numeric === null ? null : numeric;
 };
 
 export const formatPriceValue = (value) => {
@@ -203,3 +210,32 @@ export const buildConfiguredBasketItem = (product, selections = {}, quantity = 1
 
 export const getBasketPrice = (item, locale) =>
   item?.[`selected_price_${locale}`] ?? item?.[`price_${locale}`] ?? "";
+
+export const hasCreditPricing = (product) =>
+  Boolean(product?.credit_enabled) && parsePercentValue(product?.credit_6m_percent) !== null;
+
+export const calculateCreditPlan = (basePrice, sixMonthPercent, months) => {
+  const numericBasePrice =
+    typeof basePrice === "number" ? basePrice : parseNumericPrice(basePrice);
+  const numericPercent = parsePercentValue(sixMonthPercent);
+
+  if (
+    numericBasePrice === null ||
+    numericPercent === null ||
+    !Number.isFinite(months) ||
+    months <= 0
+  ) {
+    return null;
+  }
+
+  const monthlyPercent = numericPercent / 6;
+  const total = Math.round(numericBasePrice * (1 + (monthlyPercent * months) / 100));
+  const monthlyPayment = Math.round(total / months);
+
+  return {
+    months,
+    total,
+    monthlyPayment,
+    appliedPercent: Math.round(monthlyPercent * months * 100) / 100,
+  };
+};

@@ -5,6 +5,13 @@ import Products from "./icons/Products.vue";
 import Logout from "./icons/Logout.vue";
 import Statistics from "./icons/Statistics.vue";
 
+const props = defineProps({
+  mobileOpen: {
+    type: Boolean,
+    default: false,
+  },
+});
+const emit = defineEmits(["close"]);
 const store = useAdminStore();
 
 const menu = [
@@ -12,26 +19,54 @@ const menu = [
   { name: "Продукты", icon: Products },
 ];
 
-const activeItem = ref("Статистика");
+const activeItem = ref(store.showProductsView ? "Продукты" : "Статистика");
 
 const selectMenu = (name) => {
   activeItem.value = name;
 
   store.showStatistics = name === "Статистика";
   store.showProductsView = name === "Продукты";
+  emit("close");
 };
 
-const logout = () => store.logout();
+const logout = () => {
+  store.logout();
+  emit("close");
+};
 </script>
 
 <template>
+  <Transition name="aside-fade">
+    <button
+      v-if="props.mobileOpen"
+      type="button"
+      class="aside-overlay lg:hidden"
+      aria-label="Close admin menu"
+      @click="emit('close')"
+    />
+  </Transition>
+
   <aside
     class="admin-aside h-screen w-64 fixed text-white flex flex-col justify-between shadow-2xl border-r border-blue-900/30"
+    :class="{ 'admin-aside-open': props.mobileOpen }"
   >
     <div>
+      <div class="aside-mobile-head lg:hidden">
+        <p class="aside-mobile-title">Меню</p>
+        <button
+          type="button"
+          class="aside-mobile-close"
+          @click="emit('close')"
+          aria-label="Close admin menu"
+        >
+          ×
+        </button>
+      </div>
+
       <RouterLink
         to="/"
         class="aside-brand h-24 flex flex-col items-center justify-center border-b border-white/12"
+        @click="emit('close')"
       >
         <span class="aside-brand-glow" />
         <img src="@/assets/images/logo.jpg" alt="Logo" class="aside-logo w-[184px]" />
@@ -152,5 +187,59 @@ const logout = () => store.logout();
 .logout-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 18px 30px rgba(6, 24, 58, 0.44);
+}
+
+.aside-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  background: rgba(7, 19, 43, 0.42);
+  backdrop-filter: blur(5px);
+}
+
+.aside-mobile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1rem 0.4rem;
+}
+
+.aside-mobile-title {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(223, 232, 255, 0.72);
+}
+
+.aside-mobile-close {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid rgba(220, 229, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f6f8ff;
+  font-size: 1.35rem;
+}
+
+.aside-fade-enter-active,
+.aside-fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+
+.aside-fade-enter-from,
+.aside-fade-leave-to {
+  opacity: 0;
+}
+
+@media (max-width: 1023px) {
+  .admin-aside {
+    z-index: 40;
+    transform: translateX(-105%);
+    transition: transform 0.28s ease;
+  }
+
+  .admin-aside-open {
+    transform: translateX(0);
+  }
 }
 </style>

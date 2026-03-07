@@ -84,6 +84,15 @@
     "cylinderVolume": "Cylinder volume",
     "cylinderPosition": "Cylinder position"
   },
+  "credit": {
+    "title": "Installment pricing",
+    "subtitle": "Choose a term to see the estimated payment",
+    "sixMonthRate": "6-month rate",
+    "months": "mo.",
+    "total": "Total price",
+    "monthlyPayment": "Monthly payment",
+    "appliedRate": "markup applied"
+  },
   "basket": "Basket",
   "allBasket": "Total",
   "seeProducts": "View products",

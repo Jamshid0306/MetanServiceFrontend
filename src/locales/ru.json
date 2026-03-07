@@ -77,6 +77,15 @@
     "cylinderVolume": "Объем баллона",
     "cylinderPosition": "Позиция баллона"
   },
+  "credit": {
+    "title": "Покупка в кредит",
+    "subtitle": "Выберите срок и посмотрите ориентировочный расчёт",
+    "sixMonthRate": "Ставка на 6 месяцев",
+    "months": "мес.",
+    "total": "Общая сумма",
+    "monthlyPayment": "Платёж в месяц",
+    "appliedRate": "наценка по сроку"
+  },
   "products": {
     "title": "Товары",
     "allProducts": "Все товары"

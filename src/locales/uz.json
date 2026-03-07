@@ -74,6 +74,15 @@
     "cylinderVolume": "Gaz balon hajmi",
     "cylinderPosition": "Gaz balon pozitsiyasi"
   },
+  "credit": {
+    "title": "Kredit hisoblash",
+    "subtitle": "Muddatni tanlang va taxminiy to'lovni ko'ring",
+    "sixMonthRate": "6 oy stavkasi",
+    "months": "oy",
+    "total": "Jami to'lov",
+    "monthlyPayment": "Oyiga",
+    "appliedRate": "ustama qo'llandi"
+  },
   "filters": "Filtr",
   "min": "Minimal",
   "max": "Maksimal",

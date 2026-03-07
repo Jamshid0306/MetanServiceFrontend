@@ -12,11 +12,14 @@ import { useLoaderStore } from "@/store/loaderStore";
 import Notification from "@/components/Notification.vue";
 import { resolveAssetUrls } from "@/lib/api";
 import {
+  calculateCreditPlan,
   buildConfiguredBasketItem,
   calculateConfiguredPrice,
+  CREDIT_MONTH_OPTIONS,
   formatPriceValue,
   getDefaultOptionSelections,
   getProductOptionGroups,
+  hasCreditPricing,
   hasConfigurableOptions,
 } from "@/lib/productOptions";
 
@@ -31,6 +34,7 @@ const animating = ref({});
 const showCheck = ref({});
 const quantity = ref(1);
 const activeTab = ref("description");
+const selectedCreditMonths = ref(6);
 const relatedProductRefs = ref([]);
 const swiperRef = ref(null);
 const notification = ref({ show: false, message: "" });
@@ -71,6 +75,18 @@ const images = computed(() => normalizeImages(store.product?.images || []));
 const optionGroups = computed(() => getProductOptionGroups(store.product));
 const selectedPrice = computed(() =>
   calculateConfiguredPrice(store.product, locale.value, selectedOptions.value)
+);
+const creditPlans = computed(() => {
+  if (!hasCreditPricing(store.product)) {
+    return [];
+  }
+
+  return CREDIT_MONTH_OPTIONS.map((months) =>
+    calculateCreditPlan(selectedPrice.value, store.product?.credit_6m_percent, months)
+  ).filter(Boolean);
+});
+const selectedCreditPlan = computed(
+  () => creditPlans.value.find((plan) => plan.months === selectedCreditMonths.value) || null
 );
 
 const relatedProducts = computed(() => {
@@ -119,6 +135,7 @@ const fetchProductData = async (id) => {
   syncSelectedOptions();
   quantity.value = 1;
   activeTab.value = "description";
+  selectedCreditMonths.value = 6;
 
   await nextTick();
   const observer = new IntersectionObserver(
@@ -216,14 +233,14 @@ const relatedActionLabel = (product) =>
       </div>
 
       <div class="detail-info lg:w-1/2 flex flex-col gap-[20px] justify-center">
-        <div>
+        <div class="detail-summary">
           <h1
             class="detail-name text-4xl font-bold text-gray-900 tracking-tight leading-snug"
           >
             {{ store.product[`name_${locale}`] }}
           </h1>
 
-          <div class="flex flex-col gap-3 mt-6">
+          <div class="detail-price-box">
             <span
               v-if="optionGroups.length"
               class="detail-price-label text-sm font-semibold uppercase tracking-[0.16em] text-slate-500"
@@ -236,23 +253,25 @@ const relatedActionLabel = (product) =>
           </div>
         </div>
 
-        <div class="flex flex-col gap-6">
+        <div class="detail-actions">
           <div
             v-if="optionGroups.length"
             class="detail-options grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4"
           >
+            <div class="detail-options-head">
+              <p class="detail-options-kicker">
+                {{ t("productOptions.selectionHelp") }}
+              </p>
+            </div>
             <div
               v-for="group in optionGroups"
               :key="group.key"
-              class="space-y-3"
+              class="detail-option-group"
             >
-              <div class="flex items-center justify-between gap-3">
+              <div class="detail-option-headline">
                 <h3 class="text-sm font-semibold text-slate-700">
                   {{ t(group.titleKey) }}
                 </h3>
-                <span class="text-xs text-slate-500">
-                  {{ t("productOptions.selectionHelp") }}
-                </span>
               </div>
               <div class="detail-option-grid flex flex-wrap gap-2">
                 <button
@@ -276,6 +295,54 @@ const relatedActionLabel = (product) =>
                     }}
                   </span>
                 </button>
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-if="creditPlans.length"
+            class="credit-card"
+          >
+            <div class="credit-card-head">
+              <div>
+                <p class="credit-kicker">{{ t("credit.title") }}</p>
+                <h3 class="credit-heading">{{ t("credit.subtitle") }}</h3>
+              </div>
+              <div class="credit-rate-pill">
+                {{ t("credit.sixMonthRate") }}: {{ store.product.credit_6m_percent }}%
+              </div>
+            </div>
+
+            <div class="credit-months">
+              <button
+                v-for="plan in creditPlans"
+                :key="plan.months"
+                type="button"
+                class="credit-month-btn"
+                :class="{
+                  'credit-month-btn-active': selectedCreditMonths === plan.months,
+                }"
+                @click="selectedCreditMonths = plan.months"
+              >
+                {{ plan.months }} {{ t("credit.months") }}
+              </button>
+            </div>
+
+            <div v-if="selectedCreditPlan" class="credit-summary">
+              <div class="credit-metric">
+                <span class="credit-metric-label">{{ t("credit.total") }}</span>
+                <strong class="credit-metric-value">
+                  {{ formatPrice(selectedCreditPlan.total) }}
+                </strong>
+              </div>
+              <div class="credit-metric">
+                <span class="credit-metric-label">{{ t("credit.monthlyPayment") }}</span>
+                <strong class="credit-metric-value">
+                  {{ formatPrice(selectedCreditPlan.monthlyPayment) }}
+                </strong>
+              </div>
+              <div class="credit-note">
+                +{{ selectedCreditPlan.appliedPercent }}% {{ t("credit.appliedRate") }}
               </div>
             </div>
           </div>
@@ -523,9 +590,28 @@ const relatedActionLabel = (product) =>
   color: #193a67;
 }
 
+.detail-summary {
+  display: grid;
+  gap: 1rem;
+}
+
 .detail-name {
   color: #142f5f;
   font-size: clamp(1.7rem, 2.8vw, 2.4rem);
+}
+
+.detail-price-box {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  align-items: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  padding: 1rem 1.15rem;
+  border-radius: 20px;
+  border: 1px solid rgba(20, 54, 108, 0.1);
+  background: linear-gradient(180deg, rgba(251, 253, 255, 0.96), rgba(240, 246, 255, 0.9));
+  box-shadow: 0 14px 24px rgba(8, 30, 72, 0.08);
 }
 
 .detail-price {
@@ -536,8 +622,152 @@ const relatedActionLabel = (product) =>
   color: #6b7f9b;
 }
 
+.detail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.credit-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.05rem 1.1rem;
+  border-radius: 22px;
+  border: 1px solid rgba(20, 54, 108, 0.12);
+  background:
+    radial-gradient(circle at top right, rgba(42, 122, 83, 0.08), transparent 28%),
+    linear-gradient(180deg, #f7fcf8 0%, #f1f8f4 100%);
+  box-shadow: 0 16px 26px rgba(8, 30, 72, 0.06);
+}
+
+.credit-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.credit-kicker {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #5a8b6f;
+}
+
+.credit-heading {
+  margin-top: 0.24rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #173c5c;
+}
+
+.credit-rate-pill {
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgba(39, 117, 80, 0.1);
+  color: #236846;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.credit-months {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.credit-month-btn {
+  min-width: 74px;
+  height: 42px;
+  padding: 0 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 108, 73, 0.12);
+  background: rgba(255, 255, 255, 0.9);
+  color: #4c6d5d;
+  font-weight: 700;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.credit-month-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(34, 108, 73, 0.2);
+}
+
+.credit-month-btn-active {
+  background: #226c49;
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 12px 20px rgba(34, 108, 73, 0.2);
+}
+
+.credit-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.credit-metric {
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(34, 108, 73, 0.08);
+}
+
+.credit-metric-label {
+  display: block;
+  font-size: 0.8rem;
+  color: #698175;
+}
+
+.credit-metric-value {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 1.12rem;
+  color: #153c5b;
+}
+
+.credit-note {
+  grid-column: 1 / -1;
+  font-size: 0.86rem;
+  color: #4f6a5b;
+}
+
 .detail-options {
   border-color: rgba(20, 54, 108, 0.12);
+  background: linear-gradient(180deg, rgba(249, 251, 255, 0.96), rgba(240, 246, 255, 0.88));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.detail-options-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.detail-options-kicker {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #7084a4;
+}
+
+.detail-option-group {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.detail-option-headline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .detail-option {
@@ -800,6 +1030,23 @@ const relatedActionLabel = (product) =>
   .detail-main {
     border-radius: 14px;
     padding: 0.75rem;
+  }
+
+  .detail-price-box {
+    width: 100%;
+  }
+
+  .credit-card-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .credit-rate-pill {
+    width: fit-content;
+  }
+
+  .credit-summary {
+    grid-template-columns: 1fr;
   }
 
   .detail-option {
