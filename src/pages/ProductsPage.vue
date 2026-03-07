@@ -10,6 +10,12 @@ import { useFilterStore } from "@/store/filterStore";
 import { useProductsStore } from "@/store/productsStore";
 import { useLoaderStore } from "@/store/loaderStore";
 import { resolveAssetUrl, resolveAssetUrls } from "@/lib/api";
+import {
+  buildConfiguredBasketItem,
+  formatPriceValue,
+  getDefaultOptionSelections,
+  hasConfigurableOptions,
+} from "@/lib/productOptions";
 
 const route = useRoute();
 const router = useRouter();
@@ -98,6 +104,11 @@ const clearFilters = () => {
 };
 
 const handleClick = (product) => {
+  if (hasConfigurableOptions(product)) {
+    goToDetail(product.id);
+    return;
+  }
+
   const id = product.id;
   if (animating.value[id]) return;
 
@@ -108,7 +119,9 @@ const handleClick = (product) => {
     animating.value[id] = false;
   }, 1800);
 
-  basketStore.addToBasket(product);
+  basketStore.addToBasket(
+    buildConfiguredBasketItem(product, getDefaultOptionSelections(product))
+  );
   notification.value = {
     show: true,
     message: `${product[`name_${locale.value}`]} ${t("add_to_cart2")}`,
@@ -153,12 +166,9 @@ const goToDetail = (id) => {
   router.push({ name: "ProductDetail", params: { id } });
 };
 
-const formatPrice = (price) => {
-  if (!price) return "";
-  const numeric = parseInt(price.toString().replace(/[^\d]/g, ""), 10);
-  if (Number.isNaN(numeric)) return price;
-  return numeric.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " UZS";
-};
+const formatPrice = (price) => formatPriceValue(price);
+const actionLabel = (product) =>
+  hasConfigurableOptions(product) ? t("productOptions.choose") : t("add_to_cart");
 
 watch(locale, () => {
   syncPriceBounds();
@@ -254,7 +264,7 @@ onMounted(async () => {
                   class="transition-all duration-300 max-sm:text-[10px]"
                   :class="animating[product.id] ? 'opacity-0 scale-0' : 'opacity-100 scale-100'"
                 >
-                  {{ t("add_to_cart") }}
+                  {{ actionLabel(product) }}
                 </span>
                 <ShoppingCart
                   class="catalog-cart-icon absolute w-4 h-4 sm:w-5 sm:h-5 transition-all duration-500"

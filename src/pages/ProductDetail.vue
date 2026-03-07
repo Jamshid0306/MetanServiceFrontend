@@ -11,18 +11,30 @@ import LeftArrow from "@/components/icons/LeftArrow.vue";
 import { useLoaderStore } from "@/store/loaderStore";
 import Notification from "@/components/Notification.vue";
 import { resolveAssetUrls } from "@/lib/api";
+import {
+  buildConfiguredBasketItem,
+  calculateConfiguredPrice,
+  formatPriceValue,
+  getDefaultOptionSelections,
+  getProductOptionGroups,
+  hasConfigurableOptions,
+} from "@/lib/productOptions";
+
 const router = useRouter();
 const store = useProductsStore();
 const basketStore = useBasketStore();
 const { t, locale } = useI18n();
 const route = useRoute();
-const animating = ref(false);
-const showCheck = ref(false);
+const detailAnimating = ref(false);
+const detailShowCheck = ref(false);
+const animating = ref({});
+const showCheck = ref({});
 const quantity = ref(1);
 const activeTab = ref("description");
 const relatedProductRefs = ref([]);
 const swiperRef = ref(null);
 const notification = ref({ show: false, message: "" });
+const selectedOptions = ref({});
 let swiperInstance = null;
 
 const goToSlide = (index) => {
@@ -32,17 +44,23 @@ const goToSlide = (index) => {
 };
 
 const handleAddToBasket = () => {
-  if (animating.value) return;
-  basketStore.addToBasket({ ...store.product, quantity: quantity.value });
+  if (detailAnimating.value) return;
+  basketStore.addToBasket(
+    buildConfiguredBasketItem(
+      store.product,
+      selectedOptions.value,
+      Number(quantity.value) || 1
+    )
+  );
   notification.value = {
     show: true,
     message: `${store.product[`name_${locale.value}`]} ${t("add_to_cart2")}`,
   };
-  animating.value = true;
-  setTimeout(() => (showCheck.value = true), 400);
+  detailAnimating.value = true;
+  setTimeout(() => (detailShowCheck.value = true), 400);
   setTimeout(() => {
-    showCheck.value = false;
-    animating.value = false;
+    detailShowCheck.value = false;
+    detailAnimating.value = false;
     quantity.value = 1;
   }, 1600);
 };
@@ -50,6 +68,10 @@ const handleAddToBasket = () => {
 const normalizeImages = (images) => resolveAssetUrls(images);
 
 const images = computed(() => normalizeImages(store.product?.images || []));
+const optionGroups = computed(() => getProductOptionGroups(store.product));
+const selectedPrice = computed(() =>
+  calculateConfiguredPrice(store.product, locale.value, selectedOptions.value)
+);
 
 const relatedProducts = computed(() => {
   const list = Array.isArray(store.products) ? store.products : [];
@@ -69,6 +91,20 @@ onMounted(async () => {
   await fetchProductData(Number(route.params.id));
 });
 
+const syncSelectedOptions = () => {
+  const nextSelections = {};
+
+  optionGroups.value.forEach((group) => {
+    const currentValue = selectedOptions.value[group.key];
+    const hasCurrentValue = group.options.some((option) => option.id === currentValue);
+    nextSelections[group.key] = hasCurrentValue
+      ? currentValue
+      : group.options[0]?.id || "";
+  });
+
+  selectedOptions.value = nextSelections;
+};
+
 const fetchProductData = async (id) => {
   const productExists = await store.fetchProductDetail(id);
   if (!productExists) {
@@ -79,6 +115,10 @@ const fetchProductData = async (id) => {
   if (!store.products.length) {
     await store.fetchProducts(200, 0);
   }
+
+  syncSelectedOptions();
+  quantity.value = 1;
+  activeTab.value = "description";
 
   await nextTick();
   const observer = new IntersectionObserver(
@@ -97,33 +137,38 @@ const fetchProductData = async (id) => {
     if (el) observer.observe(el);
   });
 };
-const formatPrice = (price) => {
-  if (!price) return "";
-  const numeric = parseInt(price.toString().replace(/[^\d]/g, ""), 10);
-  if (isNaN(numeric)) return price;
-  return numeric.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " UZS";
-};
+const formatPrice = (price) => formatPriceValue(price);
 const goToDetail = (id) => {
   useLoaderStore().loader = true;
   router.push({ name: "ProductDetail", params: { id } });
 };
 onMounted(() => {
   if (swiperRef.value && swiperRef.value.swiper) {
-    swiperInstance.value = swiperRef.value.swiper;
+    swiperInstance = swiperRef.value.swiper;
   }
 });
 
 const handleClick = (product) => {
+  if (hasConfigurableOptions(product)) {
+    goToDetail(product.id);
+    return;
+  }
+
   const id = product.id;
-  if (animating.value) return;
+  if (animating.value[id]) return;
   animating.value = { ...animating.value, [id]: true };
   setTimeout(() => (showCheck.value = { ...showCheck.value, [id]: true }), 400);
   setTimeout(() => {
     showCheck.value = { ...showCheck.value, [id]: false };
     animating.value = { ...animating.value, [id]: false };
   }, 1600);
-  basketStore.addToBasket(product);
+  basketStore.addToBasket(
+    buildConfiguredBasketItem(product, getDefaultOptionSelections(product))
+  );
 };
+
+const relatedActionLabel = (product) =>
+  hasConfigurableOptions(product) ? t("productOptions.choose") : t("add_to_cart");
 </script>
 
 <template>
@@ -179,20 +224,68 @@ const handleClick = (product) => {
           </h1>
 
           <div class="flex flex-col gap-3 mt-6">
-            <span class="detail-price text-3xl font-semibold text-blue-800">
-              {{ formatPrice(store.product[`price_${locale}`]) }}
+            <span
+              v-if="optionGroups.length"
+              class="detail-price-label text-sm font-semibold uppercase tracking-[0.16em] text-slate-500"
+            >
+              {{ t("productOptions.totalPrice") }}
             </span>
-
+            <span class="detail-price text-3xl font-semibold text-blue-800">
+              {{ formatPrice(selectedPrice) }}
+            </span>
           </div>
         </div>
 
         <div class="flex flex-col gap-6">
+          <div
+            v-if="optionGroups.length"
+            class="detail-options grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4"
+          >
+            <div
+              v-for="group in optionGroups"
+              :key="group.key"
+              class="space-y-3"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <h3 class="text-sm font-semibold text-slate-700">
+                  {{ t(group.titleKey) }}
+                </h3>
+                <span class="text-xs text-slate-500">
+                  {{ t("productOptions.selectionHelp") }}
+                </span>
+              </div>
+              <div class="detail-option-grid flex flex-wrap gap-2">
+                <button
+                  v-for="option in group.options"
+                  :key="option.id"
+                  type="button"
+                  @click="selectedOptions[group.key] = option.id"
+                  class="detail-option"
+                  :class="
+                    selectedOptions[group.key] === option.id
+                      ? 'detail-option-active'
+                      : ''
+                  "
+                >
+                  <span>{{ option.label }}</span>
+                  <span class="text-xs font-medium text-slate-500">
+                    {{
+                      option.price_delta
+                        ? `+${formatPrice(option.price_delta)}`
+                        : t("productOptions.included")
+                    }}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <!-- Quantity -->
           <div
             class="qty-box flex items-center border w-[160px] rounded-2xl overflow-hidden shadow-md bg-white"
           >
             <button
-              @click="quantity > 1 ? (quantity -= 1) : null"
+              @click="Number(quantity) > 1 ? (quantity = Number(quantity) - 1) : null"
               class="qty-btn w-12 h-12 flex items-center justify-center bg-blue-50 cursor-pointer hover:bg-blue-200 transition-all duration-300"
             >
               <Minus class="w-5 h-5 text-blue-700" />
@@ -202,12 +295,12 @@ const handleClick = (product) => {
               type="text"
               v-model="quantity"
               class="qty-input w-16 text-center font-semibold text-xl text-gray-800 outline-none select-none focus:ring-2 focus:ring-blue-400"
-              @input="quantity = quantity.replace(/[^0-9]/g, '')"
+              @input="quantity = String(quantity).replace(/[^0-9]/g, '')"
               @blur="if (!quantity || parseInt(quantity) < 1) quantity = 1;"
             />
 
             <button
-              @click="quantity += 1"
+              @click="quantity = Number(quantity || 0) + 1"
               class="qty-btn w-12 h-12 flex items-center justify-center bg-blue-50 cursor-pointer hover:bg-blue-200 transition-all duration-300"
             >
               <Plus class="w-5 h-5 text-blue-700" />
@@ -221,7 +314,7 @@ const handleClick = (product) => {
           >
             <span
               :class="
-                animating ? 'opacity-0 scale-90' : 'opacity-100 scale-100'
+                detailAnimating ? 'opacity-0 scale-90' : 'opacity-100 scale-100'
               "
               class="transition-all duration-300"
             >
@@ -229,7 +322,7 @@ const handleClick = (product) => {
             </span>
             <ShoppingCart
               :class="
-                animating
+                detailAnimating
                   ? 'translate-x-44 opacity-0'
                   : 'translate-x-0 opacity-100'
               "
@@ -237,7 +330,7 @@ const handleClick = (product) => {
             />
             <Check
               :class="
-                showCheck ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+                detailShowCheck ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
               "
               class="absolute w-6 h-6 text-white transition-all duration-500"
             />
@@ -331,7 +424,7 @@ const handleClick = (product) => {
                   : 'opacity-100 scale-100'
               "
             >
-              {{ t("add_to_cart") }}
+              {{ relatedActionLabel(product) }}
             </span>
             <ShoppingCart
               class="related-cart-icon absolute w-5 h-5 transition-all duration-500"
@@ -437,6 +530,42 @@ const handleClick = (product) => {
 
 .detail-price {
   color: #143d7a;
+}
+
+.detail-price-label {
+  color: #6b7f9b;
+}
+
+.detail-options {
+  border-color: rgba(20, 54, 108, 0.12);
+}
+
+.detail-option {
+  min-width: 132px;
+  border-radius: 14px;
+  border: 1px solid rgba(20, 54, 108, 0.12);
+  background: #ffffff;
+  color: #1c3864;
+  padding: 0.8rem 0.95rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  text-align: left;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.detail-option:hover {
+  border-color: rgba(20, 54, 108, 0.24);
+  transform: translateY(-1px);
+}
+
+.detail-option-active {
+  border-color: rgba(20, 79, 149, 0.38);
+  box-shadow: 0 10px 18px rgba(10, 31, 75, 0.1);
+  background: linear-gradient(180deg, #f7fbff, #eef5ff);
 }
 
 .qty-box {
@@ -671,6 +800,10 @@ const handleClick = (product) => {
   .detail-main {
     border-radius: 14px;
     padding: 0.75rem;
+  }
+
+  .detail-option {
+    width: 100%;
   }
 
   .detail-swiper,

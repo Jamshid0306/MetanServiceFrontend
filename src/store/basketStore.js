@@ -1,35 +1,47 @@
 // basketStore.js (Pinia)
 import { defineStore } from "pinia";
+import { buildBasketKey } from "@/lib/productOptions";
+
+const resolveBasketKey = (product) =>
+  product?.basket_key || buildBasketKey(product?.id, product?.selected_options || []);
 
 export const useBasketStore = defineStore("basket", {
   state: () => ({
     basket: [],
   }),
   actions: {
-    updateQuantity(id, quantity) {
-      const item = this.basket.find((p) => p.id === id);
+    updateQuantity(key, quantity) {
+      const item = this.basket.find((p) => resolveBasketKey(p) === key);
       if (item) {
-        item.quantity = quantity > 0 ? quantity : 1;
+        const nextQuantity = Number(quantity);
+        item.quantity = Number.isFinite(nextQuantity) && nextQuantity > 0 ? nextQuantity : 1;
       }
     },
     addToBasket(product) {
-      const existing = this.basket.find((p) => p.id === product.id);
+      const basketKey = resolveBasketKey(product);
+      const existing = this.basket.find((p) => resolveBasketKey(p) === basketKey);
+      const nextQuantity = Number(product.quantity);
+      const safeQuantity = Number.isFinite(nextQuantity) && nextQuantity > 0 ? nextQuantity : 1;
       if (existing) {
-        existing.quantity += product.quantity || 1; // ✨ quantity ni hisobga oladi
+        existing.quantity += safeQuantity;
       } else {
-        this.basket.push({ ...product, quantity: product.quantity || 1 });
+        this.basket.push({
+          ...product,
+          basket_key: basketKey,
+          quantity: safeQuantity,
+        });
       }
     },
 
-    removeFromBasket(id) {
-      this.basket = this.basket.filter((p) => p.id !== id);
+    removeFromBasket(key) {
+      this.basket = this.basket.filter((p) => resolveBasketKey(p) !== key);
     },
-    decreaseQuantity(id) {
-      const item = this.basket.find((p) => p.id === id);
+    decreaseQuantity(key) {
+      const item = this.basket.find((p) => resolveBasketKey(p) === key);
       if (item && item.quantity > 1) {
         item.quantity -= 1;
       } else {
-        this.removeFromBasket(id);
+        this.removeFromBasket(key);
       }
     },
     clearBasket() {

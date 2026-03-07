@@ -75,6 +75,15 @@
   "product": {
     "about": "About Product"
   },
+  "productOptions": {
+    "choose": "Choose option",
+    "totalPrice": "Configured price",
+    "included": "Included",
+    "selectionHelp": "Choose the right option",
+    "transmission": "Transmission",
+    "cylinderVolume": "Cylinder volume",
+    "cylinderPosition": "Cylinder position"
+  },
   "basket": "Basket",
   "allBasket": "Total",
   "seeProducts": "View products",

@@ -13,6 +13,16 @@ import Pencil from "../../components/icons/Pencil.vue";
 
 import { useLoaderStore } from "@/store/loaderStore";
 import { resolveAssetUrl, resolveAssetUrls } from "@/lib/api";
+import {
+  PRODUCT_OPTION_GROUPS,
+  createEmptyOptionItem,
+  createEmptyProductOptions,
+  formatPriceValue,
+  getProductOptionGroups,
+  normalizeProductOptions,
+  serializeProductOptions,
+} from "@/lib/productOptions";
+
 const priceType = ref("show");
 const store = useAdminStore();
 const showModal = ref(false);
@@ -26,14 +36,44 @@ const notifMessage = ref("");
 const searchQuery = ref("");
 const currentPage = ref(1);
 const itemsPerPage = 6;
-const newProduct = ref({
+
+const adminOptionGroups = PRODUCT_OPTION_GROUPS.map((group) => {
+  if (group.key === "transmission") {
+    return {
+      ...group,
+      title: "КПП",
+      hint: "Добавьте только доступные варианты: автомат, механика и т.д.",
+      placeholder: "Автомат",
+    };
+  }
+
+  if (group.key === "cylinder_volume") {
+    return {
+      ...group,
+      title: "Объем баллона",
+      hint: "Например: 75, 85, 90, 95.",
+      placeholder: "85 л",
+    };
+  }
+
+  return {
+    ...group,
+    title: "Позиция баллона",
+    hint: "Например: 2, 3, 4.",
+    placeholder: "2",
+  };
+});
+
+const createInitialProduct = () => ({
   price: "",
   name: { uz: "", ru: "", en: "" },
   description: { uz: "", ru: "", en: "" },
   characteristic: { uz: "", ru: "", en: "" },
   images: [],
   oldImages: [],
+  options: createEmptyProductOptions(),
 });
+const newProduct = ref(createInitialProduct());
 
 const imagePreviews = ref([]);
 
@@ -63,6 +103,24 @@ const removeImage = (i) => {
 
 const changeLanguage = (lang) => {
   currentLang.value = lang;
+};
+
+const formatNumericInput = (value) => {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+};
+
+const mapOptionsForForm = (rawOptions) => {
+  const normalized = normalizeProductOptions(rawOptions);
+
+  return adminOptionGroups.reduce((acc, group) => {
+    acc[group.key] = normalized[group.key].map((option) => ({
+      id: option.id,
+      label: option.label,
+      price_delta: option.price_delta ? formatNumericInput(option.price_delta) : "",
+    }));
+    return acc;
+  }, createEmptyProductOptions());
 };
 
 const openUpdateModal = (product) => {
@@ -96,7 +154,7 @@ const openUpdateModal = (product) => {
     price_uz: product.price_uz || "",
     price_ru: product.price_ru || "",
     price_en: product.price_en || "",
-    price: priceType.value === "show" ? product.price_uz || "" : "", // shu yer
+    price: priceType.value === "show" ? product.price_uz || "" : "",
     name: {
       uz: product.name_uz || "",
       ru: product.name_ru || "",
@@ -114,27 +172,38 @@ const openUpdateModal = (product) => {
     },
     images: [],
     oldImages: oldImages,
+    options: mapOptionsForForm(product.config_options),
   };
 
   showModal.value = true;
 };
 
 const resetForm = () => {
-  newProduct.value = {
-    price: "",
-    name: { uz: "", ru: "", en: "" },
-    description: { uz: "", ru: "", en: "" },
-    characteristic: { uz: "", ru: "", en: "" },
-    images: [],
-    oldImages: [],
-  };
+  newProduct.value = createInitialProduct();
   imagePreviews.value = [];
   loading.value = false;
   isUpdate.value = false;
   currentProductId.value = null;
+  currentLang.value = "uz";
+  priceType.value = "show";
+};
+
+const addOptionRow = (groupKey) => {
+  newProduct.value.options[groupKey].push(createEmptyOptionItem());
+};
+
+const removeOptionRow = (groupKey, index) => {
+  newProduct.value.options[groupKey].splice(index, 1);
+};
+
+const onOptionPriceInput = (event, groupKey, index) => {
+  newProduct.value.options[groupKey][index].price_delta = formatNumericInput(
+    event.target.value
+  );
 };
 
 const addOrUpdateProduct = async () => {
+  loading.value = true;
   const formData = new FormData();
 
   formData.append("name_uz", newProduct.value.name.uz || "");
@@ -168,6 +237,11 @@ const addOrUpdateProduct = async () => {
     formData.append("price_en", "Request price");
   }
 
+  formData.append(
+    "config_options",
+    JSON.stringify(serializeProductOptions(newProduct.value.options))
+  );
+
   newProduct.value.images.forEach((file) => {
     formData.append("files", file);
   });
@@ -178,12 +252,17 @@ const addOrUpdateProduct = async () => {
   try {
     if (isUpdate.value) {
       await store.updateProduct(currentProductId.value, formData);
+      showNotification("Товар успешно обновлён!");
     } else {
       await store.createProduct(formData);
+      showNotification("Товар успешно добавлен!");
     }
     showModal.value = false;
+    resetForm();
   } catch (err) {
     console.error("Product add/update failed:", err);
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -218,42 +297,18 @@ const normalizeImages = (images) => resolveAssetUrls(images);
 const productsList = computed(() =>
   Array.isArray(store.products) ? store.products : []
 );
-
-const displayPrice = computed(() => {
-  if (priceType.value === "request") {
-    if (currentLang.value === "uz") return "Narxni so’rang";
-    if (currentLang.value === "ru") return "Цену уточняйте";
-    if (currentLang.value === "en") return "Request price";
-  }
-  const price = newProduct.value.price;
-  if (!price) return "";
-  return /^\d+$/.test(price)
-    ? price.replace(/\B(?=(\d{3})+(?!\d))/g, " ")
-    : price;
-});
-
-const formatPrice = (value) => {
-  if (!value) return "";
-  return /^\d+$/.test(value.toString())
-    ? value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " UZS"
-    : value;
-};
+const formatPrice = (value) => formatPriceValue(value);
 
 const onPriceInput = (e) => {
   const el = e.target;
   let start = el.selectionStart;
   let end = el.selectionEnd;
 
-  // Faqat raqamlarni olish
-  let digits = el.value.replace(/\D/g, "");
-
-  // Formatlash: har 3 raqamdan keyin space
+  const digits = el.value.replace(/\D/g, "");
   const formatted = digits.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 
-  // `v-model` ga ham qiymat berish
   newProduct.value.price = formatted;
 
-  // Kursorni to‘g‘ri joylash
   const diff = formatted.length - digits.length;
   el.setSelectionRange(start + diff, end + diff);
 };
@@ -293,6 +348,13 @@ const goToPage = (page) => {
   if (page < 1 || page > totalPages.value) return;
   currentPage.value = page;
 };
+
+const getProductOptionBadges = (product) =>
+  getProductOptionGroups(product).map((group) => ({
+    key: group.key,
+    title: adminOptionGroups.find((item) => item.key === group.key)?.title || group.key,
+    count: group.options.length,
+  }));
 </script>
 <template>
   <div class="p-6 space-y-6">
@@ -356,6 +418,18 @@ const goToPage = (page) => {
             <div class="text-gray-500 text-sm line-clamp-3">
               {{ product.description_ru }}
             </div>
+            <div
+              v-if="getProductOptionBadges(product).length"
+              class="flex flex-wrap gap-2 pt-2"
+            >
+              <span
+                v-for="badge in getProductOptionBadges(product)"
+                :key="badge.key"
+                class="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700"
+              >
+                {{ badge.title }}: {{ badge.count }}
+              </span>
+            </div>
           </div>
           <div class="text-indigo-700 font-semibold text-lg">
             {{ formatPrice(product.price_ru) }}
@@ -398,7 +472,7 @@ const goToPage = (page) => {
         class="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center z-50"
       >
         <Motion
-          class="bg-gradient-to-br from-[#f5f1ff] to-white rounded-2xl w-96 p-6 shadow-2xl relative text-gray-800 max-h-[80vh] overflow-y-auto"
+          class="bg-gradient-to-br from-[#f5f1ff] to-white rounded-2xl w-[680px] max-w-[calc(100vw-2rem)] p-6 shadow-2xl relative text-gray-800 max-h-[85vh] overflow-y-auto"
         >
           <button
             v-if="isUpdate"
@@ -427,6 +501,69 @@ const goToPage = (page) => {
                 placeholder="0 UZS"
                 class="w-full px-4 py-2 rounded border border-gray-300 focus:ring-2 focus:ring-indigo-400 outline-none"
               />
+            </div>
+            <div class="rounded-2xl border border-indigo-100 bg-white/80 p-4 space-y-4">
+              <div>
+                <h3 class="text-lg font-semibold text-indigo-800">
+                  Варианты и доплата
+                </h3>
+                <p class="text-sm text-slate-500">
+                  Добавьте только доступные категории для этого товара. Пользователь
+                  увидит только эти варианты, а цена посчитается автоматически.
+                </p>
+              </div>
+
+              <div
+                v-for="group in adminOptionGroups"
+                :key="group.key"
+                class="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-3"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 class="font-semibold text-slate-800">{{ group.title }}</h4>
+                    <p class="text-xs text-slate-500">{{ group.hint }}</p>
+                  </div>
+                  <button
+                    type="button"
+                    @click="addOptionRow(group.key)"
+                    class="shrink-0 rounded-lg bg-indigo-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-indigo-800"
+                  >
+                    Добавить
+                  </button>
+                </div>
+
+                <div
+                  v-if="!newProduct.options[group.key].length"
+                  class="rounded-lg border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-500"
+                >
+                  Варианты ещё не добавлены.
+                </div>
+
+                <div
+                  v-for="(option, index) in newProduct.options[group.key]"
+                  :key="option.id"
+                  class="grid gap-2 items-center sm:grid-cols-[minmax(0,1fr)_160px_40px]"
+                >
+                  <input
+                    v-model="option.label"
+                    :placeholder="group.placeholder"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  />
+                  <input
+                    :value="option.price_delta"
+                    @input="onOptionPriceInput($event, group.key, index)"
+                    placeholder="+0 UZS"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  />
+                  <button
+                    type="button"
+                    @click="removeOptionRow(group.key, index)"
+                    class="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 text-red-500 transition hover:bg-red-100"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
             </div>
             <div class="flex space-x-4 mb-4 justify-center">
               <button
@@ -509,7 +646,10 @@ const goToPage = (page) => {
 
             <div class="flex justify-end space-x-2 mt-4">
               <button
-                @click="showModal = false"
+                @click="
+                  showModal = false;
+                  resetForm();
+                "
                 class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-200 transition"
               >
                 Отмена

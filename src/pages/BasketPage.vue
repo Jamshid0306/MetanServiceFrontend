@@ -6,6 +6,7 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import LeftArrow from "@/components/icons/LeftArrow.vue";
 import { resolveAssetUrl, resolveAssetUrls } from "@/lib/api";
+import { formatPriceValue, getBasketPrice } from "@/lib/productOptions";
 
 const { t, locale } = useI18n();
 const basketStore = useBasketStore();
@@ -25,12 +26,14 @@ const extractNumericOrText = (price) => {
   return Number.isNaN(numeric) ? price : numeric;
 };
 
+const getItemKey = (item) => item.basket_key || `${item.id}:base`;
+
 const totalPrice = computed(() => {
   let sum = 0;
   let hasText = false;
 
   basketStore.basket.forEach((p) => {
-    const val = extractNumericOrText(p[`price_${locale.value}`]);
+    const val = extractNumericOrText(getBasketPrice(p, locale.value));
     if (typeof val === "number") {
       sum += val * p.quantity;
     } else {
@@ -44,14 +47,9 @@ const totalPrice = computed(() => {
   return sum;
 });
 
-const formatPrice = (price) => {
-  if (!price) return "";
-  const numeric = parseInt(price.toString().replace(/[^\d]/g, ""), 10);
-  if (Number.isNaN(numeric)) return price;
-  return numeric.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " UZS";
-};
+const formatPrice = (price) => formatPriceValue(price);
 
-const removeItem = (id) => basketStore.removeFromBasket(id);
+const removeItem = (item) => basketStore.removeFromBasket(getItemKey(item));
 const goToProduct = (id) =>
   router.push({ name: "ProductDetail", params: { id } });
 </script>
@@ -76,7 +74,7 @@ const goToProduct = (id) =>
       >
         <div
           v-for="item in basketStore.basket"
-          :key="item.id"
+          :key="getItemKey(item)"
           class="basket-card bg-white border border-gray-200 rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 overflow-hidden flex flex-col sm:flex-row items-center sm:items-stretch group"
         >
           <div
@@ -94,13 +92,25 @@ const goToProduct = (id) =>
             @click="goToProduct(item.id)"
           >
             <h2 class="basket-name font-semibold text-lg mb-1">{{ item[`name_${locale}`] }}</h2>
+            <div
+              v-if="item.selected_options?.length"
+              class="mt-2 flex flex-wrap gap-2"
+            >
+              <span
+                v-for="option in item.selected_options"
+                :key="`${getItemKey(item)}-${option.group_key}`"
+                class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600"
+              >
+                {{ t(option.title_key) }}: {{ option.label }}
+              </span>
+            </div>
           </div>
           <div
             class="basket-controls flex items-center justify-end gap-6 px-5 py-4 border-t sm:border-t-0 sm:border-l border-gray-100"
           >
             <span class="basket-qty flex items-center border rounded-xl overflow-hidden shadow-sm">
               <button
-                @click="basketStore.decreaseQuantity(item.id)"
+                @click="basketStore.decreaseQuantity(getItemKey(item))"
                 class="basket-qty-btn w-10 h-10 flex items-center justify-center text-lg font-bold text-blue-700 bg-blue-50 hover:bg-blue-200 cursor-pointer transition-all duration-300"
               >
                 –
@@ -110,16 +120,16 @@ const goToProduct = (id) =>
                 type="text"
                 v-model="item.quantity"
                 class="basket-qty-input w-14 text-center font-semibold text-gray-700 outline-none focus:ring-2 focus:ring-blue-400"
-                @input="item.quantity = item.quantity.replace(/[^0-9]/g, '')"
+                @input="item.quantity = String(item.quantity).replace(/[^0-9]/g, '')"
                 @blur="
                   if (!item.quantity || parseInt(item.quantity) < 1)
                     item.quantity = 1;
                 "
-                @change="basketStore.updateQuantity(item.id, parseInt(item.quantity))"
+                @change="basketStore.updateQuantity(getItemKey(item), parseInt(item.quantity))"
               />
 
               <button
-                @click="basketStore.updateQuantity(item.id, item.quantity + 1)"
+                @click="basketStore.updateQuantity(getItemKey(item), Number(item.quantity || 0) + 1)"
                 class="basket-qty-btn w-10 h-10 flex items-center justify-center text-lg font-bold text-blue-700 bg-blue-50 hover:bg-blue-200 cursor-pointer transition-all duration-300"
               >
                 +
@@ -128,16 +138,16 @@ const goToProduct = (id) =>
 
             <span class="basket-item-price text-xl font-bold text-blue-800 min-w-[140px] text-right">
               {{
-                typeof extractNumericOrText(item[`price_${locale}`]) === "number"
+                typeof extractNumericOrText(getBasketPrice(item, locale)) === "number"
                   ? formatPrice(
-                      extractNumericOrText(item[`price_${locale}`]) * item.quantity
+                      extractNumericOrText(getBasketPrice(item, locale)) * item.quantity
                     )
-                  : extractNumericOrText(item[`price_${locale}`])
+                  : extractNumericOrText(getBasketPrice(item, locale))
               }}
             </span>
 
             <button
-              @click="removeItem(item.id)"
+              @click="removeItem(item)"
               class="basket-remove p-2 bg-blue-50 rounded-xl hover:bg-blue-200 cursor-pointer transition-all duration-300"
             >
               <Trash2 class="w-5 h-5 text-blue-700" />

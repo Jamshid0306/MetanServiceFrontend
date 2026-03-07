@@ -68,6 +68,15 @@
   "product": {
     "about": "О продукте"
   },
+  "productOptions": {
+    "choose": "Выбрать вариант",
+    "totalPrice": "Цена по выбору",
+    "included": "Входит в цену",
+    "selectionHelp": "Выберите подходящий вариант",
+    "transmission": "КПП",
+    "cylinderVolume": "Объем баллона",
+    "cylinderPosition": "Позиция баллона"
+  },
   "products": {
     "title": "Товары",
     "allProducts": "Все товары"

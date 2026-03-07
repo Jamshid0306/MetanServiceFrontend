@@ -8,6 +8,13 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useLoaderStore } from "@/store/loaderStore";
 import { resolveAssetUrls } from "@/lib/api";
+import {
+  buildConfiguredBasketItem,
+  formatPriceValue,
+  getDefaultOptionSelections,
+  hasConfigurableOptions,
+} from "@/lib/productOptions";
+
 const router = useRouter();
 const { t, locale } = useI18n();
 const productsStore = useProductsStore();
@@ -17,12 +24,7 @@ const normalizeImages = (images) => resolveAssetUrls(images);
 const animating = ref({});
 const showCheck = ref({});
 const notification = ref({ show: false, message: "" });
-const formatPrice = (price) => {
-  if (!price) return "";
-  const numeric = parseInt(price.toString().replace(/[^\d]/g, ""), 10);
-  if (isNaN(numeric)) return price;
-  return numeric.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " UZS";
-};
+const formatPrice = (price) => formatPriceValue(price);
 
 onMounted(async () => {
   // Mahsulotlar yuklanishini kutish
@@ -45,6 +47,11 @@ onMounted(async () => {
   });
 });
 const handleClick = (product) => {
+  if (hasConfigurableOptions(product)) {
+    goToDetail(product.id);
+    return;
+  }
+
   const id = product.id;
   if (animating.value[id]) return;
   animating.value = { ...animating.value, [id]: true };
@@ -55,7 +62,9 @@ const handleClick = (product) => {
     showCheck.value = { ...showCheck.value, [id]: false };
     animating.value = { ...animating.value, [id]: false };
   }, 1800);
-  basketStore.addToBasket(product);
+  basketStore.addToBasket(
+    buildConfiguredBasketItem(product, getDefaultOptionSelections(product))
+  );
   notification.value = {
     show: true,
     message: `${product[`name_${locale.value}`]} ${t("add_to_cart2")}`,
@@ -65,6 +74,8 @@ const goToDetail = (id) => {
   router.push({ name: "ProductDetail", params: { id } });
   productsStore.fetchProductDetail(id);
 };
+const actionLabel = (product) =>
+  hasConfigurableOptions(product) ? t("productOptions.choose") : t("add_to_cart");
 </script>
 
 <template>
@@ -114,7 +125,7 @@ const goToDetail = (id) => {
                     : 'opacity-100 scale-100'
                 "
               >
-                {{ t("add_to_cart") }}
+                {{ actionLabel(product) }}
               </span>
               <ShoppingCart
                 class="cart-icon absolute w-5 h-5 transition-all duration-500"

@@ -65,6 +65,15 @@
   "product": {
     "about": "Mahsulot haqida"
   },
+  "productOptions": {
+    "choose": "Variantni tanlash",
+    "totalPrice": "Tanlangan narx",
+    "included": "Narx ichida",
+    "selectionHelp": "Mos variantni tanlang",
+    "transmission": "Uzatma qutisi",
+    "cylinderVolume": "Gaz balon hajmi",
+    "cylinderPosition": "Gaz balon pozitsiyasi"
+  },
   "filters": "Filtr",
   "min": "Minimal",
   "max": "Maksimal",
