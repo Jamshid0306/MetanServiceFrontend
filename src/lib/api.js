@@ -2,6 +2,14 @@ import axios from "axios";
 
 const trimTrailingSlash = (value = "") => value.replace(/\/+$/, "");
 
+const shouldSendNgrokHeader = (baseUrl) => {
+  try {
+    return new URL(baseUrl).hostname.includes("ngrok");
+  } catch {
+    return false;
+  }
+};
+
 const resolveApiBaseUrl = () => {
   const envValue = trimTrailingSlash(import.meta.env.VITE_API_URL || "");
   if (envValue) {
@@ -24,9 +32,11 @@ export const API_BASE_URL = resolveApiBaseUrl();
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    "ngrok-skip-browser-warning": "true",
-  },
+  headers: shouldSendNgrokHeader(API_BASE_URL)
+    ? {
+        "ngrok-skip-browser-warning": "true",
+      }
+    : {},
 });
 
 apiClient.interceptors.request.use((config) => {
