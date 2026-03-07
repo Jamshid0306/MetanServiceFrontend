@@ -1,0 +1,88 @@
+{
+  "footer": {
+    "logoAlt": "Urganch Metan Service logotipi",
+    "description": "Urganch Metan Service metan uskunalari va servis xizmatlarini ishonchli qo'llab-quvvatlash bilan taqdim etadi",
+    "quickLinks": "Tezkor havolalar",
+    "home": "Bosh sahifa",
+    "services": "Xizmatlar",
+    "about": "Biz haqimizda",
+    "contacts": "Kontaktlar",
+    "contact": "Bizning manzil",
+    "address": "Toshkent, Yunusobod tumani, 11-kvartal, 33",
+    "rights": "ACLOGIC ALLIANCE. Barcha huquqlar himoyalangan."
+  },
+  "about": {
+    "companyName": "\"ACLOGIC ALLIANCE\" MCHJ",
+    "addressTitle": "Manzil",
+    "address": "Toshkent, Yunusobod tumani 11-kvartal, 33",
+    "phoneTitle": "Telefon",
+    "bankTitle": "Bank rekvizitlari",
+    "account": "Hisob raqam",
+    "bank": "Bank",
+    "bankTitle2": "JSCB Hamkorbank, Yunusobod filiali",
+    "mfo": "MFO",
+    "inn": "INN",
+    "oked": "OKED"
+  },
+  "contact_title": "Kerakli mahsulotni topa olmadingizmi yoki savollaringiz qoldimi?",
+  "name": "Ism",
+  "phone": "Telefon",
+  "message": "Xabar",
+  "send": "Yuborish",
+  "sending": "Yuborilmoqda...",
+  "success_message": "Xabaringiz muvaffaqiyatli yuborildi!",
+  "please_fill_all_fields": "Iltimos, barcha maydonlarni to'ldiring va telefon raqam to‘g‘ri bo‘lsin",
+  "header": {
+    "more": "Batafsil",
+    "support": {
+      "title": "Texnik yordam",
+      "title-short": "Tex. yordam",
+      "text": "Savollaringiz yoki muammolaringiz bo‘lsa, bizning jamoamiz doimo yordam berishga tayyor"
+    },
+    "service": {
+      "title": "Bizning xizmatlarimiz",
+      "text": "Biz sizga qulay va ishonchli xizmatlarni taklif qilamiz, har bir mijoz ehtiyojiga mos ravishda"
+    }
+  },
+  "nav": {
+    "no_results": "Natija topilmadi",
+    "catalog": "Katalog",
+    "search_products": "Mahsulotlarni qidirish",
+    "blog": "Blog",
+    "about": "Biz haqimizda",
+    "contact": "Aloqa",
+    "contact_admin": "Menejer bilan bog’laning",
+    "main": "Bosh sahifa",
+    "service": "Xizmatlar"
+  },
+  "creat": "EDev tomonidan yaratilgan",
+  "products": {
+    "title": "Mahsulotlar",
+    "allProducts": "Barcha Mahsulotlar"
+  },
+  "characteristic": "Xususiyatlar",
+  "description": "Tavsif",
+  "product": {
+    "about": "Mahsulot haqida"
+  },
+  "filters": "Filtr",
+  "min": "Minimal",
+  "max": "Maksimal",
+  "clear": "Tozalash",
+  "price": "Narx",
+  "uzs": "UZS",
+  "nothing_found": "Hech narsa topilmadi",
+  "try_changing_filters": "Filtr sozlamalarini o'zgartirib ko'ring.",
+  "clear_filters": "Filtrlarni tozalash",
+  "add_to_cart": "Savatga qo‘shish",
+  "add_to_cart2": "savatga qo‘shildi",
+  "basket": "Savat",
+  "seeProducts": "Mahsulotlarni ko‘rish",
+  "allBasket": "Jami",
+  "buy": "Xarid qilish",
+  "empty": "Savatcha bo‘sh",
+  "info": "Ma’lumotlaringizni kiriting",
+  "cancel": "Bekor qilish",
+  "related_products": "O'xshash mahsulotlar",
+  "success": "Buyurtma muvaffaqiyatli yuborildi!"
+}

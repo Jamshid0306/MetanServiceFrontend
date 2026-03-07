@@ -1,0 +1,88 @@
+{
+  "footer": {
+    "logoAlt": "Urganch Metan Service logo",
+    "description": "Urganch Metan Service provides methane equipment and service support with reliable assistance",
+    "quickLinks": "Quick Links",
+    "home": "Home",
+    "services": "Services",
+    "about": "About Us",
+    "contacts": "Contacts",
+    "contact": "Address",
+    "address": "33, Block 11, Yunusabad district, Tashkent",
+    "rights": "ACLOGIC ALLIANCE. All rights reserved."
+  },
+  "about": {
+    "companyName": "\"ACLOGIC ALLIANCE\" LLC",
+    "addressTitle": "Address",
+    "address": "33, Block 11, Yunusabad district, Tashkent",
+    "phoneTitle": "Phone",
+    "bankTitle": "Bank details",
+    "account": "Account number",
+    "bank": "Bank",
+    "bankTitle2": "JSCB Hamkorbank, Yunusabad Branch",
+    "mfo": "Bank code",
+    "inn": "TIN",
+    "oked": "NACE"
+  },
+  "contact_title": "Didn’t find the product you need or still have questions?",
+  "name": "Name",
+  "phone": "Phone",
+  "message": "Message",
+  "send": "Send",
+  "sending": "Sending...",
+  "success_message": "Your message has been successfully sent!",
+  "please_fill_all_fields": "Please fill in all fields and make sure the phone number is correct",
+  "header": {
+    "more": "More",
+    "support": {
+      "title": "Technical Support",
+      "title-short": "Tech. Support",
+      "text": "If you have any questions or issues, our team is always ready to assist you"
+    },
+    "service": {
+      "title": "Our Services",
+      "text": "We provide convenient and reliable services tailored to each customer’s needs"
+    }
+  },
+  "nav": {
+    "no_results": "No results found",
+    "contact_admin": "Contact manager",
+    "catalog": "Catalog",
+    "search_products": "Search products",
+    "blog": "Blog",
+    "about": "About us",
+    "contact": "Contacts",
+    "main": "Home",
+    "service": "Services"
+  },
+  "products": {
+    "title": "Products",
+    "allProducts": "All Products"
+  },
+  "creat": "Created by EDev",
+  "filters": "Filter",
+  "min": "Minimal",
+  "max": "Maximal",
+  "clear": "Clear",
+  "price": "Price",
+  "uzs": "UZS",
+  "nothing_found": "Nothing found",
+  "try_changing_filters": "Try changing the filters.",
+  "clear_filters": "Clear filters",
+  "add_to_cart": "Add to Cart",
+  "characteristic": "Characteristics",
+  "description": "Description",
+  "product": {
+    "about": "About Product"
+  },
+  "basket": "Basket",
+  "allBasket": "Total",
+  "seeProducts": "View products",
+  "buy": "Buy",
+  "empty": "Cart is empty",
+  "info": "Enter your details",
+  "add_to_cart2": "added to cart",
+  "cancel": "Cancel",
+  "success": "Order sent successfully!",
+  "related_products": "Related Products"
+}
