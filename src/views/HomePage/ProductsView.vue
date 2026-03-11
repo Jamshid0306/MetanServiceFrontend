@@ -12,7 +12,6 @@ import {
   buildConfiguredBasketItem,
   formatPriceValue,
   getDefaultOptionSelections,
-  hasConfigurableOptions,
 } from "@/lib/productOptions";
 
 const router = useRouter();
@@ -27,9 +26,11 @@ const notification = ref({ show: false, message: "" });
 const formatPrice = (price) => formatPriceValue(price);
 
 onMounted(async () => {
-  // Mahsulotlar yuklanishini kutish
-  useLoaderStore().loader = true;
-  await productsStore.fetchProducts();
+  if (!productsStore.products.length) {
+    useLoaderStore().loader = true;
+    await productsStore.fetchProducts(200, 0);
+  }
+
   await nextTick();
   const observer = new IntersectionObserver(
     (entries) => {
@@ -47,11 +48,6 @@ onMounted(async () => {
   });
 });
 const handleClick = (product) => {
-  if (hasConfigurableOptions(product)) {
-    goToDetail(product.id);
-    return;
-  }
-
   const id = product.id;
   if (animating.value[id]) return;
   animating.value = { ...animating.value, [id]: true };
@@ -74,8 +70,7 @@ const goToDetail = (id) => {
   router.push({ name: "ProductDetail", params: { id } });
   productsStore.fetchProductDetail(id);
 };
-const actionLabel = (product) =>
-  hasConfigurableOptions(product) ? t("productOptions.choose") : t("add_to_cart");
+const actionLabel = () => t("add_to_cart");
 </script>
 
 <template>

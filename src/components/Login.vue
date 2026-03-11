@@ -101,7 +101,7 @@ const handleLogin = async () => {
   if (success) {
     router.push("/admin");
   } else {
-    alert("❌ Login yoki parol noto‘g‘ri!");
+    alert(adminStore.lastError || "❌ Login yoki parol noto‘g‘ri!");
   }
 };
 </script>

@@ -32,6 +32,37 @@ export const useBasketStore = defineStore("basket", {
         });
       }
     },
+    replaceBasketItem(oldKey, product) {
+      const sourceIndex = this.basket.findIndex((p) => resolveBasketKey(p) === oldKey);
+      if (sourceIndex === -1) return;
+
+      const basketKey = resolveBasketKey(product);
+      const nextQuantity = Number(product.quantity);
+      const safeQuantity = Number.isFinite(nextQuantity) && nextQuantity > 0 ? nextQuantity : 1;
+      const targetIndex = this.basket.findIndex(
+        (p, index) => index !== sourceIndex && resolveBasketKey(p) === basketKey
+      );
+
+      if (targetIndex !== -1) {
+        const mergedQuantity =
+          Number(this.basket[targetIndex]?.quantity || 0) + safeQuantity;
+        this.basket[targetIndex] = {
+          ...this.basket[targetIndex],
+          ...product,
+          basket_key: basketKey,
+          quantity: mergedQuantity,
+        };
+        this.basket.splice(sourceIndex, 1);
+        return;
+      }
+
+      this.basket[sourceIndex] = {
+        ...this.basket[sourceIndex],
+        ...product,
+        basket_key: basketKey,
+        quantity: safeQuantity,
+      };
+    },
 
     removeFromBasket(key) {
       this.basket = this.basket.filter((p) => resolveBasketKey(p) !== key);

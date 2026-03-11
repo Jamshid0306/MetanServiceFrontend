@@ -71,7 +71,7 @@ onBeforeUnmount(() => {
           @click="goToBasket"
           class="text-green-700 font-medium text-sm mt-2 hover:underline transition-colors"
         >
-          {{ t('add_to_cart') }} →
+          {{ t('go_to_basket') }} →
         </button>
       </div>
     </div>

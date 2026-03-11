@@ -14,11 +14,12 @@ import Pencil from "../../components/icons/Pencil.vue";
 import { useLoaderStore } from "@/store/loaderStore";
 import { resolveAssetUrl, resolveAssetUrls } from "@/lib/api";
 import {
-  PRODUCT_OPTION_GROUPS,
-  createEmptyOptionItem,
+  createEmptyCylinderVolumeItem,
+  createEmptyGenerationItem,
   createEmptyProductOptions,
+  createEmptyTransmissionItem,
   formatPriceValue,
-  getProductOptionGroups,
+  getProductOptionSummary,
   normalizeProductOptions,
   serializeProductOptions,
 } from "@/lib/productOptions";
@@ -37,37 +38,58 @@ const searchQuery = ref("");
 const currentPage = ref(1);
 const itemsPerPage = 6;
 
-const adminOptionGroups = PRODUCT_OPTION_GROUPS.map((group) => {
-  if (group.key === "transmission") {
-    return {
-      ...group,
-      title: "КПП",
-      hint: "Добавьте только доступные варианты: автомат, механика и т.д.",
-      choices: ["Avtomat", "Mexanika"],
-    };
-  }
-
-  if (group.key === "cylinder_volume") {
-    return {
-      ...group,
-      title: "Объем баллона",
-      hint: "Например: 75, 85, 90, 95.",
-      choices: ["50 l", "55 l", "60 l", "65 l", "70 l", "75 l", "80 l", "85 l", "90 l", "95 l", "100 l"],
-    };
-  }
-
-  return {
-    ...group,
-    title: "Позиция баллона",
-    hint: "Например: 2, 3, 4.",
-    choices: ["1", "2", "3", "4", "5"],
-  };
-});
+const TRANSMISSION_CHOICES = ["Avtomat", "Mexanika"];
+const GENERATION_CHOICES = ["2-avlod", "3-avlod", "4-avlod", "5-avlod"];
+const PROPAN_CYLINDER_VOLUME_CHOICES = [
+  "25 l",
+  "30 l",
+  "40 l",
+  "50 l",
+  "60 l",
+  "65 l",
+  "70 l",
+  "75 l",
+  "80 l",
+  "90 l",
+  "100 l",
+  "110 l",
+  "120 l",
+  "130 l",
+  "140 l",
+  "150 l",
+];
+const METAN_CYLINDER_VOLUME_CHOICES = [
+  "25 l",
+  "30 l",
+  "40 l",
+  "50 l",
+  "60 l",
+  "65 l",
+  "70 l",
+  "75 l",
+  "80 l",
+  "90 l",
+  "100 l",
+  "110 l",
+  "120 l",
+  "130 l",
+  "140 l",
+  "150 l",
+  "200 l",
+];
+const CYLINDER_VOLUME_CHOICES = [
+  ...new Set([
+    ...PROPAN_CYLINDER_VOLUME_CHOICES,
+    ...METAN_CYLINDER_VOLUME_CHOICES,
+  ]),
+];
+const CREDIT_MONTH_CHOICES = [3, 6, 9, 12];
 
 const createInitialProduct = () => ({
   price: "",
   credit_enabled: false,
-  credit_6m_percent: "",
+  credit_months: "3",
+  credit_percent: "",
   name: { uz: "", ru: "", en: "" },
   description: { uz: "", ru: "", en: "" },
   characteristic: { uz: "", ru: "", en: "" },
@@ -112,22 +134,124 @@ const formatNumericInput = (value) => {
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 };
 
+const formatOptionPriceInput = (value) =>
+  value === null || value === undefined || value === ""
+    ? ""
+    : formatNumericInput(value);
+
+const getProductCreditPercent = (product) => {
+  if (
+    product?.credit_percent !== null &&
+    product?.credit_percent !== undefined &&
+    String(product.credit_percent) !== ""
+  ) {
+    return product.credit_percent;
+  }
+
+  if (
+    product?.credit_6m_percent !== null &&
+    product?.credit_6m_percent !== undefined &&
+    String(product.credit_6m_percent) !== ""
+  ) {
+    return product.credit_6m_percent;
+  }
+
+  return null;
+};
+
+const getProductCreditMonths = (product) => {
+  if (
+    product?.credit_months !== null &&
+    product?.credit_months !== undefined &&
+    String(product.credit_months) !== ""
+  ) {
+    return product.credit_months;
+  }
+
+  return getProductCreditPercent(product) !== null ? 6 : null;
+};
+
+const resolveCylinderVolumeChoices = () => {
+  const searchableContent = [
+    newProduct.value.name?.uz,
+    newProduct.value.name?.ru,
+    newProduct.value.name?.en,
+    newProduct.value.description?.uz,
+    newProduct.value.description?.ru,
+    newProduct.value.description?.en,
+    newProduct.value.characteristic?.uz,
+    newProduct.value.characteristic?.ru,
+    newProduct.value.characteristic?.en,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (
+    searchableContent.includes("propan") ||
+    searchableContent.includes("пропан") ||
+    searchableContent.includes("lpg")
+  ) {
+    return PROPAN_CYLINDER_VOLUME_CHOICES;
+  }
+
+  if (
+    searchableContent.includes("metan") ||
+    searchableContent.includes("метан") ||
+    searchableContent.includes("methane") ||
+    searchableContent.includes("cng")
+  ) {
+    return METAN_CYLINDER_VOLUME_CHOICES;
+  }
+
+  return CYLINDER_VOLUME_CHOICES;
+};
+
+const withCurrentChoice = (choices, currentValue = "") => {
+  const nextChoices = [...choices];
+
+  if (currentValue && !nextChoices.includes(currentValue)) {
+    nextChoices.unshift(currentValue);
+  }
+
+  return nextChoices;
+};
+
+const mapCylinderVolumesForForm = (volumes = []) =>
+  volumes.map((volume) => ({
+    id: volume.id,
+    label: volume.label,
+    hidden: Boolean(volume.hidden),
+    price_delta: formatOptionPriceInput(volume.price_delta),
+  }));
+
+const mapGenerationsForForm = (generations = []) =>
+  generations.map((generation) => ({
+    id: generation.id,
+    label: generation.label,
+    hidden: Boolean(generation.hidden),
+    cylinder_volumes: mapCylinderVolumesForForm(generation.cylinder_volumes),
+  }));
+
 const mapOptionsForForm = (rawOptions) => {
   const normalized = normalizeProductOptions(rawOptions);
 
-  return adminOptionGroups.reduce((acc, group) => {
-    acc[group.key] = normalized[group.key].map((option) => ({
-      id: option.id,
-      label: option.label,
-      price_delta: option.price_delta ? formatNumericInput(option.price_delta) : "",
-    }));
-    return acc;
-  }, createEmptyProductOptions());
+  return {
+    ...createEmptyProductOptions(),
+    transmissions: normalized.transmissions.map((transmission) => ({
+      id: transmission.id,
+      label: transmission.label,
+      hidden: Boolean(transmission.hidden),
+      generations: mapGenerationsForForm(transmission.generations),
+    })),
+  };
 };
 
 const openUpdateModal = (product) => {
   isUpdate.value = true;
   currentProductId.value = product.id;
+  const creditMonths = getProductCreditMonths(product);
+  const creditPercent = getProductCreditPercent(product);
 
   // oldImages va imagePreviews
   const oldImages = product.images
@@ -158,10 +282,11 @@ const openUpdateModal = (product) => {
     price_en: product.price_en || "",
     price: priceType.value === "show" ? product.price_uz || "" : "",
     credit_enabled: Boolean(product.credit_enabled),
-    credit_6m_percent:
-      product.credit_6m_percent === null || product.credit_6m_percent === undefined
+    credit_months: creditMonths ? String(creditMonths) : "3",
+    credit_percent:
+      creditPercent === null || creditPercent === undefined
         ? ""
-        : formatNumericInput(product.credit_6m_percent),
+        : formatNumericInput(creditPercent),
     name: {
       uz: product.name_uz || "",
       ru: product.name_ru || "",
@@ -195,39 +320,86 @@ const resetForm = () => {
   priceType.value = "show";
 };
 
-const addOptionRow = (groupKey) => {
-  newProduct.value.options[groupKey].push(createEmptyOptionItem());
+const addTransmission = () => {
+  newProduct.value.options.transmissions.push(createEmptyTransmissionItem());
 };
 
-const removeOptionRow = (groupKey, index) => {
-  newProduct.value.options[groupKey].splice(index, 1);
+const removeTransmission = (transmissionIndex) => {
+  newProduct.value.options.transmissions.splice(transmissionIndex, 1);
 };
 
-const getGroupChoices = (groupKey, currentValue = "") => {
-  const group = adminOptionGroups.find((item) => item.key === groupKey);
-  const choices = Array.isArray(group?.choices) ? [...group.choices] : [];
+const addGeneration = (transmissionIndex) => {
+  newProduct.value.options.transmissions[transmissionIndex]?.generations.push(
+    createEmptyGenerationItem()
+  );
+};
 
-  if (currentValue && !choices.includes(currentValue)) {
-    choices.unshift(currentValue);
+const removeGeneration = (transmissionIndex, generationIndex) => {
+  newProduct.value.options.transmissions[transmissionIndex]?.generations.splice(
+    generationIndex,
+    1
+  );
+};
+
+const addCylinderVolume = (transmissionIndex, generationIndex) => {
+  newProduct.value.options.transmissions[transmissionIndex]?.generations[
+    generationIndex
+  ]?.cylinder_volumes.push(createEmptyCylinderVolumeItem());
+};
+
+const removeCylinderVolume = (transmissionIndex, generationIndex, volumeIndex) => {
+  newProduct.value.options.transmissions[transmissionIndex]?.generations[
+    generationIndex
+  ]?.cylinder_volumes.splice(volumeIndex, 1);
+};
+
+const onOptionLabelChange = (option) => {
+  if (option?.label?.trim()) {
+    option.hidden = false;
   }
-
-  return choices;
 };
 
-const isGroupChoiceDisabled = (groupKey, choice, currentIndex) =>
-  newProduct.value.options[groupKey].some(
-    (option, index) => index !== currentIndex && option.label === choice
-  );
-
-const onOptionPriceInput = (event, groupKey, index) => {
-  newProduct.value.options[groupKey][index].price_delta = formatNumericInput(
-    event.target.value
-  );
+const onCylinderPriceInput = (event, option) => {
+  option.price_delta = formatNumericInput(event.target.value);
+  if (option?.label?.trim()) {
+    option.hidden = false;
+  }
 };
 
 const onCreditPercentInput = (event) => {
-  newProduct.value.credit_6m_percent = formatNumericInput(event.target.value);
+  newProduct.value.credit_percent = formatNumericInput(event.target.value);
 };
+
+const getTransmissionChoices = (currentValue = "") =>
+  withCurrentChoice(TRANSMISSION_CHOICES, currentValue);
+
+const getGenerationChoices = (currentValue = "") =>
+  withCurrentChoice(GENERATION_CHOICES, currentValue);
+
+const getCylinderVolumeChoices = (currentValue = "") =>
+  withCurrentChoice(resolveCylinderVolumeChoices(), currentValue);
+
+const isTransmissionChoiceDisabled = (choice, currentIndex) =>
+  newProduct.value.options.transmissions.some(
+    (transmission, index) => index !== currentIndex && transmission.label === choice
+  );
+
+const isGenerationChoiceDisabled = (transmissionIndex, choice, currentIndex) =>
+  newProduct.value.options.transmissions[transmissionIndex]?.generations.some(
+    (generation, index) => index !== currentIndex && generation.label === choice
+  );
+
+const isCylinderVolumeChoiceDisabled = (
+  transmissionIndex,
+  generationIndex,
+  choice,
+  currentIndex
+) =>
+  newProduct.value.options.transmissions[transmissionIndex]?.generations[
+    generationIndex
+  ]?.cylinder_volumes.some(
+    (volume, index) => index !== currentIndex && volume.label === choice
+  );
 
 const addOrUpdateProduct = async () => {
   loading.value = true;
@@ -266,8 +438,12 @@ const addOrUpdateProduct = async () => {
 
   formData.append("credit_enabled", String(Boolean(newProduct.value.credit_enabled)));
   formData.append(
-    "credit_6m_percent",
-    newProduct.value.credit_enabled ? newProduct.value.credit_6m_percent || "" : ""
+    "credit_months",
+    newProduct.value.credit_enabled ? newProduct.value.credit_months || "" : ""
+  );
+  formData.append(
+    "credit_percent",
+    newProduct.value.credit_enabled ? newProduct.value.credit_percent || "" : ""
   );
 
   formData.append(
@@ -283,13 +459,19 @@ const addOrUpdateProduct = async () => {
   });
 
   try {
+    let isSuccess = false;
     if (isUpdate.value) {
-      await store.updateProduct(currentProductId.value, formData);
-      showNotification("Товар успешно обновлён!");
+      isSuccess = await store.updateProduct(currentProductId.value, formData);
+      if (isSuccess) {
+        showNotification("Товар успешно обновлён!");
+      }
     } else {
-      await store.createProduct(formData);
-      showNotification("Товар успешно добавлен!");
+      isSuccess = await store.createProduct(formData);
+      if (isSuccess) {
+        showNotification("Товар успешно добавлен!");
+      }
     }
+    if (!isSuccess) return;
     showModal.value = false;
     resetForm();
   } catch (err) {
@@ -300,7 +482,8 @@ const addOrUpdateProduct = async () => {
 };
 
 const deleteProduct = async () => {
-  await store.deleteProduct(currentProductId.value);
+  const isSuccess = await store.deleteProduct(currentProductId.value);
+  if (!isSuccess) return;
   showDeleteModal.value = false;
   showModal.value = false;
   resetForm();
@@ -329,7 +512,7 @@ watch(
   () => newProduct.value.credit_enabled,
   (enabled) => {
     if (!enabled) {
-      newProduct.value.credit_6m_percent = "";
+      newProduct.value.credit_percent = "";
     }
   }
 );
@@ -390,18 +573,41 @@ const goToPage = (page) => {
   currentPage.value = page;
 };
 
-const getProductOptionBadges = (product) =>
-  getProductOptionGroups(product).map((group) => ({
-    key: group.key,
-    title: adminOptionGroups.find((item) => item.key === group.key)?.title || group.key,
-    count: group.options.length,
-  }));
+const getProductOptionBadges = (product) => {
+  const summary = getProductOptionSummary(product);
+  const badges = [];
+
+  if (summary.transmissionCount) {
+    badges.push({
+      key: "transmission",
+      title: "КПП",
+      count: summary.transmissionCount,
+    });
+  }
+
+  if (summary.generationCount) {
+    badges.push({
+      key: "generation",
+      title: "Поколения",
+      count: summary.generationCount,
+    });
+  }
+
+  if (summary.cylinderVolumeCount) {
+    badges.push({
+      key: "cylinder_volume",
+      title: "Баллоны",
+      count: summary.cylinderVolumeCount,
+    });
+  }
+
+  return badges;
+};
 
 const hasCreditBadge = (product) =>
   Boolean(product.credit_enabled) &&
-  product.credit_6m_percent !== null &&
-  product.credit_6m_percent !== undefined &&
-  String(product.credit_6m_percent) !== "";
+  getProductCreditMonths(product) !== null &&
+  getProductCreditPercent(product) !== null;
 </script>
 <template>
   <div class="products-admin p-4 sm:p-6 space-y-6">
@@ -489,7 +695,7 @@ const hasCreditBadge = (product) =>
                 v-if="hasCreditBadge(product)"
                 class="product-badge product-badge-credit"
               >
-                Кредит: {{ product.credit_6m_percent }}%
+                Кредит: {{ getProductCreditMonths(product) }} мес. / {{ getProductCreditPercent(product) }}%
               </span>
             </div>
           </div>
@@ -557,7 +763,7 @@ const hasCreditBadge = (product) =>
           </div>
 
           <div class="editor-layout">
-            <div class="editor-panel editor-panel-accent">
+            <div class="editor-panel">
               <div class="space-y-2">
                 <label class="editor-label">Отображение цены</label>
               <select
@@ -582,7 +788,7 @@ const hasCreditBadge = (product) =>
                 <div>
                   <h3 class="editor-section-title">Кредит</h3>
                   <p class="editor-section-copy">
-                    Укажите ставку для 6 месяцев. Пользователь увидит расчёт на 3, 6, 9 и 12 месяцев.
+                    Включите кредит, выберите срок и укажите процент для этого товара.
                   </p>
                 </div>
               </div>
@@ -606,86 +812,258 @@ const hasCreditBadge = (product) =>
                 </button>
               </div>
 
-              <input
+              <div
                 v-if="newProduct.credit_enabled"
-                :value="newProduct.credit_6m_percent"
-                @input="onCreditPercentInput"
-                placeholder="6 oy uchun foiz, masalan 24"
-                class="editor-field"
-              />
+                class="grid gap-3 sm:grid-cols-2"
+              >
+                <select
+                  v-model="newProduct.credit_months"
+                  class="editor-field editor-select"
+                >
+                  <option
+                    v-for="months in CREDIT_MONTH_CHOICES"
+                    :key="months"
+                    :value="String(months)"
+                  >
+                    {{ months }} мес.
+                  </option>
+                </select>
+
+                <input
+                  :value="newProduct.credit_percent"
+                  @input="onCreditPercentInput"
+                  placeholder="Процент, например 24"
+                  class="editor-field"
+                />
+              </div>
             </div>
 
             <div class="editor-section space-y-4">
               <div class="editor-section-head">
                 <div>
                   <h3 class="editor-section-title">
-                    Варианты и доплата
+                    Варианты установки
                   </h3>
                   <p class="editor-section-copy">
-                    Добавьте только доступные категории для этого товара. Пользователь
-                    увидит только эти варианты, а цена посчитается автоматически.
+                    Сначала добавьте КПП, затем поколения ГБО, а цену указывайте
+                    только у конкретного баллона внутри выбранной ветки.
                   </p>
                 </div>
               </div>
 
-              <div
-                v-for="group in adminOptionGroups"
-                :key="group.key"
-                class="editor-option-group"
-              >
+              <div class="editor-option-group space-y-4">
                 <div class="editor-option-head">
                   <div>
-                    <h4 class="editor-option-title">{{ group.title }}</h4>
-                    <p class="editor-option-copy">{{ group.hint }}</p>
+                    <h4 class="editor-option-title">КПП</h4>
+                    <p class="editor-option-copy">
+                      Например: автомат и механика. Здесь только структура веток,
+                      без отдельной цены.
+                    </p>
                   </div>
                   <button
                     type="button"
-                    @click="addOptionRow(group.key)"
+                    @click="addTransmission"
                     class="editor-secondary-btn"
                   >
-                    Добавить
+                    Добавить КПП
                   </button>
                 </div>
 
                 <div
-                  v-if="!newProduct.options[group.key].length"
+                  v-if="!newProduct.options.transmissions.length"
                   class="editor-empty-state"
                 >
-                  Варианты ещё не добавлены.
+                  Ветки КПП ещё не добавлены.
                 </div>
 
                 <div
-                  v-for="(option, index) in newProduct.options[group.key]"
-                  :key="option.id"
-                  class="editor-option-row"
+                  v-for="(transmission, transmissionIndex) in newProduct.options.transmissions"
+                  :key="transmission.id"
+                  class="editor-option-group space-y-4"
                 >
-                  <select
-                    v-model="option.label"
-                    class="editor-field editor-select"
-                  >
-                    <option value="" disabled>Выберите вариант</option>
-                    <option
-                      v-for="choice in getGroupChoices(group.key, option.label)"
-                      :key="choice"
-                      :value="choice"
-                      :disabled="isGroupChoiceDisabled(group.key, choice, index)"
+                  <div class="editor-option-head">
+                    <div>
+                      <h4 class="editor-option-title">
+                        КПП {{ transmissionIndex + 1 }}
+                      </h4>
+                      <p class="editor-option-copy">
+                        Выберите тип КПП для этой ветки.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      @click="removeTransmission(transmissionIndex)"
+                      class="editor-remove-btn"
                     >
-                      {{ choice }}
-                    </option>
-                  </select>
-                  <input
-                    :value="option.price_delta"
-                    @input="onOptionPriceInput($event, group.key, index)"
-                    placeholder="+0 UZS"
-                    class="editor-field"
-                  />
-                  <button
-                    type="button"
-                    @click="removeOptionRow(group.key, index)"
-                    class="editor-remove-btn"
-                  >
-                    ×
-                  </button>
+                      ×
+                    </button>
+                  </div>
+
+                  <div class="editor-option-row editor-option-row-single">
+                    <select
+                      v-model="transmission.label"
+                      class="editor-field editor-select"
+                      @change="onOptionLabelChange(transmission)"
+                    >
+                      <option value="" disabled>Выберите КПП</option>
+                      <option
+                        v-for="choice in getTransmissionChoices(transmission.label)"
+                        :key="choice"
+                        :value="choice"
+                        :disabled="isTransmissionChoiceDisabled(choice, transmissionIndex)"
+                      >
+                        {{ choice }}
+                      </option>
+                    </select>
+                  </div>
+
+                  <div class="space-y-4">
+                    <div class="editor-option-head">
+                      <div>
+                        <h4 class="editor-option-title">Поколения ГБО</h4>
+                        <p class="editor-option-copy">
+                          Выберите доступные поколения для этой КПП. Отдельную цену
+                          здесь указывать не нужно.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        @click="addGeneration(transmissionIndex)"
+                        class="editor-secondary-btn"
+                      >
+                        Добавить поколение
+                      </button>
+                    </div>
+
+                    <div
+                      v-if="!transmission.generations.length"
+                      class="editor-empty-state"
+                    >
+                      Поколения для этой КПП ещё не добавлены.
+                    </div>
+
+                    <div
+                      v-for="(generation, generationIndex) in transmission.generations"
+                      :key="generation.id"
+                      class="editor-option-group space-y-4"
+                    >
+                      <div class="editor-option-head">
+                        <div>
+                          <h4 class="editor-option-title">
+                            Поколение {{ generationIndex + 1 }}
+                          </h4>
+                          <p class="editor-option-copy">
+                            Выберите поколение ГБО для текущей ветки.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          @click="removeGeneration(transmissionIndex, generationIndex)"
+                          class="editor-remove-btn"
+                        >
+                          ×
+                        </button>
+                      </div>
+
+                      <div class="editor-option-row editor-option-row-single">
+                        <select
+                          v-model="generation.label"
+                          class="editor-field editor-select"
+                          @change="onOptionLabelChange(generation)"
+                        >
+                          <option value="" disabled>Выберите поколение</option>
+                          <option
+                            v-for="choice in getGenerationChoices(generation.label)"
+                            :key="choice"
+                            :value="choice"
+                            :disabled="
+                              isGenerationChoiceDisabled(
+                                transmissionIndex,
+                                choice,
+                                generationIndex
+                              )
+                            "
+                          >
+                            {{ choice }}
+                          </option>
+                        </select>
+                      </div>
+
+                      <div class="space-y-4">
+                        <div class="editor-option-head">
+                          <div>
+                            <h4 class="editor-option-title">Размеры баллона</h4>
+                            <p class="editor-option-copy">
+                              Для каждого размера в этой ветке укажите цену баллона.
+                              Именно эта цена будет влиять на итоговую стоимость.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            @click="addCylinderVolume(transmissionIndex, generationIndex)"
+                            class="editor-secondary-btn"
+                          >
+                            Добавить размер
+                          </button>
+                        </div>
+
+                        <div
+                          v-if="!generation.cylinder_volumes.length"
+                          class="editor-empty-state"
+                        >
+                          Размеры баллона ещё не добавлены.
+                        </div>
+
+                        <div
+                          v-for="(volume, volumeIndex) in generation.cylinder_volumes"
+                          :key="volume.id"
+                          class="editor-option-row"
+                        >
+                          <select
+                            v-model="volume.label"
+                            class="editor-field editor-select"
+                            @change="onOptionLabelChange(volume)"
+                          >
+                            <option value="" disabled>Выберите размер баллона</option>
+                            <option
+                              v-for="choice in getCylinderVolumeChoices(volume.label)"
+                              :key="choice"
+                              :value="choice"
+                              :disabled="
+                                isCylinderVolumeChoiceDisabled(
+                                  transmissionIndex,
+                                  generationIndex,
+                                  choice,
+                                  volumeIndex
+                                )
+                              "
+                            >
+                              {{ choice }}
+                            </option>
+                          </select>
+                          <input
+                            :value="volume.price_delta"
+                            @input="onCylinderPriceInput($event, volume)"
+                            placeholder="0 UZS"
+                            class="editor-field"
+                          />
+                          <button
+                            type="button"
+                            @click="
+                              removeCylinderVolume(
+                                transmissionIndex,
+                                generationIndex,
+                                volumeIndex
+                              )
+                            "
+                            class="editor-remove-btn"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1099,22 +1477,20 @@ const hasCreditBadge = (product) =>
 }
 
 .editor-overlay {
-  padding: 1rem;
+  padding: 1.25rem;
   background: rgba(7, 19, 43, 0.44);
   backdrop-filter: blur(10px);
 }
 
 .editor-modal {
-  width: min(1040px, 100%);
-  max-height: 90vh;
+  width: min(1320px, 96vw);
+  max-height: 94vh;
   overflow-y: auto;
-  border-radius: 30px;
-  border: 1px solid rgba(20, 54, 108, 0.12);
-  background:
-    radial-gradient(circle at top left, rgba(35, 95, 179, 0.08), transparent 24%),
-    linear-gradient(180deg, #f9fbff 0%, #f2f6fb 100%);
-  box-shadow: 0 28px 60px rgba(6, 24, 58, 0.28);
-  padding: 1.2rem;
+  border-radius: 24px;
+  border: 1px solid rgba(20, 54, 108, 0.08);
+  background: #f6f8fb;
+  box-shadow: 0 28px 60px rgba(6, 24, 58, 0.22);
+  padding: 1.5rem;
   color: #1b355f;
 }
 
@@ -1154,32 +1530,27 @@ const hasCreditBadge = (product) =>
 
 .editor-layout {
   display: grid;
-  grid-template-columns: 0.98fr 1.02fr;
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1.15fr) minmax(380px, 0.85fr);
+  gap: 1.25rem;
+  align-items: start;
 }
 
 .editor-panel {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  padding: 1rem;
-  border-radius: 24px;
-  border: 1px solid rgba(20, 54, 108, 0.1);
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 18px 30px rgba(8, 30, 72, 0.06);
-}
-
-.editor-panel-accent {
-  background:
-    linear-gradient(180deg, rgba(248, 251, 255, 0.96), rgba(241, 246, 255, 0.92)),
-    #ffffff;
+  padding: 1.25rem;
+  border-radius: 20px;
+  border: 1px solid rgba(20, 54, 108, 0.08);
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(8, 30, 72, 0.05);
 }
 
 .editor-section {
   padding: 1rem;
-  border-radius: 20px;
+  border-radius: 18px;
   border: 1px solid rgba(20, 54, 108, 0.08);
-  background: #f8fbff;
+  background: #f8fafc;
 }
 
 .editor-section-head {
@@ -1255,10 +1626,10 @@ const hasCreditBadge = (product) =>
 }
 
 .editor-option-group {
-  padding: 0.9rem;
-  border-radius: 20px;
+  padding: 1rem;
+  border-radius: 18px;
   border: 1px solid rgba(20, 54, 108, 0.08);
-  background: rgba(255, 255, 255, 0.94);
+  background: #ffffff;
 }
 
 .editor-option-head {
@@ -1288,9 +1659,37 @@ const hasCreditBadge = (product) =>
   margin-top: 0.75rem;
 }
 
+.editor-option-row-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.editor-delete-btn,
+.editor-secondary-btn,
+.editor-remove-btn,
+.credit-toggle-btn,
+.language-btn,
+.editor-image-remove,
+.editor-cancel-btn,
+.editor-submit-btn {
+  appearance: none;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.15;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  -webkit-text-fill-color: currentColor;
+  opacity: 1;
+  cursor: pointer;
+}
+
 .editor-secondary-btn {
-  min-width: 112px;
+  width: max-content;
+  min-width: max-content;
   height: 42px;
+  padding: 0 1rem;
   border-radius: 14px;
   background: #173c74;
   color: #ffffff;
@@ -1339,7 +1738,8 @@ const hasCreditBadge = (product) =>
 }
 
 .credit-toggle-btn {
-  min-width: 110px;
+  width: max-content;
+  min-width: max-content;
   height: 40px;
   padding: 0 1rem;
   border-radius: 999px;
@@ -1358,7 +1758,8 @@ const hasCreditBadge = (product) =>
 }
 
 .language-btn {
-  min-width: 62px;
+  width: max-content;
+  min-width: max-content;
   height: 40px;
   padding: 0 1rem;
   border-radius: 999px;
@@ -1414,9 +1815,6 @@ const hasCreditBadge = (product) =>
   border-radius: 999px;
   background: rgba(14, 27, 53, 0.66);
   color: #ffffff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   font-size: 1rem;
 }
 
@@ -1428,12 +1826,14 @@ const hasCreditBadge = (product) =>
   gap: 0.75rem;
   margin-top: 1rem;
   padding-top: 1rem;
-  background: linear-gradient(180deg, rgba(249, 251, 255, 0), rgba(249, 251, 255, 0.9) 24%, #f9fbff 100%);
+  background: linear-gradient(180deg, rgba(246, 248, 251, 0), rgba(246, 248, 251, 0.92) 26%, #f6f8fb 100%);
 }
 
 .editor-cancel-btn,
 .editor-submit-btn {
-  min-width: 150px;
+  width: max-content;
+  min-width: max-content;
+  padding: 0 1.15rem;
   height: 48px;
   border-radius: 16px;
   font-weight: 700;
@@ -1524,8 +1924,9 @@ const hasCreditBadge = (product) =>
   }
 
   .editor-modal {
+    width: min(100%, 100%);
     padding: 1rem;
-    border-radius: 24px;
+    border-radius: 20px;
   }
 
   .editor-header {
@@ -1542,11 +1943,12 @@ const hasCreditBadge = (product) =>
 
   .editor-footer {
     flex-direction: column-reverse;
+    align-items: flex-end;
   }
 
   .editor-cancel-btn,
   .editor-submit-btn {
-    width: 100%;
+    width: max-content;
   }
 
   .language-switcher {
@@ -1560,11 +1962,11 @@ const hasCreditBadge = (product) =>
   }
 
   .language-btn {
-    flex: 1;
+    flex: 0 0 auto;
   }
 
   .credit-toggle-btn {
-    flex: 1;
+    flex: 0 0 auto;
   }
 }
 </style>

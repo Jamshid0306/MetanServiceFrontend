@@ -15,12 +15,12 @@ import {
   calculateCreditPlan,
   buildConfiguredBasketItem,
   calculateConfiguredPrice,
-  CREDIT_MONTH_OPTIONS,
+  ensureValidOptionSelections,
   formatPriceValue,
   getDefaultOptionSelections,
+  getCreditConfig,
   getProductOptionGroups,
   hasCreditPricing,
-  hasConfigurableOptions,
 } from "@/lib/productOptions";
 
 const router = useRouter();
@@ -34,7 +34,6 @@ const animating = ref({});
 const showCheck = ref({});
 const quantity = ref(1);
 const activeTab = ref("description");
-const selectedCreditMonths = ref(6);
 const relatedProductRefs = ref([]);
 const swiperRef = ref(null);
 const notification = ref({ show: false, message: "" });
@@ -72,22 +71,24 @@ const handleAddToBasket = () => {
 const normalizeImages = (images) => resolveAssetUrls(images);
 
 const images = computed(() => normalizeImages(store.product?.images || []));
-const optionGroups = computed(() => getProductOptionGroups(store.product));
+const optionGroups = computed(() =>
+  getProductOptionGroups(store.product, selectedOptions.value)
+);
 const selectedPrice = computed(() =>
   calculateConfiguredPrice(store.product, locale.value, selectedOptions.value)
 );
-const creditPlans = computed(() => {
-  if (!hasCreditPricing(store.product)) {
-    return [];
+const creditConfig = computed(() => getCreditConfig(store.product));
+const selectedCreditPlan = computed(() => {
+  if (!hasCreditPricing(store.product) || !creditConfig.value) {
+    return null;
   }
 
-  return CREDIT_MONTH_OPTIONS.map((months) =>
-    calculateCreditPlan(selectedPrice.value, store.product?.credit_6m_percent, months)
-  ).filter(Boolean);
+  return calculateCreditPlan(
+    selectedPrice.value,
+    creditConfig.value.percent,
+    creditConfig.value.months
+  );
 });
-const selectedCreditPlan = computed(
-  () => creditPlans.value.find((plan) => plan.months === selectedCreditMonths.value) || null
-);
 
 const relatedProducts = computed(() => {
   const list = Array.isArray(store.products) ? store.products : [];
@@ -108,17 +109,7 @@ onMounted(async () => {
 });
 
 const syncSelectedOptions = () => {
-  const nextSelections = {};
-
-  optionGroups.value.forEach((group) => {
-    const currentValue = selectedOptions.value[group.key];
-    const hasCurrentValue = group.options.some((option) => option.id === currentValue);
-    nextSelections[group.key] = hasCurrentValue
-      ? currentValue
-      : group.options[0]?.id || "";
-  });
-
-  selectedOptions.value = nextSelections;
+  selectedOptions.value = ensureValidOptionSelections(store.product, selectedOptions.value);
 };
 
 const fetchProductData = async (id) => {
@@ -135,7 +126,6 @@ const fetchProductData = async (id) => {
   syncSelectedOptions();
   quantity.value = 1;
   activeTab.value = "description";
-  selectedCreditMonths.value = 6;
 
   await nextTick();
   const observer = new IntersectionObserver(
@@ -155,6 +145,12 @@ const fetchProductData = async (id) => {
   });
 };
 const formatPrice = (price) => formatPriceValue(price);
+const selectOption = (groupKey, optionId) => {
+  selectedOptions.value = ensureValidOptionSelections(store.product, {
+    ...selectedOptions.value,
+    [groupKey]: optionId,
+  });
+};
 const goToDetail = (id) => {
   useLoaderStore().loader = true;
   router.push({ name: "ProductDetail", params: { id } });
@@ -166,11 +162,6 @@ onMounted(() => {
 });
 
 const handleClick = (product) => {
-  if (hasConfigurableOptions(product)) {
-    goToDetail(product.id);
-    return;
-  }
-
   const id = product.id;
   if (animating.value[id]) return;
   animating.value = { ...animating.value, [id]: true };
@@ -184,8 +175,7 @@ const handleClick = (product) => {
   );
 };
 
-const relatedActionLabel = (product) =>
-  hasConfigurableOptions(product) ? t("productOptions.choose") : t("add_to_cart");
+const relatedActionLabel = () => t("add_to_cart");
 </script>
 
 <template>
@@ -278,7 +268,7 @@ const relatedActionLabel = (product) =>
                   v-for="option in group.options"
                   :key="option.id"
                   type="button"
-                  @click="selectedOptions[group.key] = option.id"
+                  @click="selectOption(group.key, option.id)"
                   class="detail-option"
                   :class="
                     selectedOptions[group.key] === option.id
@@ -287,7 +277,10 @@ const relatedActionLabel = (product) =>
                   "
                 >
                   <span>{{ option.label }}</span>
-                  <span class="text-xs font-medium text-slate-500">
+                  <span
+                    v-if="group.key === 'cylinder_volume'"
+                    class="text-xs font-medium text-slate-500"
+                  >
                     {{
                       option.price_delta
                         ? `+${formatPrice(option.price_delta)}`
@@ -300,7 +293,7 @@ const relatedActionLabel = (product) =>
           </div>
 
           <div
-            v-if="creditPlans.length"
+            v-if="selectedCreditPlan && creditConfig"
             class="credit-card"
           >
             <div class="credit-card-head">
@@ -308,24 +301,14 @@ const relatedActionLabel = (product) =>
                 <p class="credit-kicker">{{ t("credit.title") }}</p>
                 <h3 class="credit-heading">{{ t("credit.subtitle") }}</h3>
               </div>
-              <div class="credit-rate-pill">
-                {{ t("credit.sixMonthRate") }}: {{ store.product.credit_6m_percent }}%
+              <div class="credit-pill-group">
+                <div class="credit-rate-pill">
+                  {{ creditConfig.percent }}%
+                </div>
+                <div class="credit-rate-pill">
+                  {{ creditConfig.months }} {{ t("credit.months") }}
+                </div>
               </div>
-            </div>
-
-            <div class="credit-months">
-              <button
-                v-for="plan in creditPlans"
-                :key="plan.months"
-                type="button"
-                class="credit-month-btn"
-                :class="{
-                  'credit-month-btn-active': selectedCreditMonths === plan.months,
-                }"
-                @click="selectedCreditMonths = plan.months"
-              >
-                {{ plan.months }} {{ t("credit.months") }}
-              </button>
             </div>
 
             <div v-if="selectedCreditPlan" class="credit-summary">
@@ -672,38 +655,10 @@ const relatedActionLabel = (product) =>
   font-weight: 700;
 }
 
-.credit-months {
+.credit-pill-group {
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
-}
-
-.credit-month-btn {
-  min-width: 74px;
-  height: 42px;
-  padding: 0 1rem;
-  border-radius: 999px;
-  border: 1px solid rgba(34, 108, 73, 0.12);
-  background: rgba(255, 255, 255, 0.9);
-  color: #4c6d5d;
-  font-weight: 700;
-  transition:
-    border-color 0.2s ease,
-    background 0.2s ease,
-    color 0.2s ease,
-    transform 0.2s ease;
-}
-
-.credit-month-btn:hover {
-  transform: translateY(-1px);
-  border-color: rgba(34, 108, 73, 0.2);
-}
-
-.credit-month-btn-active {
-  background: #226c49;
-  border-color: transparent;
-  color: #ffffff;
-  box-shadow: 0 12px 20px rgba(34, 108, 73, 0.2);
 }
 
 .credit-summary {

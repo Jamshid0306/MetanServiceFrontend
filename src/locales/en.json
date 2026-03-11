@@ -72,6 +72,7 @@
   "add_to_cart": "Add to Cart",
   "characteristic": "Characteristics",
   "description": "Description",
+  "go_to_basket": "Go to basket",
   "product": {
     "about": "About Product"
   },
@@ -81,6 +82,7 @@
     "included": "Included",
     "selectionHelp": "Choose the right option",
     "transmission": "Transmission",
+    "generation": "LPG generation",
     "cylinderVolume": "Cylinder volume",
     "cylinderPosition": "Cylinder position"
   },
@@ -97,6 +99,9 @@
   "allBasket": "Total",
   "seeProducts": "View products",
   "buy": "Buy",
+  "checkout": "Place order",
+  "checkout_subtitle": "Configure items in the basket and leave your contact details",
+  "basket_options_title": "Additional information and choices",
   "empty": "Cart is empty",
   "info": "Enter your details",
   "add_to_cart2": "added to cart",

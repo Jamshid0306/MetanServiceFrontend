@@ -14,7 +14,6 @@ import {
   buildConfiguredBasketItem,
   formatPriceValue,
   getDefaultOptionSelections,
-  hasConfigurableOptions,
 } from "@/lib/productOptions";
 
 const route = useRoute();
@@ -104,11 +103,6 @@ const clearFilters = () => {
 };
 
 const handleClick = (product) => {
-  if (hasConfigurableOptions(product)) {
-    goToDetail(product.id);
-    return;
-  }
-
   const id = product.id;
   if (animating.value[id]) return;
 
@@ -167,8 +161,7 @@ const goToDetail = (id) => {
 };
 
 const formatPrice = (price) => formatPriceValue(price);
-const actionLabel = (product) =>
-  hasConfigurableOptions(product) ? t("productOptions.choose") : t("add_to_cart");
+const actionLabel = () => t("add_to_cart");
 
 watch(locale, () => {
   syncPriceBounds();
