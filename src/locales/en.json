@@ -81,6 +81,7 @@
     "totalPrice": "Configured price",
     "included": "Included",
     "selectionHelp": "Choose the right option",
+    "fuelType": "Fuel type",
     "transmission": "Transmission",
     "generation": "LPG generation",
     "cylinderVolume": "Cylinder volume",

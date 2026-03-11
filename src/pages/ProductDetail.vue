@@ -18,7 +18,7 @@ import {
   ensureValidOptionSelections,
   formatPriceValue,
   getDefaultOptionSelections,
-  getCreditConfig,
+  getCreditPlans,
   getProductOptionGroups,
   hasCreditPricing,
 } from "@/lib/productOptions";
@@ -38,6 +38,7 @@ const relatedProductRefs = ref([]);
 const swiperRef = ref(null);
 const notification = ref({ show: false, message: "" });
 const selectedOptions = ref({});
+const selectedCreditMonths = ref(null);
 let swiperInstance = null;
 
 const goToSlide = (index) => {
@@ -77,16 +78,22 @@ const optionGroups = computed(() =>
 const selectedPrice = computed(() =>
   calculateConfiguredPrice(store.product, locale.value, selectedOptions.value)
 );
-const creditConfig = computed(() => getCreditConfig(store.product));
+const creditPlans = computed(() => getCreditPlans(store.product));
+const selectedCreditConfig = computed(
+  () =>
+    creditPlans.value.find(
+      (plan) => plan.months === Number(selectedCreditMonths.value)
+    ) || creditPlans.value[0] || null
+);
 const selectedCreditPlan = computed(() => {
-  if (!hasCreditPricing(store.product) || !creditConfig.value) {
+  if (!hasCreditPricing(store.product) || !selectedCreditConfig.value) {
     return null;
   }
 
   return calculateCreditPlan(
     selectedPrice.value,
-    creditConfig.value.percent,
-    creditConfig.value.months
+    selectedCreditConfig.value.percent,
+    selectedCreditConfig.value.months
   );
 });
 
@@ -102,6 +109,17 @@ watch(
       await fetchProductData(Number(newId));
     }
   }
+);
+
+watch(
+  creditPlans,
+  (plans) => {
+    const currentMonths = Number(selectedCreditMonths.value);
+    if (!plans.some((plan) => plan.months === currentMonths)) {
+      selectedCreditMonths.value = plans[0]?.months ?? null;
+    }
+  },
+  { immediate: true }
 );
 
 onMounted(async () => {
@@ -293,7 +311,7 @@ const relatedActionLabel = () => t("add_to_cart");
           </div>
 
           <div
-            v-if="selectedCreditPlan && creditConfig"
+            v-if="selectedCreditPlan && selectedCreditConfig"
             class="credit-card"
           >
             <div class="credit-card-head">
@@ -303,12 +321,35 @@ const relatedActionLabel = () => t("add_to_cart");
               </div>
               <div class="credit-pill-group">
                 <div class="credit-rate-pill">
-                  {{ creditConfig.percent }}%
+                  {{ selectedCreditConfig.percent }}%
                 </div>
                 <div class="credit-rate-pill">
-                  {{ creditConfig.months }} {{ t("credit.months") }}
+                  {{ selectedCreditConfig.months }} {{ t("credit.months") }}
                 </div>
               </div>
+            </div>
+
+            <div
+              v-if="creditPlans.length"
+              class="credit-plan-switcher"
+            >
+              <button
+                v-for="plan in creditPlans"
+                :key="`${plan.months}-${plan.percent}`"
+                type="button"
+                class="credit-plan-btn"
+                :class="
+                  selectedCreditConfig?.months === plan.months
+                    ? 'credit-plan-btn-active'
+                    : ''
+                "
+                @click="selectedCreditMonths = plan.months"
+              >
+                <span>
+                  {{ plan.months }} {{ t("credit.months") }}
+                </span>
+                <strong>+{{ plan.percent }}%</strong>
+              </button>
             </div>
 
             <div v-if="selectedCreditPlan" class="credit-summary">
@@ -652,6 +693,41 @@ const relatedActionLabel = () => t("add_to_cart");
   gap: 0.6rem;
 }
 
+.credit-plan-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.credit-plan-btn {
+  border: 1px solid rgba(24, 71, 55, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.7);
+  color: #315646;
+  padding: 0.7rem 0.9rem;
+  min-width: 128px;
+  display: grid;
+  gap: 0.2rem;
+  text-align: left;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.credit-plan-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(24, 71, 55, 0.2);
+}
+
+.credit-plan-btn-active {
+  background: #1f3a31;
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 14px 26px rgba(24, 71, 55, 0.18);
+}
+
 .credit-summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -836,15 +912,12 @@ const relatedActionLabel = () => t("add_to_cart");
 
 .related-media {
   position: relative;
-  min-height: 150px;
+  min-height: 170px;
+  height: 170px;
   border-radius: 16px;
   border: 1px solid rgba(20, 35, 56, 0.08);
   background: #f3f5f7;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   overflow: hidden;
-  padding: 12px;
 }
 
 .related-chip {
@@ -861,10 +934,9 @@ const relatedActionLabel = () => t("add_to_cart");
 
 .related-image {
   width: 100%;
-  max-width: 128px;
   height: 100%;
-  max-height: 128px;
-  object-fit: contain;
+  display: block;
+  object-fit: cover;
   transition: transform 0.45s ease;
 }
 
@@ -979,6 +1051,10 @@ const relatedActionLabel = () => t("add_to_cart");
 
   .credit-rate-pill {
     width: fit-content;
+  }
+
+  .credit-plan-btn {
+    width: 100%;
   }
 
   .credit-summary {

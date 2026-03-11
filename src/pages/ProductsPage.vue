@@ -361,23 +361,19 @@ onMounted(async () => {
 }
 
 .catalog-media {
-  min-height: 126px;
+  min-height: 170px;
+  height: 170px;
   border-radius: 16px;
   border: 1px solid rgba(20, 35, 56, 0.08);
   background: #f3f5f7;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   overflow: hidden;
-  padding: 10px;
 }
 
 .catalog-image {
   width: 100%;
-  max-width: 128px;
   height: 100%;
-  max-height: 128px;
-  object-fit: contain;
+  display: block;
+  object-fit: cover;
   transition: transform 0.45s ease;
 }
 

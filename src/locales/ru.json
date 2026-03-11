@@ -73,6 +73,7 @@
     "totalPrice": "Цена по выбору",
     "included": "Входит в цену",
     "selectionHelp": "Выберите подходящий вариант",
+    "fuelType": "Тип топлива",
     "transmission": "КПП",
     "generation": "Поколение ГБО",
     "cylinderVolume": "Объем баллона",

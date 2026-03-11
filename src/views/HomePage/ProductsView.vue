@@ -237,14 +237,12 @@ const actionLabel = () => t("add_to_cart");
 
 .product-media {
   position: relative;
-  min-height: 150px;
+  min-height: 170px;
+  height: 170px;
   border-radius: 16px;
   border: 1px solid rgba(20, 35, 56, 0.08);
   background: #f3f5f7;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 14px;
+  overflow: hidden;
 }
 
 .product-chip {
@@ -261,10 +259,9 @@ const actionLabel = () => t("add_to_cart");
 
 .product-image {
   width: 100%;
-  max-width: 140px;
   height: 100%;
-  max-height: 130px;
-  object-fit: contain;
+  display: block;
+  object-fit: cover;
   transition: transform 0.45s ease;
 }
 

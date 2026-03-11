@@ -14,11 +14,14 @@ import Pencil from "../../components/icons/Pencil.vue";
 import { useLoaderStore } from "@/store/loaderStore";
 import { resolveAssetUrl, resolveAssetUrls } from "@/lib/api";
 import {
+  createEmptyCreditPlan,
   createEmptyCylinderVolumeItem,
+  createEmptyFuelTypeItem,
   createEmptyGenerationItem,
   createEmptyProductOptions,
   createEmptyTransmissionItem,
   formatPriceValue,
+  getCreditPlans,
   getProductOptionSummary,
   normalizeProductOptions,
   serializeProductOptions,
@@ -37,6 +40,7 @@ const searchQuery = ref("");
 const currentPage = ref(1);
 const itemsPerPage = 6;
 
+const FUEL_TYPE_CHOICES = ["Metan", "Propan"];
 const TRANSMISSION_CHOICES = ["Avtomat", "Mexanika"];
 const GENERATION_CHOICES = ["2-avlod", "3-avlod", "4-avlod", "5-avlod"];
 const PROPAN_CYLINDER_VOLUME_CHOICES = [
@@ -86,8 +90,7 @@ const CREDIT_MONTH_CHOICES = [3, 6, 9, 12];
 
 const createInitialProduct = () => ({
   credit_enabled: false,
-  credit_months: "3",
-  credit_percent: "",
+  credit_plans: [createEmptyCreditPlan()],
   name: { uz: "", ru: "", en: "" },
   description: { uz: "", ru: "", en: "" },
   characteristic: { uz: "", ru: "", en: "" },
@@ -138,27 +141,33 @@ const formatOptionPriceInput = (value) =>
     : formatNumericInput(value);
 
 const getMinimumOptionPrice = (rawOptions) => {
-  const transmissions = Array.isArray(rawOptions?.transmissions) ? rawOptions.transmissions : [];
+  const fuelTypes = Array.isArray(rawOptions?.fuel_types) ? rawOptions.fuel_types : [];
   let minimumPrice = null;
 
-  transmissions.forEach((transmission) => {
-    const generations = Array.isArray(transmission?.generations)
-      ? transmission.generations
+  fuelTypes.forEach((fuelType) => {
+    const transmissions = Array.isArray(fuelType?.transmissions)
+      ? fuelType.transmissions
       : [];
 
-    generations.forEach((generation) => {
-      const cylinderVolumes = Array.isArray(generation?.cylinder_volumes)
-        ? generation.cylinder_volumes
+    transmissions.forEach((transmission) => {
+      const generations = Array.isArray(transmission?.generations)
+        ? transmission.generations
         : [];
 
-      cylinderVolumes.forEach((volume) => {
-        const numericPrice = Number(String(volume?.price_delta || "").replace(/[^\d]/g, ""));
-        if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
-          return;
-        }
+      generations.forEach((generation) => {
+        const cylinderVolumes = Array.isArray(generation?.cylinder_volumes)
+          ? generation.cylinder_volumes
+          : [];
 
-        minimumPrice =
-          minimumPrice === null ? numericPrice : Math.min(minimumPrice, numericPrice);
+        cylinderVolumes.forEach((volume) => {
+          const numericPrice = Number(String(volume?.price_delta || "").replace(/[^\d]/g, ""));
+          if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
+            return;
+          }
+
+          minimumPrice =
+            minimumPrice === null ? numericPrice : Math.min(minimumPrice, numericPrice);
+        });
       });
     });
   });
@@ -166,49 +175,38 @@ const getMinimumOptionPrice = (rawOptions) => {
   return minimumPrice;
 };
 
-const getProductCreditPercent = (product) => {
-  if (
-    product?.credit_percent !== null &&
-    product?.credit_percent !== undefined &&
-    String(product.credit_percent) !== ""
-  ) {
-    return product.credit_percent;
+const mapCreditPlansForForm = (product) => {
+  const creditPlans = getCreditPlans(product);
+
+  if (!creditPlans.length) {
+    return [createEmptyCreditPlan()];
   }
 
-  if (
-    product?.credit_6m_percent !== null &&
-    product?.credit_6m_percent !== undefined &&
-    String(product.credit_6m_percent) !== ""
-  ) {
-    return product.credit_6m_percent;
-  }
-
-  return null;
+  return creditPlans.map((plan) => ({
+    ...createEmptyCreditPlan(plan.months),
+    months: String(plan.months),
+    percent: formatNumericInput(plan.percent),
+  }));
 };
 
-const getProductCreditMonths = (product) => {
-  if (
-    product?.credit_months !== null &&
-    product?.credit_months !== undefined &&
-    String(product.credit_months) !== ""
-  ) {
-    return product.credit_months;
-  }
+const getProductCreditPlans = (product) => getCreditPlans(product);
 
-  return getProductCreditPercent(product) !== null ? 6 : null;
-};
+const getProductCreditBadge = (product) =>
+  getProductCreditPlans(product)
+    .map((plan) => `${plan.months} мес. / ${plan.percent}%`)
+    .join(", ");
 
-const resolveCylinderVolumeChoices = () => {
+const inferFuelTypeChoiceFromProduct = (productLike = newProduct.value) => {
   const searchableContent = [
-    newProduct.value.name?.uz,
-    newProduct.value.name?.ru,
-    newProduct.value.name?.en,
-    newProduct.value.description?.uz,
-    newProduct.value.description?.ru,
-    newProduct.value.description?.en,
-    newProduct.value.characteristic?.uz,
-    newProduct.value.characteristic?.ru,
-    newProduct.value.characteristic?.en,
+    productLike?.name?.uz ?? productLike?.name_uz,
+    productLike?.name?.ru ?? productLike?.name_ru,
+    productLike?.name?.en ?? productLike?.name_en,
+    productLike?.description?.uz ?? productLike?.description_uz,
+    productLike?.description?.ru ?? productLike?.description_ru,
+    productLike?.description?.en ?? productLike?.description_en,
+    productLike?.characteristic?.uz ?? productLike?.characteristic_uz,
+    productLike?.characteristic?.ru ?? productLike?.characteristic_ru,
+    productLike?.characteristic?.en ?? productLike?.characteristic_en,
   ]
     .filter(Boolean)
     .join(" ")
@@ -219,7 +217,7 @@ const resolveCylinderVolumeChoices = () => {
     searchableContent.includes("пропан") ||
     searchableContent.includes("lpg")
   ) {
-    return PROPAN_CYLINDER_VOLUME_CHOICES;
+    return "Propan";
   }
 
   if (
@@ -227,6 +225,29 @@ const resolveCylinderVolumeChoices = () => {
     searchableContent.includes("метан") ||
     searchableContent.includes("methane") ||
     searchableContent.includes("cng")
+  ) {
+    return "Metan";
+  }
+
+  return "";
+};
+
+const resolveCylinderVolumeChoices = (fuelTypeLabel = "") => {
+  const normalizedFuelType = String(fuelTypeLabel || "").trim().toLowerCase();
+
+  if (
+    normalizedFuelType.includes("propan") ||
+    normalizedFuelType.includes("пропан") ||
+    normalizedFuelType.includes("lpg")
+  ) {
+    return PROPAN_CYLINDER_VOLUME_CHOICES;
+  }
+
+  if (
+    normalizedFuelType.includes("metan") ||
+    normalizedFuelType.includes("метан") ||
+    normalizedFuelType.includes("methane") ||
+    normalizedFuelType.includes("cng")
   ) {
     return METAN_CYLINDER_VOLUME_CHOICES;
   }
@@ -260,16 +281,28 @@ const mapGenerationsForForm = (generations = []) =>
     cylinder_volumes: mapCylinderVolumesForForm(generation.cylinder_volumes),
   }));
 
-const mapOptionsForForm = (rawOptions) => {
+const mapTransmissionsForForm = (transmissions = []) =>
+  transmissions.map((transmission) => ({
+    id: transmission.id,
+    label: transmission.label,
+    hidden: Boolean(transmission.hidden),
+    generations: mapGenerationsForForm(transmission.generations),
+  }));
+
+const mapOptionsForForm = (product, rawOptions) => {
   const normalized = normalizeProductOptions(rawOptions);
+  const inferredFuelType = inferFuelTypeChoiceFromProduct(product);
 
   return {
     ...createEmptyProductOptions(),
-    transmissions: normalized.transmissions.map((transmission) => ({
-      id: transmission.id,
-      label: transmission.label,
-      hidden: Boolean(transmission.hidden),
-      generations: mapGenerationsForForm(transmission.generations),
+    fuel_types: normalized.fuel_types.map((fuelType) => ({
+      id: fuelType.id,
+      label:
+        fuelType.label === "Standart" && inferredFuelType
+          ? inferredFuelType
+          : fuelType.label,
+      hidden: false,
+      transmissions: mapTransmissionsForForm(fuelType.transmissions),
     })),
   };
 };
@@ -277,8 +310,6 @@ const mapOptionsForForm = (rawOptions) => {
 const openUpdateModal = (product) => {
   isUpdate.value = true;
   currentProductId.value = product.id;
-  const creditMonths = getProductCreditMonths(product);
-  const creditPercent = getProductCreditPercent(product);
 
   // oldImages va imagePreviews
   const oldImages = product.images
@@ -291,11 +322,7 @@ const openUpdateModal = (product) => {
 
   newProduct.value = {
     credit_enabled: Boolean(product.credit_enabled),
-    credit_months: creditMonths ? String(creditMonths) : "3",
-    credit_percent:
-      creditPercent === null || creditPercent === undefined
-        ? ""
-        : formatNumericInput(creditPercent),
+    credit_plans: mapCreditPlansForForm(product),
     name: {
       uz: product.name_uz || "",
       ru: product.name_ru || "",
@@ -313,7 +340,7 @@ const openUpdateModal = (product) => {
     },
     images: [],
     oldImages: oldImages,
-    options: mapOptionsForForm(product.config_options),
+    options: mapOptionsForForm(product, product.config_options),
   };
 
   showModal.value = true;
@@ -328,37 +355,66 @@ const resetForm = () => {
   currentLang.value = "uz";
 };
 
-const addTransmission = () => {
-  newProduct.value.options.transmissions.push(createEmptyTransmissionItem());
+const addFuelType = () => {
+  newProduct.value.options.fuel_types.push({
+    ...createEmptyFuelTypeItem(),
+    label:
+      FUEL_TYPE_CHOICES.find(
+        (choice) =>
+          !newProduct.value.options.fuel_types.some((fuelType) => fuelType.label === choice)
+      ) || "",
+  });
 };
 
-const removeTransmission = (transmissionIndex) => {
-  newProduct.value.options.transmissions.splice(transmissionIndex, 1);
+const removeFuelType = (fuelTypeIndex) => {
+  newProduct.value.options.fuel_types.splice(fuelTypeIndex, 1);
 };
 
-const addGeneration = (transmissionIndex) => {
-  newProduct.value.options.transmissions[transmissionIndex]?.generations.push(
+const addTransmission = (fuelTypeIndex) => {
+  newProduct.value.options.fuel_types[fuelTypeIndex]?.transmissions.push(
+    createEmptyTransmissionItem()
+  );
+};
+
+const removeTransmission = (fuelTypeIndex, transmissionIndex) => {
+  newProduct.value.options.fuel_types[fuelTypeIndex]?.transmissions.splice(
+    transmissionIndex,
+    1
+  );
+};
+
+const addGeneration = (fuelTypeIndex, transmissionIndex) => {
+  newProduct.value.options.fuel_types[fuelTypeIndex]?.transmissions[
+    transmissionIndex
+  ]?.generations.push(
     createEmptyGenerationItem()
   );
 };
 
-const removeGeneration = (transmissionIndex, generationIndex) => {
-  newProduct.value.options.transmissions[transmissionIndex]?.generations.splice(
+const removeGeneration = (fuelTypeIndex, transmissionIndex, generationIndex) => {
+  newProduct.value.options.fuel_types[fuelTypeIndex]?.transmissions[
+    transmissionIndex
+  ]?.generations.splice(
     generationIndex,
     1
   );
 };
 
-const addCylinderVolume = (transmissionIndex, generationIndex) => {
-  newProduct.value.options.transmissions[transmissionIndex]?.generations[
-    generationIndex
-  ]?.cylinder_volumes.push(createEmptyCylinderVolumeItem());
+const addCylinderVolume = (fuelTypeIndex, transmissionIndex, generationIndex) => {
+  newProduct.value.options.fuel_types[fuelTypeIndex]?.transmissions[
+    transmissionIndex
+  ]?.generations[generationIndex]?.cylinder_volumes.push(createEmptyCylinderVolumeItem());
 };
 
-const removeCylinderVolume = (transmissionIndex, generationIndex, volumeIndex) => {
-  newProduct.value.options.transmissions[transmissionIndex]?.generations[
-    generationIndex
-  ]?.cylinder_volumes.splice(volumeIndex, 1);
+const removeCylinderVolume = (
+  fuelTypeIndex,
+  transmissionIndex,
+  generationIndex,
+  volumeIndex
+) => {
+  newProduct.value.options.fuel_types[fuelTypeIndex]?.transmissions[
+    transmissionIndex
+  ]?.generations[generationIndex]?.cylinder_volumes.splice(volumeIndex, 1);
 };
 
 const onOptionLabelChange = (option) => {
@@ -375,8 +431,46 @@ const onCylinderPriceInput = (event, option) => {
 };
 
 const onCreditPercentInput = (event) => {
-  newProduct.value.credit_percent = formatNumericInput(event.target.value);
+  return formatNumericInput(event.target.value);
 };
+
+const getNextCreditMonths = () => {
+  const usedMonths = new Set(
+    newProduct.value.credit_plans.map((plan) => String(plan.months || ""))
+  );
+
+  const nextMonths = CREDIT_MONTH_CHOICES.find(
+    (months) => !usedMonths.has(String(months))
+  );
+
+  return nextMonths || CREDIT_MONTH_CHOICES[0];
+};
+
+const addCreditPlan = () => {
+  newProduct.value.credit_plans.push(createEmptyCreditPlan(getNextCreditMonths()));
+};
+
+const removeCreditPlan = (planIndex) => {
+  newProduct.value.credit_plans.splice(planIndex, 1);
+};
+
+const getCreditMonthChoices = (currentValue = "") =>
+  withCurrentChoice(
+    CREDIT_MONTH_CHOICES.map((months) => String(months)),
+    String(currentValue || "")
+  );
+
+const isCreditMonthChoiceDisabled = (choice, currentIndex) =>
+  newProduct.value.credit_plans.some(
+    (plan, index) => index !== currentIndex && String(plan.months) === String(choice)
+  );
+
+const onCreditPlanPercentInput = (event, creditPlan) => {
+  creditPlan.percent = onCreditPercentInput(event);
+};
+
+const getFuelTypeChoices = (currentValue = "") =>
+  withCurrentChoice(FUEL_TYPE_CHOICES, currentValue);
 
 const getTransmissionChoices = (currentValue = "") =>
   withCurrentChoice(TRANSMISSION_CHOICES, currentValue);
@@ -384,28 +478,36 @@ const getTransmissionChoices = (currentValue = "") =>
 const getGenerationChoices = (currentValue = "") =>
   withCurrentChoice(GENERATION_CHOICES, currentValue);
 
-const getCylinderVolumeChoices = (currentValue = "") =>
-  withCurrentChoice(resolveCylinderVolumeChoices(), currentValue);
+const getCylinderVolumeChoices = (fuelTypeLabel = "", currentValue = "") =>
+  withCurrentChoice(resolveCylinderVolumeChoices(fuelTypeLabel), currentValue);
 
-const isTransmissionChoiceDisabled = (choice, currentIndex) =>
-  newProduct.value.options.transmissions.some(
+const isFuelTypeChoiceDisabled = (choice, currentIndex) =>
+  newProduct.value.options.fuel_types.some(
+    (fuelType, index) => index !== currentIndex && fuelType.label === choice
+  );
+
+const isTransmissionChoiceDisabled = (fuelTypeIndex, choice, currentIndex) =>
+  newProduct.value.options.fuel_types[fuelTypeIndex]?.transmissions.some(
     (transmission, index) => index !== currentIndex && transmission.label === choice
   );
 
-const isGenerationChoiceDisabled = (transmissionIndex, choice, currentIndex) =>
-  newProduct.value.options.transmissions[transmissionIndex]?.generations.some(
+const isGenerationChoiceDisabled = (fuelTypeIndex, transmissionIndex, choice, currentIndex) =>
+  newProduct.value.options.fuel_types[fuelTypeIndex]?.transmissions[
+    transmissionIndex
+  ]?.generations.some(
     (generation, index) => index !== currentIndex && generation.label === choice
   );
 
 const isCylinderVolumeChoiceDisabled = (
+  fuelTypeIndex,
   transmissionIndex,
   generationIndex,
   choice,
   currentIndex
 ) =>
-  newProduct.value.options.transmissions[transmissionIndex]?.generations[
-    generationIndex
-  ]?.cylinder_volumes.some(
+  newProduct.value.options.fuel_types[fuelTypeIndex]?.transmissions[
+    transmissionIndex
+  ]?.generations[generationIndex]?.cylinder_volumes.some(
     (volume, index) => index !== currentIndex && volume.label === choice
   );
 
@@ -447,14 +549,26 @@ const addOrUpdateProduct = async () => {
     formData.append("price_en", normalizedPrice);
   }
 
+  const serializedCreditPlans = newProduct.value.credit_plans
+    .map((plan) => ({
+      months: plan.months,
+      percent: plan.percent,
+    }))
+    .filter((plan) => String(plan.months || "").trim() || String(plan.percent || "").trim());
+  const primaryCreditPlan = serializedCreditPlans[0] || null;
+
   formData.append("credit_enabled", String(Boolean(newProduct.value.credit_enabled)));
   formData.append(
+    "credit_plans",
+    newProduct.value.credit_enabled ? JSON.stringify(serializedCreditPlans) : ""
+  );
+  formData.append(
     "credit_months",
-    newProduct.value.credit_enabled ? newProduct.value.credit_months || "" : ""
+    newProduct.value.credit_enabled ? primaryCreditPlan?.months || "" : ""
   );
   formData.append(
     "credit_percent",
-    newProduct.value.credit_enabled ? newProduct.value.credit_percent || "" : ""
+    newProduct.value.credit_enabled ? primaryCreditPlan?.percent || "" : ""
   );
 
   formData.append(
@@ -509,8 +623,8 @@ onMounted(async () => {
 watch(
   () => newProduct.value.credit_enabled,
   (enabled) => {
-    if (!enabled) {
-      newProduct.value.credit_percent = "";
+    if (enabled && !newProduct.value.credit_plans.length) {
+      newProduct.value.credit_plans = [createEmptyCreditPlan()];
     }
   }
 );
@@ -561,6 +675,14 @@ const getProductOptionBadges = (product) => {
   const summary = getProductOptionSummary(product);
   const badges = [];
 
+  if (summary.fuelTypeCount) {
+    badges.push({
+      key: "fuel_type",
+      title: "Топливо",
+      count: summary.fuelTypeCount,
+    });
+  }
+
   if (summary.transmissionCount) {
     badges.push({
       key: "transmission",
@@ -590,8 +712,7 @@ const getProductOptionBadges = (product) => {
 
 const hasCreditBadge = (product) =>
   Boolean(product.credit_enabled) &&
-  getProductCreditMonths(product) !== null &&
-  getProductCreditPercent(product) !== null;
+  getProductCreditPlans(product).length > 0;
 </script>
 <template>
   <div class="products-admin p-4 sm:p-6 space-y-6">
@@ -679,7 +800,7 @@ const hasCreditBadge = (product) =>
                 v-if="hasCreditBadge(product)"
                 class="product-badge product-badge-credit"
               >
-                Кредит: {{ getProductCreditMonths(product) }} мес. / {{ getProductCreditPercent(product) }}%
+                Кредит: {{ getProductCreditBadge(product) }}
               </span>
             </div>
           </div>
@@ -753,7 +874,7 @@ const hasCreditBadge = (product) =>
                 <div>
                   <h3 class="editor-section-title">Кредит</h3>
                   <p class="editor-section-copy">
-                    Включите кредит, выберите срок и укажите процент для этого товара.
+                    Включите кредит и добавьте несколько сроков с отдельной ставкой для каждого.
                   </p>
                 </div>
               </div>
@@ -779,27 +900,66 @@ const hasCreditBadge = (product) =>
 
               <div
                 v-if="newProduct.credit_enabled"
-                class="grid gap-3 sm:grid-cols-2"
+                class="space-y-3"
               >
-                <select
-                  v-model="newProduct.credit_months"
-                  class="editor-field editor-select"
-                >
-                  <option
-                    v-for="months in CREDIT_MONTH_CHOICES"
-                    :key="months"
-                    :value="String(months)"
+                <div class="editor-option-head">
+                  <div>
+                    <h4 class="editor-option-title">Планы кредита</h4>
+                    <p class="editor-option-copy">
+                      Например: 3 месяца с одной ставкой и 6 месяцев с другой.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    @click="addCreditPlan"
+                    class="editor-secondary-btn"
                   >
-                    {{ months }} мес.
-                  </option>
-                </select>
+                    Добавить срок
+                  </button>
+                </div>
 
-                <input
-                  :value="newProduct.credit_percent"
-                  @input="onCreditPercentInput"
-                  placeholder="Процент, например 24"
-                  class="editor-field"
-                />
+                <div
+                  v-if="!newProduct.credit_plans.length"
+                  class="editor-empty-state"
+                >
+                  Пока не добавлен ни один кредитный срок.
+                </div>
+
+                <div
+                  v-for="(creditPlan, creditPlanIndex) in newProduct.credit_plans"
+                  :key="creditPlan.id"
+                  class="editor-option-row"
+                >
+                  <select
+                    v-model="creditPlan.months"
+                    class="editor-field editor-select"
+                  >
+                    <option value="" disabled>Выберите срок</option>
+                    <option
+                      v-for="months in getCreditMonthChoices(creditPlan.months)"
+                      :key="months"
+                      :value="String(months)"
+                      :disabled="isCreditMonthChoiceDisabled(months, creditPlanIndex)"
+                    >
+                      {{ months }} мес.
+                    </option>
+                  </select>
+
+                  <input
+                    :value="creditPlan.percent"
+                    @input="onCreditPlanPercentInput($event, creditPlan)"
+                    placeholder="Процент"
+                    class="editor-field"
+                  />
+
+                  <button
+                    type="button"
+                    @click="removeCreditPlan(creditPlanIndex)"
+                    class="editor-remove-btn"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -810,8 +970,8 @@ const hasCreditBadge = (product) =>
                     Варианты установки
                   </h3>
                   <p class="editor-section-copy">
-                    Сначала добавьте КПП, затем поколения ГБО, а цену указывайте
-                    только у конкретного баллона внутри выбранной ветки.
+                    Сначала добавьте тип топлива, затем КПП, поколения ГБО и
+                    только потом конкретные баллоны с ценой.
                   </p>
                 </div>
               </div>
@@ -819,45 +979,46 @@ const hasCreditBadge = (product) =>
               <div class="editor-option-group space-y-4">
                 <div class="editor-option-head">
                   <div>
-                    <h4 class="editor-option-title">КПП</h4>
+                    <h4 class="editor-option-title">Тип топлива</h4>
                     <p class="editor-option-copy">
-                      Например: автомат и механика. Здесь только структура веток,
-                      без отдельной цены.
+                      Сначала добавьте метан или пропан, затем внутри каждого типа
+                      настройте КПП, поколения и баллоны.
                     </p>
                   </div>
                   <button
                     type="button"
-                    @click="addTransmission"
+                    @click="addFuelType"
                     class="editor-secondary-btn"
                   >
-                    Добавить КПП
+                    Добавить тип
                   </button>
                 </div>
 
                 <div
-                  v-if="!newProduct.options.transmissions.length"
+                  v-if="!newProduct.options.fuel_types.length"
                   class="editor-empty-state"
                 >
-                  Ветки КПП ещё не добавлены.
+                  Типы топлива ещё не добавлены.
                 </div>
 
                 <div
-                  v-for="(transmission, transmissionIndex) in newProduct.options.transmissions"
-                  :key="transmission.id"
+                  v-for="(fuelType, fuelTypeIndex) in newProduct.options.fuel_types"
+                  :key="fuelType.id"
                   class="editor-option-group space-y-4"
                 >
                   <div class="editor-option-head">
                     <div>
                       <h4 class="editor-option-title">
-                        КПП {{ transmissionIndex + 1 }}
+                        Топливо {{ fuelTypeIndex + 1 }}
                       </h4>
                       <p class="editor-option-copy">
-                        Выберите тип КПП для этой ветки.
+                        Выберите тип топлива для этой ветки. Один товар может
+                        содержать и метан, и пропан.
                       </p>
                     </div>
                     <button
                       type="button"
-                      @click="removeTransmission(transmissionIndex)"
+                      @click="removeFuelType(fuelTypeIndex)"
                       class="editor-remove-btn"
                     >
                       ×
@@ -866,16 +1027,16 @@ const hasCreditBadge = (product) =>
 
                   <div class="editor-option-row editor-option-row-single">
                     <select
-                      v-model="transmission.label"
+                      v-model="fuelType.label"
                       class="editor-field editor-select"
-                      @change="onOptionLabelChange(transmission)"
+                      @change="onOptionLabelChange(fuelType)"
                     >
-                      <option value="" disabled>Выберите КПП</option>
+                      <option value="" disabled>Выберите тип топлива</option>
                       <option
-                        v-for="choice in getTransmissionChoices(transmission.label)"
+                        v-for="choice in getFuelTypeChoices(fuelType.label)"
                         :key="choice"
                         :value="choice"
-                        :disabled="isTransmissionChoiceDisabled(choice, transmissionIndex)"
+                        :disabled="isFuelTypeChoiceDisabled(choice, fuelTypeIndex)"
                       >
                         {{ choice }}
                       </option>
@@ -885,45 +1046,44 @@ const hasCreditBadge = (product) =>
                   <div class="space-y-4">
                     <div class="editor-option-head">
                       <div>
-                        <h4 class="editor-option-title">Поколения ГБО</h4>
+                        <h4 class="editor-option-title">КПП</h4>
                         <p class="editor-option-copy">
-                          Выберите доступные поколения для этой КПП. Отдельную цену
-                          здесь указывать не нужно.
+                          Например: автомат и механика для выбранного топлива.
                         </p>
                       </div>
                       <button
                         type="button"
-                        @click="addGeneration(transmissionIndex)"
+                        @click="addTransmission(fuelTypeIndex)"
                         class="editor-secondary-btn"
                       >
-                        Добавить поколение
+                        Добавить КПП
                       </button>
                     </div>
 
                     <div
-                      v-if="!transmission.generations.length"
+                      v-if="!fuelType.transmissions.length"
                       class="editor-empty-state"
                     >
-                      Поколения для этой КПП ещё не добавлены.
+                      Ветки КПП для этого топлива ещё не добавлены.
                     </div>
 
                     <div
-                      v-for="(generation, generationIndex) in transmission.generations"
-                      :key="generation.id"
+                      v-for="(transmission, transmissionIndex) in fuelType.transmissions"
+                      :key="transmission.id"
                       class="editor-option-group space-y-4"
                     >
                       <div class="editor-option-head">
                         <div>
                           <h4 class="editor-option-title">
-                            Поколение {{ generationIndex + 1 }}
+                            КПП {{ transmissionIndex + 1 }}
                           </h4>
                           <p class="editor-option-copy">
-                            Выберите поколение ГБО для текущей ветки.
+                            Выберите тип КПП для топлива {{ fuelType.label || "..." }}.
                           </p>
                         </div>
                         <button
                           type="button"
-                          @click="removeGeneration(transmissionIndex, generationIndex)"
+                          @click="removeTransmission(fuelTypeIndex, transmissionIndex)"
                           class="editor-remove-btn"
                         >
                           ×
@@ -932,20 +1092,20 @@ const hasCreditBadge = (product) =>
 
                       <div class="editor-option-row editor-option-row-single">
                         <select
-                          v-model="generation.label"
+                          v-model="transmission.label"
                           class="editor-field editor-select"
-                          @change="onOptionLabelChange(generation)"
+                          @change="onOptionLabelChange(transmission)"
                         >
-                          <option value="" disabled>Выберите поколение</option>
+                          <option value="" disabled>Выберите КПП</option>
                           <option
-                            v-for="choice in getGenerationChoices(generation.label)"
+                            v-for="choice in getTransmissionChoices(transmission.label)"
                             :key="choice"
                             :value="choice"
                             :disabled="
-                              isGenerationChoiceDisabled(
-                                transmissionIndex,
+                              isTransmissionChoiceDisabled(
+                                fuelTypeIndex,
                                 choice,
-                                generationIndex
+                                transmissionIndex
                               )
                             "
                           >
@@ -957,74 +1117,162 @@ const hasCreditBadge = (product) =>
                       <div class="space-y-4">
                         <div class="editor-option-head">
                           <div>
-                            <h4 class="editor-option-title">Размеры баллона</h4>
+                            <h4 class="editor-option-title">Поколения ГБО</h4>
                             <p class="editor-option-copy">
-                              Для каждого размера в этой ветке укажите цену баллона.
-                              Именно эта цена будет влиять на итоговую стоимость.
+                              Выберите доступные поколения ГБО для этой ветки КПП.
                             </p>
                           </div>
                           <button
                             type="button"
-                            @click="addCylinderVolume(transmissionIndex, generationIndex)"
+                            @click="addGeneration(fuelTypeIndex, transmissionIndex)"
                             class="editor-secondary-btn"
                           >
-                            Добавить размер
+                            Добавить поколение
                           </button>
                         </div>
 
                         <div
-                          v-if="!generation.cylinder_volumes.length"
+                          v-if="!transmission.generations.length"
                           class="editor-empty-state"
                         >
-                          Размеры баллона ещё не добавлены.
+                          Поколения для этой КПП ещё не добавлены.
                         </div>
 
                         <div
-                          v-for="(volume, volumeIndex) in generation.cylinder_volumes"
-                          :key="volume.id"
-                          class="editor-option-row"
+                          v-for="(generation, generationIndex) in transmission.generations"
+                          :key="generation.id"
+                          class="editor-option-group space-y-4"
                         >
-                          <select
-                            v-model="volume.label"
-                            class="editor-field editor-select"
-                            @change="onOptionLabelChange(volume)"
-                          >
-                            <option value="" disabled>Выберите размер баллона</option>
-                            <option
-                              v-for="choice in getCylinderVolumeChoices(volume.label)"
-                              :key="choice"
-                              :value="choice"
-                              :disabled="
-                                isCylinderVolumeChoiceDisabled(
+                          <div class="editor-option-head">
+                            <div>
+                              <h4 class="editor-option-title">
+                                Поколение {{ generationIndex + 1 }}
+                              </h4>
+                              <p class="editor-option-copy">
+                                Выберите поколение ГБО для текущей ветки.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              @click="
+                                removeGeneration(
+                                  fuelTypeIndex,
                                   transmissionIndex,
-                                  generationIndex,
-                                  choice,
-                                  volumeIndex
+                                  generationIndex
                                 )
                               "
+                              class="editor-remove-btn"
                             >
-                              {{ choice }}
-                            </option>
-                          </select>
-                          <input
-                            :value="volume.price_delta"
-                            @input="onCylinderPriceInput($event, volume)"
-                            placeholder="0 UZS"
-                            class="editor-field"
-                          />
-                          <button
-                            type="button"
-                            @click="
-                              removeCylinderVolume(
-                                transmissionIndex,
-                                generationIndex,
-                                volumeIndex
-                              )
-                            "
-                            class="editor-remove-btn"
-                          >
-                            ×
-                          </button>
+                              ×
+                            </button>
+                          </div>
+
+                          <div class="editor-option-row editor-option-row-single">
+                            <select
+                              v-model="generation.label"
+                              class="editor-field editor-select"
+                              @change="onOptionLabelChange(generation)"
+                            >
+                              <option value="" disabled>Выберите поколение</option>
+                              <option
+                                v-for="choice in getGenerationChoices(generation.label)"
+                                :key="choice"
+                                :value="choice"
+                                :disabled="
+                                  isGenerationChoiceDisabled(
+                                    fuelTypeIndex,
+                                    transmissionIndex,
+                                    choice,
+                                    generationIndex
+                                  )
+                                "
+                              >
+                                {{ choice }}
+                              </option>
+                            </select>
+                          </div>
+
+                          <div class="space-y-4">
+                            <div class="editor-option-head">
+                              <div>
+                                <h4 class="editor-option-title">Размеры баллона</h4>
+                                <p class="editor-option-copy">
+                                  Для каждого размера в этой ветке укажите цену баллона.
+                                  Именно эта цена будет влиять на итоговую стоимость.
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                @click="
+                                  addCylinderVolume(
+                                    fuelTypeIndex,
+                                    transmissionIndex,
+                                    generationIndex
+                                  )
+                                "
+                                class="editor-secondary-btn"
+                              >
+                                Добавить размер
+                              </button>
+                            </div>
+
+                            <div
+                              v-if="!generation.cylinder_volumes.length"
+                              class="editor-empty-state"
+                            >
+                              Размеры баллона ещё не добавлены.
+                            </div>
+
+                            <div
+                              v-for="(volume, volumeIndex) in generation.cylinder_volumes"
+                              :key="volume.id"
+                              class="editor-option-row"
+                            >
+                              <select
+                                v-model="volume.label"
+                                class="editor-field editor-select"
+                                @change="onOptionLabelChange(volume)"
+                              >
+                                <option value="" disabled>Выберите размер баллона</option>
+                                <option
+                                  v-for="choice in getCylinderVolumeChoices(fuelType.label, volume.label)"
+                                  :key="choice"
+                                  :value="choice"
+                                  :disabled="
+                                    isCylinderVolumeChoiceDisabled(
+                                      fuelTypeIndex,
+                                      transmissionIndex,
+                                      generationIndex,
+                                      choice,
+                                      volumeIndex
+                                    )
+                                  "
+                                >
+                                  {{ choice }}
+                                </option>
+                              </select>
+                              <input
+                                :value="volume.price_delta"
+                                @input="onCylinderPriceInput($event, volume)"
+                                placeholder="0 UZS"
+                                class="editor-field"
+                              />
+                              <button
+                                type="button"
+                                @click="
+                                  removeCylinderVolume(
+                                    fuelTypeIndex,
+                                    transmissionIndex,
+                                    generationIndex,
+                                    volumeIndex
+                                  )
+                                "
+                                class="editor-remove-btn"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
