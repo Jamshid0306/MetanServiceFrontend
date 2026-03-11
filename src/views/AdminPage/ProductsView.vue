@@ -24,7 +24,6 @@ import {
   serializeProductOptions,
 } from "@/lib/productOptions";
 
-const priceType = ref("show");
 const store = useAdminStore();
 const showModal = ref(false);
 const showDeleteModal = ref(false);
@@ -86,7 +85,6 @@ const CYLINDER_VOLUME_CHOICES = [
 const CREDIT_MONTH_CHOICES = [3, 6, 9, 12];
 
 const createInitialProduct = () => ({
-  price: "",
   credit_enabled: false,
   credit_months: "3",
   credit_percent: "",
@@ -138,6 +136,35 @@ const formatOptionPriceInput = (value) =>
   value === null || value === undefined || value === ""
     ? ""
     : formatNumericInput(value);
+
+const getMinimumOptionPrice = (rawOptions) => {
+  const transmissions = Array.isArray(rawOptions?.transmissions) ? rawOptions.transmissions : [];
+  let minimumPrice = null;
+
+  transmissions.forEach((transmission) => {
+    const generations = Array.isArray(transmission?.generations)
+      ? transmission.generations
+      : [];
+
+    generations.forEach((generation) => {
+      const cylinderVolumes = Array.isArray(generation?.cylinder_volumes)
+        ? generation.cylinder_volumes
+        : [];
+
+      cylinderVolumes.forEach((volume) => {
+        const numericPrice = Number(String(volume?.price_delta || "").replace(/[^\d]/g, ""));
+        if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
+          return;
+        }
+
+        minimumPrice =
+          minimumPrice === null ? numericPrice : Math.min(minimumPrice, numericPrice);
+      });
+    });
+  });
+
+  return minimumPrice;
+};
 
 const getProductCreditPercent = (product) => {
   if (
@@ -262,25 +289,7 @@ const openUpdateModal = (product) => {
 
   imagePreviews.value = oldImages.map(resolveAssetUrl).filter(Boolean);
 
-  // Price type aniqlash
-  if (
-    product.price_uz === "Narxni so’rang" ||
-    product.price_ru === "Цену уточняйте" ||
-    product.price_en === "Request price"
-  ) {
-    priceType.value = "request";
-    newProduct.value.price = "";
-  } else {
-    priceType.value = "show";
-    // Eski price’ni set qilamiz
-    newProduct.value.price = product.price_uz || "";
-  }
-
   newProduct.value = {
-    price_uz: product.price_uz || "",
-    price_ru: product.price_ru || "",
-    price_en: product.price_en || "",
-    price: priceType.value === "show" ? product.price_uz || "" : "",
     credit_enabled: Boolean(product.credit_enabled),
     credit_months: creditMonths ? String(creditMonths) : "3",
     credit_percent:
@@ -317,7 +326,6 @@ const resetForm = () => {
   isUpdate.value = false;
   currentProductId.value = null;
   currentLang.value = "uz";
-  priceType.value = "show";
 };
 
 const addTransmission = () => {
@@ -404,6 +412,8 @@ const isCylinderVolumeChoiceDisabled = (
 const addOrUpdateProduct = async () => {
   loading.value = true;
   const formData = new FormData();
+  const serializedOptions = serializeProductOptions(newProduct.value.options);
+  const minimumOptionPrice = getMinimumOptionPrice(serializedOptions);
 
   formData.append("name_uz", newProduct.value.name.uz || "");
   formData.append("name_ru", newProduct.value.name.ru || "");
@@ -426,14 +436,15 @@ const addOrUpdateProduct = async () => {
     newProduct.value.characteristic?.en || ""
   );
 
-  if (priceType.value === "show") {
-    formData.append("price_uz", newProduct.value.price || "");
-    formData.append("price_ru", newProduct.value.price || "");
-    formData.append("price_en", newProduct.value.price || "");
-  } else {
+  if (minimumOptionPrice === null) {
     formData.append("price_uz", "Narxni so’rang");
     formData.append("price_ru", "Цену уточняйте");
     formData.append("price_en", "Request price");
+  } else {
+    const normalizedPrice = formatNumericInput(minimumOptionPrice);
+    formData.append("price_uz", normalizedPrice);
+    formData.append("price_ru", normalizedPrice);
+    formData.append("price_en", normalizedPrice);
   }
 
   formData.append("credit_enabled", String(Boolean(newProduct.value.credit_enabled)));
@@ -448,7 +459,7 @@ const addOrUpdateProduct = async () => {
 
   formData.append(
     "config_options",
-    JSON.stringify(serializeProductOptions(newProduct.value.options))
+    JSON.stringify(serializedOptions)
   );
 
   newProduct.value.images.forEach((file) => {
@@ -495,19 +506,6 @@ onMounted(async () => {
   useLoaderStore().loader = true;
   await store.getProducts();
 });
-
-watch(priceType, (val) => {
-  if (val === "show") {
-    newProduct.value.price =
-      newProduct.value.price_uz &&
-      newProduct.value.price_uz !== "Narxni so’rang"
-        ? newProduct.value.price_uz
-        : "";
-  } else {
-    // Agar request bo‘lsa, input bo‘sh bo‘lsin
-    newProduct.value.price = "";
-  }
-});
 watch(
   () => newProduct.value.credit_enabled,
   (enabled) => {
@@ -522,20 +520,6 @@ const productsList = computed(() =>
   Array.isArray(store.products) ? store.products : []
 );
 const formatPrice = (value) => formatPriceValue(value);
-
-const onPriceInput = (e) => {
-  const el = e.target;
-  let start = el.selectionStart;
-  let end = el.selectionEnd;
-
-  const digits = el.value.replace(/\D/g, "");
-  const formatted = digits.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-
-  newProduct.value.price = formatted;
-
-  const diff = formatted.length - digits.length;
-  el.setSelectionRange(start + diff, end + diff);
-};
 
 const filteredProducts = computed(() => {
   const products = productsList.value;
@@ -764,25 +748,6 @@ const hasCreditBadge = (product) =>
 
           <div class="editor-layout">
             <div class="editor-panel">
-              <div class="space-y-2">
-                <label class="editor-label">Отображение цены</label>
-              <select
-                v-model="priceType"
-                class="editor-field"
-              >
-                <option value="show">Показать цену</option>
-                <option value="request">Не показывать цену</option>
-              </select>
-
-              <input
-                v-if="priceType === 'show'"
-                v-model="newProduct.price"
-                @input="onPriceInput"
-                placeholder="0 UZS"
-                class="editor-field"
-              />
-            </div>
-
             <div class="editor-section space-y-4">
               <div class="editor-section-head">
                 <div>

@@ -236,7 +236,7 @@ const submitOrder = async () => {
                       v-if="group.key === 'cylinder_volume' && option.price_delta"
                       class="basket-option-delta"
                     >
-                      +{{ formatPrice(option.price_delta) }}
+                      {{ formatPrice(option.price_delta) }}
                     </span>
                   </button>
                 </div>

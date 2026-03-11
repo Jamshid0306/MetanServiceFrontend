@@ -283,8 +283,8 @@ const relatedActionLabel = () => t("add_to_cart");
                   >
                     {{
                       option.price_delta
-                        ? `+${formatPrice(option.price_delta)}`
-                        : t("productOptions.included")
+                        ? formatPrice(option.price_delta)
+                        : ""
                     }}
                   </span>
                 </button>

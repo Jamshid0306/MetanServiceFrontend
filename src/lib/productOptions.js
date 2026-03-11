@@ -421,15 +421,18 @@ export const getSelectedProductOptions = (product, selections = {}) => {
 };
 
 export const calculateConfiguredPrice = (product, locale, selections = {}) => {
+  const { cylinderVolume } = resolveSelectedPath(product, selections);
+  const configuredPrice = parseNumericPrice(cylinderVolume?.price_delta);
+  if (configuredPrice !== null) {
+    return configuredPrice;
+  }
+
   const basePrice = parseNumericPrice(product?.[`price_${locale}`]);
   if (basePrice === null) {
     return product?.[`price_${locale}`] || "";
   }
 
-  const { cylinderVolume } = resolveSelectedPath(product, selections);
-  const totalDelta = cylinderVolume?.price_delta || 0;
-
-  return basePrice + totalDelta;
+  return basePrice;
 };
 
 export const getProductOptionSummary = (product) => {
