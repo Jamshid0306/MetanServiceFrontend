@@ -29,9 +29,6 @@ const heroSlides = [
     class="container mx-auto mb-16 md:mb-24 mt-[72px] select-none"
   >
     <section class="hero-shell">
-      <span class="hero-aura hero-aura-left" />
-      <span class="hero-aura hero-aura-right" />
-
       <Swiper
         :modules="[Autoplay, Pagination]"
         :loop="true"
@@ -56,37 +53,11 @@ const heroSlides = [
 .hero-shell {
   position: relative;
   overflow: hidden;
-  border-radius: 24px;
-  border: 1px solid rgba(20, 54, 108, 0.13);
-  background: linear-gradient(155deg, rgba(255, 255, 255, 0.98), rgba(244, 248, 255, 0.96));
-  box-shadow: 0 18px 36px rgba(8, 30, 72, 0.1);
-  padding: 1.05rem;
-}
-
-.hero-aura {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(52px);
-  opacity: 0.2;
-  pointer-events: none;
-  animation: auraMove 20s ease-in-out infinite;
-}
-
-.hero-aura-left {
-  width: 220px;
-  height: 220px;
-  left: -70px;
-  top: -55px;
-  background: rgba(26, 79, 149, 0.3);
-}
-
-.hero-aura-right {
-  width: 250px;
-  height: 250px;
-  right: -80px;
-  bottom: -80px;
-  background: rgba(62, 143, 218, 0.25);
-  animation-delay: 2s;
+  border-radius: 28px;
+  border: 1px solid rgba(20, 35, 56, 0.1);
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(10px);
+  padding: 0.75rem;
 }
 
 .hero-swiper {
@@ -94,10 +65,10 @@ const heroSlides = [
   z-index: 1;
   width: min(1120px, 100%);
   margin: 0 auto;
-  border-radius: 18px;
+  border-radius: 22px;
   overflow: hidden;
-  border: 1px solid rgba(20, 54, 108, 0.16);
-  box-shadow: 0 16px 28px rgba(8, 30, 72, 0.18);
+  border: 1px solid rgba(20, 35, 56, 0.12);
+  background: #dfe6ee;
 }
 
 .hero-slide {
@@ -111,8 +82,8 @@ const heroSlides = [
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 14% 18%, rgba(14, 43, 102, 0.15), transparent 34%),
-    linear-gradient(to top, rgba(12, 40, 91, 0.18), transparent 44%);
+    linear-gradient(to top, rgba(15, 23, 42, 0.22), transparent 40%),
+    linear-gradient(to right, rgba(15, 23, 42, 0.12), transparent 28%);
   pointer-events: none;
 }
 
@@ -121,7 +92,7 @@ const heroSlides = [
   height: 100%;
   object-fit: cover;
   display: block;
-  transform: scale(1.015);
+  transform: scale(1.01);
 }
 
 .reveal-up {
@@ -139,16 +110,6 @@ const heroSlides = [
   }
 }
 
-@keyframes auraMove {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-  50% {
-    transform: translate3d(8px, -8px, 0);
-  }
-}
-
 @media (max-width: 1100px) {
   .hero-slide {
     min-height: 190px;
@@ -157,12 +118,12 @@ const heroSlides = [
 
 @media (max-width: 700px) {
   .hero-shell {
-    border-radius: 20px;
-    padding: 0.78rem;
+    border-radius: 22px;
+    padding: 0.6rem;
   }
 
   .hero-swiper {
-    border-radius: 14px;
+    border-radius: 18px;
   }
 
   .hero-slide {
@@ -175,14 +136,14 @@ const heroSlides = [
 }
 
 :deep(.hero-swiper .swiper-pagination-bullet) {
-  width: 8px;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.8);
-  opacity: 0.72;
+  width: 7px;
+  height: 7px;
+  background: rgba(255, 255, 255, 0.72);
+  opacity: 0.8;
 }
 
 :deep(.hero-swiper .swiper-pagination-bullet-active) {
-  width: 24px;
+  width: 22px;
   border-radius: 999px;
   background: #ffffff;
   opacity: 1;

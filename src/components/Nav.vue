@@ -134,7 +134,7 @@ watch(
             class="search-input w-full pl-11 pr-4 py-2.5 text-sm"
           />
           <svg
-            class="w-5 h-5 text-blue-600 absolute left-3.5"
+            class="absolute left-3.5 h-5 w-5 text-slate-500"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -164,7 +164,7 @@ watch(
               />
               <div class="min-w-0">
                 <p class="text-sm font-semibold text-slate-800 truncate">{{ product[`name_${locale}`] }}</p>
-                <p class="text-xs text-blue-700 font-bold">{{ product[`price_${locale}`] || product.price_uz }} so'm</p>
+                <p class="text-xs font-bold text-slate-700">{{ product[`price_${locale}`] || product.price_uz }} so'm</p>
               </div>
             </div>
           </div>
@@ -196,10 +196,10 @@ watch(
             @click="toggleLang"
             class="lang-button flex items-center gap-1 sm:gap-2 p-2 rounded-full text-sm font-semibold text-slate-700"
           >
-            <img :src="activeLanguage.flag" class="w-5 h-5 rounded-sm ring-1 ring-blue-200" alt="Lang" />
+            <img :src="activeLanguage.flag" class="h-5 w-5 rounded-sm ring-1 ring-slate-200" alt="Lang" />
             <span class="hidden sm:inline">{{ locale.toUpperCase() }}</span>
             <svg
-              class="w-4 h-4 transition-transform duration-300 text-blue-700"
+              class="h-4 w-4 text-slate-700 transition-transform duration-300"
               :class="{ 'rotate-180': langOpen }"
               fill="none"
               stroke="currentColor"
@@ -211,21 +211,21 @@ watch(
 
           <div
             v-if="langOpen"
-            class="absolute right-12 sm:right-14 top-[calc(100%+6px)] w-36 rounded-2xl border border-blue-100 bg-white/95 backdrop-blur-md shadow-xl overflow-hidden z-[1000]"
+            class="lang-dropdown absolute right-12 sm:right-14 top-[calc(100%+6px)] w-36 rounded-2xl overflow-hidden z-[1000]"
           >
             <button
               v-for="lang in languages"
               :key="lang.code"
               @click="changeLanguage(lang.code)"
-              class="w-full text-left px-3 py-2.5 text-sm hover:bg-blue-50 flex items-center gap-2"
-              :class="locale === lang.code ? 'text-blue-700 font-bold' : 'text-slate-700'"
+              class="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-slate-100"
+              :class="locale === lang.code ? 'font-bold text-slate-900' : 'text-slate-700'"
             >
               <img :src="lang.flag" class="w-4 h-4 rounded-sm" alt="Lang" />
               {{ lang.label }}
             </button>
           </div>
 
-          <RouterLink to="/basket" class="basket-chip relative text-slate-600 hover:text-blue-700 p-2 rounded-full">
+          <RouterLink to="/basket" class="basket-chip relative rounded-full p-2 text-slate-600 hover:text-slate-950">
             <div
               v-if="basketStore.basket.length"
               class="absolute right-0 top-0 bg-rose-600 rounded-full w-5 h-5 text-xs text-white font-bold flex justify-center items-center"
@@ -237,7 +237,7 @@ watch(
 
           <button
             @click="toggleMenu"
-            class="menu-toggle xl:hidden p-2 text-slate-700 hover:text-blue-700"
+            class="menu-toggle p-2 text-slate-700 hover:text-slate-950 xl:hidden"
             aria-label="Toggle menu"
           >
             <div class="space-y-1.5">
@@ -260,9 +260,9 @@ watch(
             v-model="searchQuery"
             type="search"
             :placeholder="t('nav.search_products') + '...'"
-            class="w-full rounded-full border border-blue-200 pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white/90"
+            class="w-full rounded-full border border-slate-200 bg-white/90 py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
           />
-          <svg class="w-5 h-5 text-blue-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
 
@@ -283,7 +283,7 @@ watch(
               />
               <div class="min-w-0">
                 <p class="text-sm font-semibold text-slate-800 truncate">{{ product[`name_${locale}`] }}</p>
-                <p class="text-xs text-blue-700 font-bold">{{ product[`price_${locale}`] || product.price_uz }} so'm</p>
+                <p class="text-xs font-bold text-slate-700">{{ product[`price_${locale}`] || product.price_uz }} so'm</p>
               </div>
             </div>
           </div>
@@ -318,18 +318,18 @@ watch(
 
 <style scoped>
 .brand-nav {
-  border-bottom: 1px solid rgba(20, 54, 108, 0.14);
-  background: rgba(251, 253, 255, 0.92);
-  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(20, 35, 56, 0.08);
+  background: rgba(249, 250, 251, 0.86);
+  backdrop-filter: blur(14px);
 }
 
 .nav-rest {
-  box-shadow: 0 8px 22px rgba(8, 30, 72, 0.08);
+  box-shadow: none;
 }
 
 .nav-sticky {
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 14px 30px rgba(8, 30, 72, 0.13);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.05);
 }
 
 .brand-logo-wrap {
@@ -339,8 +339,8 @@ watch(
   justify-content: center;
   border-radius: 14px;
   padding: 3px;
-  border: 1px solid rgba(20, 54, 108, 0.1);
-  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(20, 35, 56, 0.1);
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .logo-halo {
@@ -352,19 +352,15 @@ watch(
   z-index: 1;
   object-fit: contain;
   border-radius: 10px;
-  box-shadow: 0 8px 18px rgba(8, 30, 72, 0.14);
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+  transition: opacity 0.2s ease;
 }
 
 .brand-logo-wrap:hover .brand-logo {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 20px rgba(8, 30, 72, 0.2);
+  opacity: 0.92;
 }
 
 .nav-link {
-  color: #3d4f70;
+  color: #4b5b72;
   position: relative;
   font-weight: 600;
   transition: color 0.2s ease;
@@ -372,7 +368,7 @@ watch(
 
 .nav-link.router-link-active,
 .nav-link.router-link-exact-active {
-  color: #0f2b66;
+  color: #18304f;
 }
 
 .nav-link::after {
@@ -381,15 +377,15 @@ watch(
   left: 0;
   bottom: -5px;
   width: 100%;
-  height: 2px;
-  background: #1a4f95;
+  height: 1px;
+  background: #24466f;
   transform: scaleX(0);
   transform-origin: right;
   transition: transform 0.2s ease;
 }
 
 .nav-link:hover {
-  color: #173e7c;
+  color: #18304f;
 }
 
 .nav-link:hover::after {
@@ -398,28 +394,25 @@ watch(
 }
 
 .products-pill {
-  background: #143d7a;
+  background: #18304f;
   color: #ffffff;
   padding: 9px 15px;
   border-radius: 999px;
-  border: 1px solid rgba(20, 54, 108, 0.18);
-  box-shadow: 0 10px 18px rgba(8, 30, 72, 0.2);
+  border: 1px solid rgba(20, 35, 56, 0.08);
   transition:
     transform 0.2s ease,
-    box-shadow 0.2s ease,
     background-color 0.2s ease;
 }
 
 .products-pill:hover {
-  background: #0f2f61;
+  background: #142338;
   transform: translateY(-1px);
-  box-shadow: 0 13px 21px rgba(8, 30, 72, 0.28);
 }
 
 .search-input {
   border-radius: 999px;
-  border: 1px solid rgba(20, 54, 108, 0.2);
-  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(20, 35, 56, 0.12);
+  background: rgba(255, 255, 255, 0.86);
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease;
@@ -427,15 +420,17 @@ watch(
 
 .search-input:focus {
   outline: none;
-  border-color: rgba(20, 62, 122, 0.55);
-  box-shadow: 0 0 0 3px rgba(20, 62, 122, 0.14);
+  border-color: rgba(36, 70, 111, 0.34);
+  box-shadow: 0 0 0 3px rgba(36, 70, 111, 0.08);
 }
 
-.search-dropdown {
+.search-dropdown,
+.lang-dropdown {
   border-radius: 14px;
-  border: 1px solid rgba(20, 54, 108, 0.16);
+  border: 1px solid rgba(20, 35, 56, 0.12);
   background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 18px 30px rgba(8, 30, 72, 0.14);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
 }
 
 .search-row {
@@ -443,7 +438,7 @@ watch(
 }
 
 .search-row:hover {
-  background-color: rgba(20, 62, 122, 0.07);
+  background-color: rgba(20, 35, 56, 0.04);
 }
 
 .contact-chip {
@@ -452,8 +447,8 @@ watch(
   gap: 6px;
   padding: 8px 11px;
   border-radius: 999px;
-  color: #0f2f61;
-  border: 1px solid rgba(20, 54, 108, 0.18);
+  color: #18304f;
+  border: 1px solid rgba(20, 35, 56, 0.12);
   background: rgba(255, 255, 255, 0.82);
   transition:
     background-color 0.2s ease,
@@ -463,12 +458,12 @@ watch(
 
 .contact-chip:hover {
   background: rgba(255, 255, 255, 1);
-  border-color: rgba(20, 54, 108, 0.35);
+  border-color: rgba(20, 35, 56, 0.2);
   transform: translateY(-1px);
 }
 
 .lang-button {
-  border: 1px solid rgba(20, 54, 108, 0.18);
+  border: 1px solid rgba(20, 35, 56, 0.12);
   background: rgba(255, 255, 255, 0.84);
   transition:
     border-color 0.2s ease,
@@ -477,13 +472,13 @@ watch(
 }
 
 .lang-button:hover {
-  border-color: rgba(20, 54, 108, 0.34);
+  border-color: rgba(20, 35, 56, 0.2);
   background: rgba(255, 255, 255, 1);
   transform: translateY(-1px);
 }
 
 .basket-chip {
-  border: 1px solid rgba(20, 54, 108, 0.2);
+  border: 1px solid rgba(20, 35, 56, 0.12);
   background: rgba(255, 255, 255, 0.84);
   transition:
     transform 0.2s ease,
@@ -493,32 +488,31 @@ watch(
 
 .basket-chip:hover {
   transform: translateY(-1px);
-  border-color: rgba(20, 54, 108, 0.36);
+  border-color: rgba(20, 35, 56, 0.2);
   background: rgba(255, 255, 255, 1);
 }
 
 .menu-toggle {
   border-radius: 12px;
-  border: 1px solid rgba(20, 54, 108, 0.2);
+  border: 1px solid rgba(20, 35, 56, 0.12);
   background: rgba(255, 255, 255, 0.86);
 }
 
 .menu-overlay {
-  background:
-    linear-gradient(180deg, rgba(248, 251, 255, 0.98), rgba(241, 246, 254, 0.98));
+  background: rgba(245, 247, 250, 0.94);
+  backdrop-filter: blur(12px);
 }
 
 .mobile-card {
   border-radius: 16px;
-  border: 1px solid rgba(20, 54, 108, 0.14);
+  border: 1px solid rgba(20, 35, 56, 0.1);
   background: rgba(255, 255, 255, 0.95);
   padding: 12px;
-  box-shadow: 0 14px 22px rgba(8, 30, 72, 0.08);
 }
 
 .mobile-link {
   text-align: left;
-  border: 1px solid rgba(20, 54, 108, 0.16);
+  border: 1px solid rgba(20, 35, 56, 0.1);
   border-radius: 12px;
   padding: 10px 12px;
   transition:
@@ -528,8 +522,8 @@ watch(
 }
 
 .mobile-link:hover {
-  background: rgba(20, 62, 122, 0.08);
-  color: #15407c;
+  background: rgba(20, 35, 56, 0.04);
+  color: #18304f;
   transform: translateX(2px);
 }
 
@@ -537,14 +531,14 @@ watch(
   cursor: pointer;
   border-radius: 999px;
   padding: 8px 12px;
-  border: 1px solid rgba(20, 54, 108, 0.2);
+  border: 1px solid rgba(20, 35, 56, 0.12);
   font-weight: 600;
-  color: #103663;
+  color: #18304f;
   background: #ffffff;
 }
 
 .mobile-basket {
-  background: #143d7a;
+  background: #18304f;
   color: #fff;
   border-color: transparent;
   padding-right: 28px;

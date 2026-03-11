@@ -163,13 +163,13 @@ const actionLabel = () => t("add_to_cart");
 
 <style scoped>
 .home-products-section {
-  background: linear-gradient(180deg, #f9fbff 0%, #f1f6ff 100%);
+  background: transparent;
 }
 
 .section-title {
   margin-bottom: clamp(2rem, 4vw, 3.2rem);
   text-align: center;
-  color: #132f62;
+  color: #142338;
   font-size: clamp(1.8rem, 3.1vw, 3rem);
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -178,11 +178,17 @@ const actionLabel = () => t("add_to_cart");
 .section-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  color: #194583;
-  font-size: 1rem;
+  gap: 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(20, 35, 56, 0.12);
+  background: rgba(255, 255, 255, 0.88);
+  color: #18304f;
+  font-size: 0.95rem;
   font-weight: 700;
-  transition: color 0.2s ease;
+  padding: 0.82rem 1.1rem;
+  transition:
+    border-color 0.2s ease,
+    transform 0.2s ease;
 }
 
 .section-link::after {
@@ -191,7 +197,8 @@ const actionLabel = () => t("add_to_cart");
 }
 
 .section-link:hover {
-  color: #0f2f61;
+  border-color: rgba(20, 35, 56, 0.22);
+  transform: translateY(-1px);
 }
 
 .section-link:hover::after {
@@ -201,24 +208,21 @@ const actionLabel = () => t("add_to_cart");
 .product-card {
   position: relative;
   overflow: hidden;
-  border-radius: 18px;
-  border: 1px solid rgba(20, 54, 108, 0.13);
+  border-radius: 20px;
+  border: 1px solid rgba(20, 35, 56, 0.1);
   background: #ffffff;
-  box-shadow: 0 12px 22px rgba(8, 30, 72, 0.07);
   padding: 12px;
   opacity: 0;
   transform: translateY(40px) scale(0.9);
   transition:
     opacity 0.5s ease,
     transform 0.5s ease,
-    box-shadow 0.3s ease,
     border-color 0.3s ease;
 }
 
 .product-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 18px 30px rgba(8, 30, 72, 0.13);
-  border-color: rgba(20, 54, 108, 0.26);
+  transform: translateY(-2px);
+  border-color: rgba(20, 35, 56, 0.18);
 }
 
 .product-card.animate-show {
@@ -234,9 +238,9 @@ const actionLabel = () => t("add_to_cart");
 .product-media {
   position: relative;
   min-height: 150px;
-  border-radius: 14px;
-  border: 1px solid rgba(20, 54, 108, 0.12);
-  background: linear-gradient(180deg, #fbfdff, #f3f7ff);
+  border-radius: 16px;
+  border: 1px solid rgba(20, 35, 56, 0.08);
+  background: #f3f5f7;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -251,8 +255,8 @@ const actionLabel = () => t("add_to_cart");
   padding: 4px 8px;
   font-size: 10px;
   font-weight: 800;
-  color: #1b4a8a;
-  background: rgba(20, 62, 122, 0.1);
+  color: #41536f;
+  background: rgba(20, 35, 56, 0.06);
 }
 
 .product-image {
@@ -274,35 +278,32 @@ const actionLabel = () => t("add_to_cart");
   font-size: 0.95rem;
   line-height: 1.45;
   font-weight: 700;
-  color: #1b3968;
+  color: #1b2d44;
   min-height: 46px;
 }
 
 .card-footer {
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px dashed rgba(20, 54, 108, 0.16);
+  border-top: 1px solid rgba(20, 35, 56, 0.08);
 }
 
 .product-price {
-  color: #12325f;
+  color: #142338;
   font-size: 1.02rem;
   font-weight: 800;
   margin-bottom: 10px;
 }
 
 .add-btn {
-  background: #143d7a;
-  border: 1px solid rgba(20, 54, 108, 0.14);
-  box-shadow: 0 10px 16px rgba(8, 33, 76, 0.18);
-  transition:
-    transform 0.25s ease,
-    box-shadow 0.25s ease;
+  background: #18304f;
+  border: 1px solid rgba(20, 35, 56, 0.06);
+  transition: transform 0.25s ease;
 }
 
 .add-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 14px 20px rgba(8, 33, 76, 0.24);
+  background: #142338;
 }
 
 .cart-icon {

@@ -190,7 +190,7 @@ const relatedActionLabel = () => t("add_to_cart");
         <LeftArrow :size="40" />
       </button>
 
-      <h2 class="detail-page-title text-2xl sm:text-3xl font-bold text-center text-blue-900">
+      <h2 class="detail-page-title text-center text-2xl font-bold sm:text-3xl">
         {{ t("product.about") }}
       </h2>
     </div>
@@ -198,7 +198,7 @@ const relatedActionLabel = () => t("add_to_cart");
       <div class="detail-gallery lg:w-1/2 flex justify-center items-center flex-col gap-4">
         <Swiper
           ref="swiperRef"
-          class="detail-swiper rounded-2xl w-full h-[450px] border border-gray-100 shadow-md bg-white"
+          class="detail-swiper h-[450px] w-full rounded-2xl bg-white"
           space-between="10"
           slides-per-view="1"
           :onSwiper="(swiper) => (swiperInstance = swiper)"
@@ -207,7 +207,7 @@ const relatedActionLabel = () => t("add_to_cart");
             <img
               :src="img"
               alt="Product"
-              class="detail-slide-image w-full h-[450px] object-contain rounded-2xl transition-transform duration-500 hover:scale-105"
+              class="detail-slide-image h-[450px] w-full rounded-2xl object-contain transition-transform duration-500 hover:scale-105"
             />
           </SwiperSlide>
         </Swiper>
@@ -216,7 +216,7 @@ const relatedActionLabel = () => t("add_to_cart");
             v-for="(img, index) in images"
             :key="index"
             :src="img"
-            class="detail-thumb w-24 h-24 object-cover rounded-xl border cursor-pointer transition-transform duration-300 hover:scale-110 hover:shadow-md"
+            class="detail-thumb h-24 w-24 cursor-pointer rounded-xl border object-cover transition-transform duration-300 hover:scale-105"
             @click="goToSlide(index)"
           />
         </div>
@@ -237,7 +237,7 @@ const relatedActionLabel = () => t("add_to_cart");
             >
               {{ t("productOptions.totalPrice") }}
             </span>
-            <span class="detail-price text-3xl font-semibold text-blue-800">
+            <span class="detail-price text-3xl font-semibold">
               {{ formatPrice(selectedPrice) }}
             </span>
           </div>
@@ -331,36 +331,34 @@ const relatedActionLabel = () => t("add_to_cart");
           </div>
 
           <!-- Quantity -->
-          <div
-            class="qty-box flex items-center border w-[160px] rounded-2xl overflow-hidden shadow-md bg-white"
-          >
+          <div class="qty-box flex w-[160px] items-center overflow-hidden rounded-2xl border bg-white">
             <button
               @click="Number(quantity) > 1 ? (quantity = Number(quantity) - 1) : null"
-              class="qty-btn w-12 h-12 flex items-center justify-center bg-blue-50 cursor-pointer hover:bg-blue-200 transition-all duration-300"
+              class="qty-btn flex h-12 w-12 cursor-pointer items-center justify-center transition-all duration-300"
             >
-              <Minus class="w-5 h-5 text-blue-700" />
+              <Minus class="h-5 w-5 text-slate-700" />
             </button>
 
             <input
               type="text"
               v-model="quantity"
-              class="qty-input w-16 text-center font-semibold text-xl text-gray-800 outline-none select-none focus:ring-2 focus:ring-blue-400"
+              class="qty-input w-16 select-none text-center text-xl font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-slate-300"
               @input="quantity = String(quantity).replace(/[^0-9]/g, '')"
               @blur="if (!quantity || parseInt(quantity) < 1) quantity = 1;"
             />
 
             <button
               @click="quantity = Number(quantity || 0) + 1"
-              class="qty-btn w-12 h-12 flex items-center justify-center bg-blue-50 cursor-pointer hover:bg-blue-200 transition-all duration-300"
+              class="qty-btn flex h-12 w-12 cursor-pointer items-center justify-center transition-all duration-300"
             >
-              <Plus class="w-5 h-5 text-blue-700" />
+              <Plus class="h-5 w-5 text-slate-700" />
             </button>
           </div>
 
           <!-- Add to cart -->
           <button
             @click="handleAddToBasket"
-            class="detail-add-btn relative cursor-pointer w-[70%] flex-1 flex items-center justify-center gap-2 bg-[#1a4f95] text-white py-4 rounded-2xl font-medium overflow-hidden shadow-lg hover:bg-blue-800 active:scale-95 transition-all duration-300"
+            class="detail-add-btn relative flex w-[70%] flex-1 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-2xl py-4 font-medium text-white transition-all duration-300 active:scale-95"
           >
             <span
               :class="
@@ -426,7 +424,7 @@ const relatedActionLabel = () => t("add_to_cart");
     ></span>
     <h3
       v-if="relatedProducts.length"
-      class="related-heading text-3xl font-bold text-blue-900 mt-[40px] mb-6 animate-fade-in-up"
+      class="related-heading mt-[40px] mb-6 text-3xl font-bold animate-fade-in-up"
     >
       {{ t("related_products") }}
     </h3>
@@ -508,9 +506,7 @@ const relatedActionLabel = () => t("add_to_cart");
 
 <style scoped>
 .detail-page {
-  background:
-    radial-gradient(circle at 0% 0%, rgba(24, 79, 149, 0.08), transparent 32%),
-    radial-gradient(circle at 100% 100%, rgba(15, 43, 102, 0.06), transparent 34%);
+  background: transparent;
   padding-bottom: 1.6rem;
 }
 
@@ -519,7 +515,7 @@ const relatedActionLabel = () => t("add_to_cart");
 }
 
 .detail-page-title {
-  color: #133166;
+  color: #142338;
   letter-spacing: -0.015em;
 }
 
@@ -527,10 +523,10 @@ const relatedActionLabel = () => t("add_to_cart");
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(20, 54, 108, 0.18);
+  border: 1px solid rgba(20, 35, 56, 0.12);
   border-radius: 12px;
   background: #ffffff;
-  color: #1b457f;
+  color: #18304f;
   padding: 2px;
   transition:
     transform 0.2s ease,
@@ -539,24 +535,23 @@ const relatedActionLabel = () => t("add_to_cart");
 
 .detail-back:hover {
   transform: translateX(-1px);
-  border-color: rgba(20, 54, 108, 0.32);
+  border-color: rgba(20, 35, 56, 0.2);
 }
 
 .detail-main {
-  border-radius: 18px;
-  border: 1px solid rgba(20, 54, 108, 0.12);
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 16px 30px rgba(8, 30, 72, 0.08);
+  border-radius: 24px;
+  border: 1px solid rgba(20, 35, 56, 0.1);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
   padding: clamp(0.9rem, 2vw, 1.3rem);
 }
 
 .detail-swiper {
-  border: 1px solid rgba(20, 54, 108, 0.12);
-  box-shadow: 0 14px 24px rgba(8, 30, 72, 0.1);
+  border: 1px solid rgba(20, 35, 56, 0.08);
 }
 
 .detail-slide-image {
-  background: linear-gradient(180deg, #fbfdff, #f4f8ff);
+  background: #f3f5f7;
 }
 
 .detail-thumbs {
@@ -564,13 +559,13 @@ const relatedActionLabel = () => t("add_to_cart");
 }
 
 .detail-thumb {
-  border-color: rgba(20, 54, 108, 0.16);
-  background: #ffffff;
+  border-color: rgba(20, 35, 56, 0.1);
+  background: #f8fafc;
   flex-shrink: 0;
 }
 
 .detail-info {
-  color: #193a67;
+  color: #1b2d44;
 }
 
 .detail-summary {
@@ -579,7 +574,7 @@ const relatedActionLabel = () => t("add_to_cart");
 }
 
 .detail-name {
-  color: #142f5f;
+  color: #142338;
   font-size: clamp(1.7rem, 2.8vw, 2.4rem);
 }
 
@@ -592,17 +587,16 @@ const relatedActionLabel = () => t("add_to_cart");
   max-width: 100%;
   padding: 1rem 1.15rem;
   border-radius: 20px;
-  border: 1px solid rgba(20, 54, 108, 0.1);
-  background: linear-gradient(180deg, rgba(251, 253, 255, 0.96), rgba(240, 246, 255, 0.9));
-  box-shadow: 0 14px 24px rgba(8, 30, 72, 0.08);
+  border: 1px solid rgba(20, 35, 56, 0.1);
+  background: #f4f6f8;
 }
 
 .detail-price {
-  color: #143d7a;
+  color: #142338;
 }
 
 .detail-price-label {
-  color: #6b7f9b;
+  color: #64748b;
 }
 
 .detail-actions {
@@ -616,11 +610,8 @@ const relatedActionLabel = () => t("add_to_cart");
   gap: 1rem;
   padding: 1.05rem 1.1rem;
   border-radius: 22px;
-  border: 1px solid rgba(20, 54, 108, 0.12);
-  background:
-    radial-gradient(circle at top right, rgba(42, 122, 83, 0.08), transparent 28%),
-    linear-gradient(180deg, #f7fcf8 0%, #f1f8f4 100%);
-  box-shadow: 0 16px 26px rgba(8, 30, 72, 0.06);
+  border: 1px solid rgba(24, 71, 55, 0.12);
+  background: #f4f8f4;
 }
 
 .credit-card-head {
@@ -635,21 +626,21 @@ const relatedActionLabel = () => t("add_to_cart");
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #5a8b6f;
+  color: #5f7468;
 }
 
 .credit-heading {
   margin-top: 0.24rem;
   font-size: 1.05rem;
   font-weight: 800;
-  color: #173c5c;
+  color: #1f3a31;
 }
 
 .credit-rate-pill {
   flex-shrink: 0;
   border-radius: 999px;
-  background: rgba(39, 117, 80, 0.1);
-  color: #236846;
+  background: rgba(24, 71, 55, 0.08);
+  color: #315646;
   padding: 0.45rem 0.8rem;
   font-size: 0.8rem;
   font-weight: 700;
@@ -671,32 +662,31 @@ const relatedActionLabel = () => t("add_to_cart");
   padding: 0.95rem 1rem;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(34, 108, 73, 0.08);
+  border: 1px solid rgba(24, 71, 55, 0.08);
 }
 
 .credit-metric-label {
   display: block;
   font-size: 0.8rem;
-  color: #698175;
+  color: #6a7d71;
 }
 
 .credit-metric-value {
   display: block;
   margin-top: 0.35rem;
   font-size: 1.12rem;
-  color: #153c5b;
+  color: #1f3a31;
 }
 
 .credit-note {
   grid-column: 1 / -1;
   font-size: 0.86rem;
-  color: #4f6a5b;
+  color: #5f7468;
 }
 
 .detail-options {
-  border-color: rgba(20, 54, 108, 0.12);
-  background: linear-gradient(180deg, rgba(249, 251, 255, 0.96), rgba(240, 246, 255, 0.88));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  border-color: rgba(20, 35, 56, 0.1);
+  background: #f6f7f9;
 }
 
 .detail-options-head {
@@ -710,7 +700,7 @@ const relatedActionLabel = () => t("add_to_cart");
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #7084a4;
+  color: #64748b;
 }
 
 .detail-option-group {
@@ -728,9 +718,9 @@ const relatedActionLabel = () => t("add_to_cart");
 .detail-option {
   min-width: 132px;
   border-radius: 14px;
-  border: 1px solid rgba(20, 54, 108, 0.12);
+  border: 1px solid rgba(20, 35, 56, 0.1);
   background: #ffffff;
-  color: #1c3864;
+  color: #1b2d44;
   padding: 0.8rem 0.95rem;
   display: flex;
   flex-direction: column;
@@ -738,73 +728,70 @@ const relatedActionLabel = () => t("add_to_cart");
   text-align: left;
   transition:
     border-color 0.2s ease,
-    box-shadow 0.2s ease,
     transform 0.2s ease;
 }
 
 .detail-option:hover {
-  border-color: rgba(20, 54, 108, 0.24);
+  border-color: rgba(20, 35, 56, 0.18);
   transform: translateY(-1px);
 }
 
 .detail-option-active {
-  border-color: rgba(20, 79, 149, 0.38);
-  box-shadow: 0 10px 18px rgba(10, 31, 75, 0.1);
-  background: linear-gradient(180deg, #f7fbff, #eef5ff);
+  border-color: rgba(20, 35, 56, 0.18);
+  background: #edf2f6;
 }
 
 .qty-box {
-  border-color: rgba(20, 54, 108, 0.16);
+  border-color: rgba(20, 35, 56, 0.12);
 }
 
 .qty-btn {
-  background: #edf3ff;
+  background: #f1f4f7;
 }
 
 .qty-btn:hover {
-  background: #dae8ff;
+  background: #e8edf2;
 }
 
 .qty-input {
-  color: #2a3e5f;
+  color: #22334b;
 }
 
 .detail-add-btn {
-  background: #143d7a;
-  border: 1px solid rgba(20, 54, 108, 0.18);
-  box-shadow: 0 14px 24px rgba(8, 30, 72, 0.22);
+  background: #18304f;
+  border: 1px solid rgba(20, 35, 56, 0.06);
 }
 
 .detail-add-btn:hover {
-  background: #0f2f61;
+  background: #142338;
 }
 
 .detail-tabs {
-  border-bottom: 1px solid rgba(20, 54, 108, 0.14);
+  border-bottom: 1px solid rgba(20, 35, 56, 0.1);
   padding-bottom: 0.45rem;
 }
 
 .detail-tab {
-  color: #637a9f;
+  color: #64748b;
   cursor: pointer;
   border-bottom: 2px solid transparent;
   padding-bottom: 0.25rem;
 }
 
 .detail-tab-active {
-  color: #1a447f;
-  border-bottom-color: #1a4f95;
+  color: #18304f;
+  border-bottom-color: #18304f;
 }
 
 .detail-content {
   display: block;
-  color: #3a4f70;
+  color: #46566c;
   line-height: 1.7;
   font-size: 0.97rem;
 }
 
 .related-heading {
-  color: #14315f;
+  color: #142338;
 }
 
 .related-grid {
@@ -812,24 +799,20 @@ const relatedActionLabel = () => t("add_to_cart");
 }
 
 .buttonShop {
-  background: #143d7a;
-  border: 1px solid rgba(20, 54, 108, 0.14);
-  box-shadow: 0 10px 16px rgba(8, 33, 76, 0.2);
-  transition:
-    transform 0.25s ease,
-    box-shadow 0.25s ease;
+  background: #18304f;
+  border: 1px solid rgba(20, 35, 56, 0.06);
+  transition: transform 0.25s ease;
 }
 
 .related-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 14px 20px rgba(8, 33, 76, 0.24);
+  background: #142338;
 }
 
 .related-card {
-  border-radius: 16px;
-  border: 1px solid rgba(20, 54, 108, 0.14);
+  border-radius: 20px;
+  border: 1px solid rgba(20, 35, 56, 0.1);
   background: #ffffff;
-  box-shadow: 0 12px 22px rgba(10, 31, 75, 0.08);
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -839,13 +822,11 @@ const relatedActionLabel = () => t("add_to_cart");
   transition:
     opacity 0.7s ease-out,
     transform 0.7s ease-out,
-    border-color 0.3s ease,
-    box-shadow 0.3s ease;
+    border-color 0.3s ease;
 }
 
 .related-card:hover {
-  border-color: rgba(20, 54, 108, 0.24);
-  box-shadow: 0 20px 30px rgba(10, 31, 75, 0.14);
+  border-color: rgba(20, 35, 56, 0.18);
 }
 
 .related-card.animate-show {
@@ -856,9 +837,9 @@ const relatedActionLabel = () => t("add_to_cart");
 .related-media {
   position: relative;
   min-height: 150px;
-  border-radius: 12px;
-  border: 1px solid rgba(20, 54, 108, 0.12);
-  background: linear-gradient(180deg, #fbfdff, #f3f7ff);
+  border-radius: 16px;
+  border: 1px solid rgba(20, 35, 56, 0.08);
+  background: #f3f5f7;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -871,8 +852,8 @@ const relatedActionLabel = () => t("add_to_cart");
   left: 10px;
   top: 10px;
   border-radius: 999px;
-  background: rgba(20, 62, 122, 0.1);
-  color: #1a4a89;
+  background: rgba(20, 35, 56, 0.06);
+  color: #41536f;
   padding: 3px 8px;
   font-size: 10px;
   font-weight: 800;
@@ -893,7 +874,7 @@ const relatedActionLabel = () => t("add_to_cart");
 
 .related-title {
   margin-top: 10px;
-  color: #1a3968;
+  color: #1b2d44;
   text-align: left;
   font-size: 0.95rem;
   font-weight: 700;
@@ -905,7 +886,7 @@ const relatedActionLabel = () => t("add_to_cart");
 .related-price {
   margin-top: 8px;
   margin-bottom: 10px;
-  color: #12325f;
+  color: #142338;
   font-size: 1rem;
   font-weight: 800;
   text-align: left;

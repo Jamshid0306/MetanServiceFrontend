@@ -147,9 +147,9 @@ watch(
 }
 
 .quick-toggle {
-  border: 1px solid rgba(24, 79, 149, 0.26);
-  background: linear-gradient(135deg, #0f2b66, #1a4f95 68%);
-  color: #ffffff;
+  border: 1px solid rgba(20, 35, 56, 0.14);
+  background: rgba(255, 255, 255, 0.92);
+  color: #18304f;
   border-radius: 999px;
   min-width: 128px;
   height: 3rem;
@@ -159,17 +159,16 @@ watch(
   gap: 0.45rem;
   font-size: 0.9rem;
   font-weight: 700;
-  box-shadow: 0 12px 24px rgba(6, 24, 58, 0.28);
   transition:
     transform 0.2s ease,
-    box-shadow 0.2s ease,
-    filter 0.2s ease;
+    background-color 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .quick-toggle:hover {
   transform: translateY(-1px);
-  box-shadow: 0 16px 26px rgba(6, 24, 58, 0.32);
-  filter: brightness(1.03);
+  border-color: rgba(20, 35, 56, 0.2);
+  background: #ffffff;
 }
 
 .quick-toggle-icon {
@@ -184,16 +183,16 @@ watch(
 
 .contact-panel {
   width: min(280px, calc(100vw - 2.5rem));
-  border-radius: 18px;
-  border: 1px solid rgba(24, 79, 149, 0.22);
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 20px 34px rgba(6, 24, 58, 0.22);
+  border-radius: 20px;
+  border: 1px solid rgba(20, 35, 56, 0.12);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
   padding: 0.82rem;
 }
 
 .contact-panel-title {
-  color: #122d61;
+  color: #142338;
   font-size: 0.86rem;
   font-weight: 800;
   line-height: 1.1;
@@ -204,7 +203,7 @@ watch(
 .contact-panel-subtitle {
   margin-top: 0.22rem;
   margin-bottom: 0.72rem;
-  color: #4f6f9f;
+  color: #64748b;
   font-size: 0.76rem;
   font-weight: 600;
 }
@@ -225,7 +224,7 @@ watch(
 }
 
 .contact-link:hover {
-  background: rgba(15, 43, 102, 0.06);
+  background: rgba(20, 35, 56, 0.04);
   transform: translateX(1px);
 }
 
@@ -236,27 +235,27 @@ watch(
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  color: #142338;
   flex-shrink: 0;
 }
 
 .contact-link-icon-tg {
-  background: linear-gradient(135deg, #1f5ca5, #347fca);
+  background: #eef2f6;
 }
 
 .contact-link-icon-inst {
-  background: linear-gradient(135deg, #2e4f96, #4d7acd);
+  background: #eef2f6;
 }
 
 .contact-link-icon-fb {
-  background: linear-gradient(135deg, #153d7c, #2158a7);
+  background: #eef2f6;
 }
 
 .contact-link-text {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  color: #102c5b;
+  color: #142338;
 }
 
 .contact-link-text strong {
@@ -268,7 +267,7 @@ watch(
 .contact-link-text small {
   margin-top: 1px;
   font-size: 0.72rem;
-  color: #5470a1;
+  color: #64748b;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

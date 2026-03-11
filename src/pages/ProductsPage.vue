@@ -197,7 +197,7 @@ onMounted(async () => {
             <button
               v-if="isAnyFilterActive"
               @click="clearFilters"
-              class="text-sm text-blue-700 hover:text-blue-900 font-semibold transition-colors"
+              class="text-sm font-semibold text-slate-700 transition-colors hover:text-slate-950"
             >
               {{ t("clear") }}
             </button>
@@ -278,7 +278,7 @@ onMounted(async () => {
       <button
         @click="currentPage > 1 && currentPage--"
         :disabled="currentPage === 1"
-        class="w-9 h-9 flex items-center justify-center rounded-full border border-slate-300 text-slate-600 hover:bg-blue-700 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+        class="w-9 h-9 flex items-center justify-center rounded-full border border-slate-300 text-slate-600 transition-all hover:bg-slate-900 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
       >
         ‹
       </button>
@@ -290,8 +290,8 @@ onMounted(async () => {
         class="w-9 h-9 flex items-center justify-center rounded-full font-medium transition-all"
         :class="
           currentPage === page
-            ? 'bg-blue-700 text-white shadow-md scale-105 border border-blue-700'
-            : 'border border-slate-300 text-slate-700 hover:bg-blue-100'
+            ? 'border border-slate-900 bg-slate-900 text-white'
+            : 'border border-slate-300 text-slate-700 hover:bg-slate-100'
         "
       >
         {{ page }}
@@ -300,7 +300,7 @@ onMounted(async () => {
       <button
         @click="currentPage < totalPages && currentPage++"
         :disabled="currentPage === totalPages"
-        class="w-9 h-9 flex items-center justify-center rounded-full border border-slate-300 text-slate-600 hover:bg-blue-700 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+        class="w-9 h-9 flex items-center justify-center rounded-full border border-slate-300 text-slate-600 transition-all hover:bg-slate-900 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
       >
         ›
       </button>
@@ -317,38 +317,32 @@ onMounted(async () => {
 
 <style scoped>
 .products-page {
-  background:
-    radial-gradient(circle at top right, rgba(24, 79, 149, 0.09), transparent 42%),
-    radial-gradient(circle at bottom left, rgba(15, 43, 102, 0.06), transparent 40%),
-    #f8fbff;
+  background: transparent;
 }
 
 .filter-panel {
-  background: #ffffff;
-  border: 1px solid #dfe8f6;
-  border-radius: 14px;
-  box-shadow: 0 10px 20px rgba(8, 30, 72, 0.08);
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(20, 35, 56, 0.1);
+  border-radius: 18px;
+  backdrop-filter: blur(8px);
 }
 
 .catalog-card {
-  border-radius: 16px;
-  border: 1px solid rgba(20, 54, 108, 0.14);
+  border-radius: 20px;
+  border: 1px solid rgba(20, 35, 56, 0.1);
   background: #ffffff;
-  box-shadow: 0 12px 22px rgba(8, 30, 72, 0.07);
   padding: 10px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   transition:
     transform 0.3s ease,
-    box-shadow 0.3s ease,
     border-color 0.3s ease;
 }
 
 .catalog-card:hover {
-  transform: translateY(-4px);
-  border-color: rgba(20, 54, 108, 0.25);
-  box-shadow: 0 18px 28px rgba(8, 30, 72, 0.13);
+  transform: translateY(-2px);
+  border-color: rgba(20, 35, 56, 0.18);
 }
 
 .catalog-meta {
@@ -359,8 +353,8 @@ onMounted(async () => {
 
 .catalog-id {
   border-radius: 999px;
-  background: rgba(20, 62, 122, 0.1);
-  color: #194887;
+  background: rgba(20, 35, 56, 0.06);
+  color: #41536f;
   padding: 3px 8px;
   font-size: 10px;
   font-weight: 800;
@@ -368,9 +362,9 @@ onMounted(async () => {
 
 .catalog-media {
   min-height: 126px;
-  border-radius: 12px;
-  border: 1px solid rgba(20, 54, 108, 0.12);
-  background: linear-gradient(180deg, #fbfdff, #f3f7ff);
+  border-radius: 16px;
+  border: 1px solid rgba(20, 35, 56, 0.08);
+  background: #f3f5f7;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -394,7 +388,7 @@ onMounted(async () => {
 .catalog-title {
   margin-top: 10px;
   text-align: left;
-  color: #1a3968;
+  color: #1b2d44;
   font-size: 0.9rem;
   font-weight: 700;
   line-height: 1.4;
@@ -404,11 +398,11 @@ onMounted(async () => {
 .catalog-footer {
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px dashed rgba(20, 54, 108, 0.16);
+  border-top: 1px solid rgba(20, 35, 56, 0.08);
 }
 
 .catalog-price {
-  color: #12325f;
+  color: #142338;
   font-size: 1rem;
   font-weight: 800;
   margin-bottom: 10px;
@@ -416,20 +410,17 @@ onMounted(async () => {
 }
 
 .cart-btn {
-  background: #143d7a;
-  border: 1px solid rgba(20, 54, 108, 0.14);
-  box-shadow: 0 10px 16px rgba(8, 33, 76, 0.2);
+  background: #18304f;
+  border: 1px solid rgba(20, 35, 56, 0.06);
 }
 
 .catalog-btn {
-  transition:
-    transform 0.25s ease,
-    box-shadow 0.25s ease;
+  transition: transform 0.25s ease;
 }
 
 .catalog-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 14px 20px rgba(8, 33, 76, 0.25);
+  background: #142338;
 }
 
 .catalog-cart-icon {

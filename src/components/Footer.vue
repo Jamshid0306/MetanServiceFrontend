@@ -1,8 +1,5 @@
 <template>
   <footer id="site-footer" class="footer-shell relative overflow-hidden pt-16 pb-8">
-    <span class="footer-aura footer-aura-left" />
-    <span class="footer-aura footer-aura-right" />
-
     <div class="container mx-auto px-6 relative z-10">
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div class="lg:col-span-5 footer-card animate-fade-in-up">
@@ -96,42 +93,15 @@ const { t } = useI18n();
 
 <style scoped>
 .footer-shell {
-  background: linear-gradient(155deg, #0a1f47 0%, #103263 52%, #12376d 100%);
-  color: #dbe4ff;
-}
-
-.footer-aura {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(56px);
-  opacity: 0.3;
-  pointer-events: none;
-  animation: aura-drift 18s ease-in-out infinite;
-}
-
-.footer-aura-left {
-  width: 280px;
-  height: 280px;
-  left: -100px;
-  top: -80px;
-  background: rgba(44, 106, 191, 0.56);
-}
-
-.footer-aura-right {
-  width: 250px;
-  height: 250px;
-  right: -80px;
-  bottom: -70px;
-  background: rgba(62, 143, 218, 0.48);
-  animation-delay: 2.5s;
+  background: linear-gradient(180deg, #141d2a 0%, #182433 100%);
+  color: #d7e0ea;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .footer-card {
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 16px 30px rgba(4, 18, 45, 0.28);
-  backdrop-filter: blur(8px);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
   padding: 24px;
 }
 
@@ -139,7 +109,6 @@ const { t } = useI18n();
   width: 190px;
   max-width: 100%;
   border-radius: 12px;
-  box-shadow: 0 12px 24px rgba(4, 18, 45, 0.34);
 }
 
 .footer-description {
@@ -158,11 +127,11 @@ const { t } = useI18n();
 
 .footer-chip {
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   padding: 8px 12px;
   font-size: 0.83rem;
   color: #edf3ff;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.02);
   transition:
     transform 0.2s ease,
     border-color 0.2s ease,
@@ -171,8 +140,8 @@ const { t } = useI18n();
 
 .footer-chip:hover {
   transform: translateY(-1px);
-  border-color: rgba(255, 255, 255, 0.34);
-  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .footer-title {
@@ -185,7 +154,7 @@ const { t } = useI18n();
 
 .footer-link {
   position: relative;
-  color: rgba(238, 242, 255, 0.82);
+  color: rgba(231, 238, 247, 0.78);
   transition:
     color 0.2s ease,
     transform 0.2s ease;
@@ -198,7 +167,7 @@ const { t } = useI18n();
   bottom: -3px;
   width: 100%;
   height: 1px;
-  background: rgba(220, 231, 255, 0.65);
+  background: rgba(231, 238, 247, 0.48);
   transform: scaleX(0);
   transform-origin: right;
   transition: transform 0.25s ease;
@@ -215,7 +184,7 @@ const { t } = useI18n();
 }
 
 .footer-contact {
-  color: rgba(238, 242, 255, 0.87);
+  color: rgba(231, 238, 247, 0.82);
   transition: color 0.2s ease;
 }
 
@@ -227,7 +196,7 @@ const { t } = useI18n();
 .footer-bottom {
   margin-top: 28px;
   padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -237,13 +206,13 @@ const { t } = useI18n();
 
 .edev-link {
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 6px 12px 6px 6px;
   color: #e7eeff;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.03);
   transition:
     transform 0.2s ease,
     border-color 0.2s ease,
@@ -252,8 +221,8 @@ const { t } = useI18n();
 
 .edev-link:hover {
   transform: translateY(-1px);
-  border-color: rgba(255, 255, 255, 0.3);
-  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .animation-delay-200 {
@@ -277,13 +246,4 @@ const { t } = useI18n();
   animation: fade-in-up 0.8s ease-out forwards;
 }
 
-@keyframes aura-drift {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-  50% {
-    transform: translate3d(20px, -16px, 0);
-  }
-}
 </style>

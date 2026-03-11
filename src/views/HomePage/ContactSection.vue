@@ -57,23 +57,23 @@ const telegramUrl = "https://t.me/metanservice";
 
 <style scoped>
 .contact-section {
-  background: linear-gradient(180deg, #f5f9ff 0%, #edf3ff 100%);
+  background: transparent;
 }
 
 .contact-shell {
   display: grid;
   grid-template-columns: 0.95fr 1.05fr;
   gap: 1rem;
-  border-radius: 22px;
-  border: 1px solid rgba(20, 54, 108, 0.14);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 18px 30px rgba(8, 30, 72, 0.1);
+  border-radius: 24px;
+  border: 1px solid rgba(20, 35, 56, 0.1);
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(8px);
   padding: clamp(0.9rem, 1.7vw, 1.2rem);
 }
 
 .contact-content {
-  border-radius: 16px;
-  border: 1px solid rgba(20, 54, 108, 0.11);
+  border-radius: 18px;
+  border: 1px solid rgba(20, 35, 56, 0.08);
   background: rgba(255, 255, 255, 0.98);
   padding: clamp(1rem, 2vw, 1.55rem);
 }
@@ -81,8 +81,8 @@ const telegramUrl = "https://t.me/metanservice";
 .contact-kicker {
   display: inline-flex;
   border-radius: 999px;
-  background: rgba(20, 62, 122, 0.1);
-  color: #133f7e;
+  background: rgba(20, 35, 56, 0.06);
+  color: #41536f;
   font-size: 0.76rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -92,7 +92,7 @@ const telegramUrl = "https://t.me/metanservice";
 
 .contact-title {
   margin-top: 0.72rem;
-  color: #12315f;
+  color: #142338;
   font-weight: 800;
   line-height: 1.18;
   font-size: clamp(1.2rem, 2vw, 1.9rem);
@@ -100,7 +100,7 @@ const telegramUrl = "https://t.me/metanservice";
 
 .contact-address {
   margin-top: 0.56rem;
-  color: #45608a;
+  color: #64748b;
   line-height: 1.6;
   font-size: 0.95rem;
 }
@@ -114,19 +114,17 @@ const telegramUrl = "https://t.me/metanservice";
 
 .contact-card {
   border-radius: 12px;
-  border: 1px solid rgba(20, 54, 108, 0.14);
+  border: 1px solid rgba(20, 35, 56, 0.1);
   background: #ffffff;
   padding: 0.72rem 0.78rem;
   transition:
     transform 0.2s ease,
-    box-shadow 0.2s ease,
     border-color 0.2s ease;
 }
 
 .contact-card:hover {
   transform: translateY(-1px);
-  border-color: rgba(20, 54, 108, 0.26);
-  box-shadow: 0 10px 16px rgba(8, 30, 72, 0.1);
+  border-color: rgba(20, 35, 56, 0.18);
 }
 
 .contact-label {
@@ -135,7 +133,7 @@ const telegramUrl = "https://t.me/metanservice";
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: #516b95;
+  color: #64748b;
 }
 
 .contact-value {
@@ -143,16 +141,16 @@ const telegramUrl = "https://t.me/metanservice";
   margin-top: 0.24rem;
   font-size: 0.9rem;
   line-height: 1.45;
-  color: #12325f;
+  color: #142338;
   font-weight: 700;
 }
 
 .map-wrap {
-  border-radius: 16px;
+  border-radius: 18px;
   overflow: hidden;
-  border: 1px solid rgba(20, 54, 108, 0.16);
+  border: 1px solid rgba(20, 35, 56, 0.1);
   min-height: 360px;
-  box-shadow: 0 16px 26px rgba(8, 30, 72, 0.14);
+  background: #ffffff;
 }
 
 .map-frame {

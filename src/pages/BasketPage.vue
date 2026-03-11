@@ -157,7 +157,7 @@ const submitOrder = async () => {
       <RouterLink class="basket-back hover:scale-105" to="/">
         <LeftArrow :size="30" />
       </RouterLink>
-      <h1 class="basket-title text-3xl font-bold text-blue-800 flex items-center gap-3 animate-fade">
+      <h1 class="basket-title animate-fade flex items-center gap-3 text-3xl font-bold">
         <ShoppingCart class="w-6 h-6" /> {{ t("basket") }}
       </h1>
     </div>
@@ -172,7 +172,7 @@ const submitOrder = async () => {
         <div
           v-for="item in basketStore.basket"
           :key="getItemKey(item)"
-          class="basket-card bg-white border border-gray-200 rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 overflow-hidden flex flex-col sm:flex-row items-center sm:items-stretch group"
+          class="basket-card group flex flex-col items-center overflow-hidden rounded-2xl border bg-white transition-all duration-500 sm:flex-row sm:items-stretch"
         >
           <div
             class="basket-media flex-shrink-0 w-full sm:w-40 h-40 flex items-center justify-center cursor-pointer"
@@ -180,7 +180,7 @@ const submitOrder = async () => {
           >
             <img
               :src="normalizeImages(item.images)[0]"
-              class="w-28 h-28 object-contain transition-transform duration-300 group-hover:scale-105"
+              class="h-28 w-28 object-contain transition-transform duration-300 group-hover:scale-105"
             />
           </div>
           <hr class="basket-divider h-full w-[1px] bg-gray-300" />
@@ -246,10 +246,10 @@ const submitOrder = async () => {
           <div
             class="basket-controls flex items-center justify-end gap-6 px-5 py-4 border-t sm:border-t-0 sm:border-l border-gray-100"
           >
-            <span class="basket-qty flex items-center border rounded-xl overflow-hidden shadow-sm">
+            <span class="basket-qty flex items-center overflow-hidden rounded-xl border">
               <button
                 @click="basketStore.decreaseQuantity(getItemKey(item))"
-                class="basket-qty-btn w-10 h-10 flex items-center justify-center text-lg font-bold text-blue-700 bg-blue-50 hover:bg-blue-200 cursor-pointer transition-all duration-300"
+                class="basket-qty-btn flex h-10 w-10 cursor-pointer items-center justify-center text-lg font-bold text-slate-700 transition-all duration-300"
               >
                 –
               </button>
@@ -257,7 +257,7 @@ const submitOrder = async () => {
               <input
                 type="text"
                 v-model="item.quantity"
-                class="basket-qty-input w-14 text-center font-semibold text-gray-700 outline-none focus:ring-2 focus:ring-blue-400"
+                class="basket-qty-input w-14 text-center font-semibold text-gray-700 outline-none focus:ring-2 focus:ring-slate-300"
                 @input="item.quantity = String(item.quantity).replace(/[^0-9]/g, '')"
                 @blur="
                   if (!item.quantity || parseInt(item.quantity) < 1)
@@ -268,13 +268,13 @@ const submitOrder = async () => {
 
               <button
                 @click="basketStore.updateQuantity(getItemKey(item), Number(item.quantity || 0) + 1)"
-                class="basket-qty-btn w-10 h-10 flex items-center justify-center text-lg font-bold text-blue-700 bg-blue-50 hover:bg-blue-200 cursor-pointer transition-all duration-300"
+                class="basket-qty-btn flex h-10 w-10 cursor-pointer items-center justify-center text-lg font-bold text-slate-700 transition-all duration-300"
               >
                 +
               </button>
             </span>
 
-            <span class="basket-item-price text-xl font-bold text-blue-800 min-w-[140px] text-right">
+            <span class="basket-item-price min-w-[140px] text-right text-xl font-bold">
               {{
                 typeof extractNumericOrText(getBasketPrice(item, locale)) === "number"
                   ? formatPrice(
@@ -286,9 +286,9 @@ const submitOrder = async () => {
 
             <button
               @click="removeItem(item)"
-              class="basket-remove p-2 bg-blue-50 rounded-xl hover:bg-blue-200 cursor-pointer transition-all duration-300"
+              class="basket-remove cursor-pointer rounded-xl p-2 transition-all duration-300"
             >
-              <Trash2 class="w-5 h-5 text-blue-700" />
+              <Trash2 class="h-5 w-5 text-slate-700" />
             </button>
           </div>
         </div>
@@ -298,7 +298,7 @@ const submitOrder = async () => {
         <p class="text-xl mb-4">{{ t("empty") }}</p>
         <button
           @click="router.push('/products')"
-          class="basket-empty-btn bg-blue-700 text-white py-3 px-6 rounded-xl hover:bg-blue-800 transition-all duration-300"
+          class="basket-empty-btn rounded-xl px-6 py-3 text-white transition-all duration-300"
         >
           {{ t("seeProducts") }}
         </button>
@@ -309,12 +309,12 @@ const submitOrder = async () => {
         v-if="basketStore.basket.length"
       >
         <div class="basket-total-row flex justify-between items-center gap-6">
-          <p class="basket-total text-2xl font-bold text-blue-800">
+          <p class="basket-total text-2xl font-bold">
             {{ t("allBasket") }}: {{ formatPrice(totalPrice) }}
           </p>
           <button
             @click="basketStore.clearBasket()"
-            class="basket-clear bg-gradient-to-r from-blue-600 to-blue-800 text-white py-3 px-6 rounded-xl shadow-lg hover:from-blue-700 hover:to-blue-900 transition-all duration-300"
+            class="basket-clear rounded-xl px-6 py-3 text-white transition-all duration-300"
           >
             {{ t("clear") }}
           </button>
@@ -358,56 +358,53 @@ const submitOrder = async () => {
 
 <style scoped>
 .basket-page {
-  background:
-    radial-gradient(circle at 0% 0%, rgba(24, 79, 149, 0.08), transparent 32%),
-    radial-gradient(circle at 100% 100%, rgba(15, 43, 102, 0.06), transparent 34%);
+  background: transparent;
 }
 
 .basket-back {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(20, 54, 108, 0.18);
+  border: 1px solid rgba(20, 35, 56, 0.12);
   border-radius: 12px;
   background: #ffffff;
-  color: #1a447f;
+  color: #18304f;
   padding: 2px;
 }
 
 .basket-title {
-  color: #14325f;
+  color: #142338;
 }
 
 .basket-card {
-  border: 1px solid rgba(20, 54, 108, 0.14);
-  box-shadow: 0 12px 20px rgba(8, 30, 72, 0.08);
+  border: 1px solid rgba(20, 35, 56, 0.1);
 }
 
 .basket-card:hover {
-  box-shadow: 0 18px 28px rgba(8, 30, 72, 0.14);
+  border-color: rgba(20, 35, 56, 0.18);
 }
 
 .basket-media {
-  background: linear-gradient(180deg, #fbfdff, #f2f7ff);
+  background: #f3f5f7;
 }
 
 .basket-divider {
-  background: rgba(20, 54, 108, 0.16);
+  background: rgba(20, 35, 56, 0.12);
 }
 
 .basket-name {
-  color: #183a6a;
+  color: #1b2d44;
 }
 
 .basket-configurator {
   padding: 1rem;
-  border-radius: 16px;
-  border: 1px solid rgba(20, 54, 108, 0.1);
-  background: #f8fbff;
+  border-radius: 18px;
+  border: 1px solid rgba(20, 35, 56, 0.08);
+  background: #f6f7f9;
 }
 
 .basket-configurator-title {
-  color: #173861;
+  color: #142338;
   font-size: 0.9rem;
   font-weight: 800;
 }
@@ -419,7 +416,7 @@ const submitOrder = async () => {
 .basket-option-group-title {
   margin-top: 0.7rem;
   margin-bottom: 0.45rem;
-  color: #5e7597;
+  color: #64748b;
   font-size: 0.8rem;
   font-weight: 700;
 }
@@ -437,9 +434,9 @@ const submitOrder = async () => {
   min-height: 38px;
   padding: 0.45rem 0.8rem;
   border-radius: 999px;
-  border: 1px solid rgba(20, 54, 108, 0.12);
+  border: 1px solid rgba(20, 35, 56, 0.1);
   background: #ffffff;
-  color: #31527f;
+  color: #41536f;
   font-size: 0.78rem;
   font-weight: 700;
   transition:
@@ -451,14 +448,13 @@ const submitOrder = async () => {
 
 .basket-option-chip:hover {
   transform: translateY(-1px);
-  border-color: rgba(20, 54, 108, 0.24);
+  border-color: rgba(20, 35, 56, 0.18);
 }
 
 .basket-option-chip-active {
-  border-color: transparent;
-  background: #143d7a;
-  color: #ffffff;
-  box-shadow: 0 10px 18px rgba(8, 30, 72, 0.18);
+  border-color: rgba(20, 35, 56, 0.18);
+  background: #edf2f6;
+  color: #142338;
 }
 
 .basket-option-delta {
@@ -467,35 +463,35 @@ const submitOrder = async () => {
 }
 
 .basket-controls {
-  border-color: rgba(20, 54, 108, 0.12);
+  border-color: rgba(20, 35, 56, 0.08);
 }
 
 .basket-qty {
-  border-color: rgba(20, 54, 108, 0.18);
+  border-color: rgba(20, 35, 56, 0.12);
 }
 
 .basket-qty-btn {
-  background: #edf3ff;
+  background: #f1f4f7;
 }
 
 .basket-qty-btn:hover {
-  background: #dae8ff;
+  background: #e8edf2;
 }
 
 .basket-qty-input {
-  color: #253a5a;
+  color: #22334b;
 }
 
 .basket-item-price {
-  color: #123660;
+  color: #142338;
 }
 
 .basket-remove {
-  background: #edf3ff;
+  background: #f1f4f7;
 }
 
 .basket-remove:hover {
-  background: #dae8ff;
+  background: #e8edf2;
 }
 
 .basket-empty {
@@ -503,24 +499,23 @@ const submitOrder = async () => {
 }
 
 .basket-empty-btn {
-  background: #143d7a;
+  background: #18304f;
 }
 
 .basket-empty-btn:hover {
-  background: #0f2f61;
+  background: #142338;
 }
 
 .basket-total {
-  color: #14325f;
+  color: #142338;
 }
 
 .basket-clear {
-  background: #143d7a;
-  box-shadow: 0 12px 20px rgba(8, 30, 72, 0.2);
+  background: #18304f;
 }
 
 .basket-clear:hover {
-  background: #0f2f61;
+  background: #142338;
 }
 
 .basket-summary-grid {
@@ -531,20 +526,20 @@ const submitOrder = async () => {
 .basket-checkout-card {
   padding: 1.2rem;
   border-radius: 20px;
-  border: 1px solid rgba(20, 54, 108, 0.14);
-  background: linear-gradient(180deg, #ffffff, #f6faff);
-  box-shadow: 0 14px 24px rgba(8, 30, 72, 0.08);
+  border: 1px solid rgba(20, 35, 56, 0.1);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(8px);
 }
 
 .basket-checkout-title {
-  color: #14325f;
+  color: #142338;
   font-size: 1.2rem;
   font-weight: 800;
 }
 
 .basket-checkout-subtitle {
   margin-top: 0.3rem;
-  color: #60789a;
+  color: #64748b;
 }
 
 .basket-checkout-form {
@@ -559,9 +554,9 @@ const submitOrder = async () => {
   min-height: 48px;
   padding: 0.75rem 0.95rem;
   border-radius: 14px;
-  border: 1px solid rgba(20, 54, 108, 0.14);
+  border: 1px solid rgba(20, 35, 56, 0.12);
   background: #ffffff;
-  color: #1d355d;
+  color: #22334b;
   outline: none;
   transition:
     border-color 0.2s ease,
@@ -569,8 +564,8 @@ const submitOrder = async () => {
 }
 
 .basket-field:focus {
-  border-color: rgba(20, 79, 149, 0.36);
-  box-shadow: 0 0 0 4px rgba(26, 79, 149, 0.08);
+  border-color: rgba(20, 35, 56, 0.2);
+  box-shadow: 0 0 0 4px rgba(20, 35, 56, 0.06);
 }
 
 .basket-error {
@@ -584,19 +579,18 @@ const submitOrder = async () => {
   min-height: 50px;
   width: 100%;
   border-radius: 14px;
-  background: linear-gradient(135deg, #143d7a, #1a4f95);
+  background: #18304f;
   color: #ffffff;
   font-weight: 800;
-  box-shadow: 0 12px 20px rgba(8, 30, 72, 0.18);
   transition:
     transform 0.2s ease,
-    box-shadow 0.2s ease,
+    background-color 0.2s ease,
     opacity 0.2s ease;
 }
 
 .basket-submit-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 16px 24px rgba(8, 30, 72, 0.22);
+  background: #142338;
 }
 
 .basket-submit-btn:disabled {

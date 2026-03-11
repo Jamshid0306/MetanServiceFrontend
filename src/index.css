@@ -67,12 +67,20 @@
   padding: 0 15px;
 }
 :root {
-  --brand-ink: #081a42;
-  --brand-deep: #0f2b66;
-  --brand-main: #1a4f95;
-  --brand-bright: #3e8fda;
-  --brand-soft: #edf4ff;
-  --brand-border: rgba(24, 70, 132, 0.22);
+  --brand-ink: #142338;
+  --brand-deep: #18304f;
+  --brand-main: #24466f;
+  --brand-bright: #627c9b;
+  --brand-soft: #f4f7fa;
+  --brand-border: rgba(20, 35, 56, 0.12);
+  --surface-canvas: #f5f7fa;
+  --surface-panel: rgba(255, 255, 255, 0.9);
+  --surface-muted: #edf1f5;
+  --line-soft: rgba(20, 35, 56, 0.1);
+  --line-strong: rgba(20, 35, 56, 0.16);
+  --text-main: #142338;
+  --text-muted: #64748b;
+  --shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.05);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -106,6 +114,10 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 .dark {
@@ -154,10 +166,9 @@
     isolation: isolate;
     min-height: 100vh;
     overflow-x: hidden;
+    color: var(--text-main);
     background:
-      radial-gradient(circle at 0% 0%, rgba(24, 79, 149, 0.09), transparent 33%),
-      radial-gradient(circle at 100% 100%, rgba(15, 43, 102, 0.06), transparent 38%),
-      var(--background);
+      linear-gradient(180deg, #fbfcfd 0%, var(--surface-canvas) 54%, #f2f5f8 100%);
   }
 
   h1,
@@ -177,35 +188,16 @@
 body::before {
   content: "";
   position: fixed;
-  inset: -10% -5%;
-  z-index: -2;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 10% 20%, rgba(26, 79, 149, 0.12), transparent 34%),
-    radial-gradient(circle at 80% 12%, rgba(62, 143, 218, 0.1), transparent 30%),
-    radial-gradient(circle at 72% 80%, rgba(15, 43, 102, 0.06), transparent 36%);
-  animation: auroraDrift 18s ease-in-out infinite alternate;
-}
-
-body::after {
-  content: "";
-  position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-image:
-    linear-gradient(
-      to right,
-      rgba(42, 78, 138, 0.025) 1px,
-      transparent 1px
-    ),
-    linear-gradient(
-      to bottom,
-      rgba(42, 78, 138, 0.022) 1px,
-      transparent 1px
-    );
-  background-size: 52px 52px;
-  mask-image: radial-gradient(circle at center, black 42%, transparent 88%);
+  background:
+    radial-gradient(circle at top left, rgba(36, 70, 111, 0.06), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(99, 122, 155, 0.06), transparent 28%);
+}
+
+body::after {
+  display: none;
 }
 
 .brand-gradient-text {
@@ -217,9 +209,9 @@ body::after {
 
 .brand-surface {
   border: 1px solid var(--brand-border);
-  background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 14px 24px rgba(12, 35, 82, 0.1);
+  background: var(--surface-panel);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-soft);
 }
 
 @keyframes auroraDrift {

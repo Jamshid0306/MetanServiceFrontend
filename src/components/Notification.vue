@@ -56,20 +56,20 @@ onBeforeUnmount(() => {
   <transition name="toast-slide">
     <div
       v-if="visible"
-      class="fixed top-6 right-6 max-w-xs w-full bg-gradient-to-r from-green-50 to-white shadow-2xl rounded-2xl p-4 flex items-start gap-3 border border-green-200 z-[9999]"
+      class="fixed top-6 right-6 z-[9999] flex w-full max-w-xs items-start gap-3 rounded-2xl border border-slate-200 bg-white/96 p-4 backdrop-blur-md"
       @mouseenter="isHovered = true; clearTimer()"
       @mouseleave="isHovered = false; startTimer()"
     >
-      <div class="bg-green-100 p-2 rounded-full">
-        <Check class="w-6 h-6 text-green-600" />
+      <div class="rounded-full bg-slate-100 p-2">
+        <Check class="h-6 w-6 text-slate-700" />
       </div>
       <div>
-        <p class="text-gray-800 font-semibold leading-snug">
+        <p class="font-semibold leading-snug text-slate-800">
           {{ message }}
         </p>
         <button
           @click="goToBasket"
-          class="text-green-700 font-medium text-sm mt-2 hover:underline transition-colors"
+          class="mt-2 text-sm font-medium text-slate-700 transition-colors hover:text-slate-950"
         >
           {{ t('go_to_basket') }} →
         </button>
