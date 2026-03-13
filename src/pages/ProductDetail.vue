@@ -1,8 +1,8 @@
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
 import { useProductsStore } from "../store/productsStore";
 import { useBasketStore } from "../store/basketStore";
-import { ShoppingCart, Check, Plus, Minus } from "lucide-vue-next";
+import { ShoppingCart, Check, Plus, Minus, X } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { useRoute, useRouter } from "vue-router";
@@ -10,7 +10,7 @@ import "swiper/css";
 import LeftArrow from "@/components/icons/LeftArrow.vue";
 import { useLoaderStore } from "@/store/loaderStore";
 import Notification from "@/components/Notification.vue";
-import { resolveAssetUrls } from "@/lib/api";
+import { apiClient, getApiErrorMessage, resolveAssetUrls } from "@/lib/api";
 import {
   calculateCreditPlan,
   buildConfiguredBasketItem,
@@ -21,6 +21,7 @@ import {
   getCreditPlans,
   getProductOptionGroups,
   hasCreditPricing,
+  parseNumericPrice,
 } from "@/lib/productOptions";
 
 const router = useRouter();
@@ -39,37 +40,48 @@ const swiperRef = ref(null);
 const notification = ref({ show: false, message: "" });
 const selectedOptions = ref({});
 const selectedCreditMonths = ref(null);
+const orderModalOpen = ref(false);
+const orderSubmitting = ref(false);
+const orderError = ref("");
+const orderForm = ref(createEmptyOrderForm());
 let swiperInstance = null;
 
-const goToSlide = (index) => {
-  if (swiperInstance) {
-    swiperInstance.slideTo(index);
-  }
+function createEmptyOrderForm(orderType = "standard") {
+  return {
+    orderType,
+    name: "",
+    phone: "",
+    tariffId: "",
+    amount: "",
+    initialPayment: "",
+    period: "",
+    startDate: "",
+    passport: "",
+    pinfl: "",
+    lastName: "",
+    firstName: "",
+    middleName: "",
+    gender: "",
+    birthDate: "",
+    regionId: "",
+    districtId: "",
+    phones: "",
+  };
+}
+
+const getTodayIsoDate = () => {
+  const now = new Date();
+  const timezoneAdjusted = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return timezoneAdjusted.toISOString().slice(0, 10);
 };
 
-const handleAddToBasket = () => {
-  if (detailAnimating.value) return;
-  basketStore.addToBasket(
-    buildConfiguredBasketItem(
-      store.product,
-      selectedOptions.value,
-      Number(quantity.value) || 1
-    )
-  );
-  notification.value = {
-    show: true,
-    message: `${store.product[`name_${locale.value}`]} ${t("add_to_cart2")}`,
-  };
-  detailAnimating.value = true;
-  setTimeout(() => (detailShowCheck.value = true), 400);
-  setTimeout(() => {
-    detailShowCheck.value = false;
-    detailAnimating.value = false;
-    quantity.value = 1;
-  }, 1600);
-};
+const safeQuantity = computed(() => {
+  const parsed = Number(quantity.value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+});
 
 const normalizeImages = (images) => resolveAssetUrls(images);
+const formatPrice = (price) => formatPriceValue(price);
 
 const images = computed(() => normalizeImages(store.product?.images || []));
 const optionGroups = computed(() =>
@@ -96,11 +108,310 @@ const selectedCreditPlan = computed(() => {
     selectedCreditConfig.value.months
   );
 });
+const configuredBasketItem = computed(() =>
+  store.product
+    ? buildConfiguredBasketItem(
+        store.product,
+        selectedOptions.value,
+        safeQuantity.value
+      )
+    : null
+);
+const currentOrderTotal = computed(() => {
+  const numericPrice = parseNumericPrice(selectedPrice.value);
+  return numericPrice === null ? 0 : numericPrice * safeQuantity.value;
+});
+const currentOrderTotalLabel = computed(() => {
+  if (currentOrderTotal.value > 0) {
+    return formatPrice(currentOrderTotal.value);
+  }
 
+  if (typeof selectedPrice.value === "string" && selectedPrice.value.trim()) {
+    return selectedPrice.value;
+  }
+
+  return formatPrice(selectedPrice.value);
+});
+const canUseCreditOrder = computed(
+  () => hasCreditPricing(store.product) && Boolean(selectedCreditConfig.value)
+);
+const selectedOptionsSummary = computed(
+  () => configuredBasketItem.value?.selected_options || []
+);
+const orderProductsPayload = computed(() => {
+  const item = configuredBasketItem.value;
+  if (!item) {
+    return [];
+  }
+
+  return [
+    {
+      id: item.id,
+      name: item[`name_${locale.value}`] || item.name_uz || "",
+      quantity: item.quantity,
+      price: item[`selected_price_${locale.value}`] ?? item[`price_${locale.value}`] ?? "",
+      selected_options: item.selected_options || [],
+      credit_plan: selectedCreditConfig.value
+        ? {
+            months: selectedCreditConfig.value.months,
+            percent: selectedCreditConfig.value.percent,
+          }
+        : null,
+    },
+  ];
+});
 const relatedProducts = computed(() => {
   const list = Array.isArray(store.products) ? store.products : [];
   return list.filter((p) => p.id !== store.product?.id).slice(0, 4);
 });
+
+const goToSlide = (index) => {
+  if (swiperInstance) {
+    swiperInstance.slideTo(index);
+  }
+};
+
+const syncSelectedOptions = () => {
+  selectedOptions.value = ensureValidOptionSelections(store.product, selectedOptions.value);
+};
+
+const resetOrderForm = (orderType = canUseCreditOrder.value ? "credit" : "standard") => {
+  orderForm.value = {
+    ...createEmptyOrderForm(orderType),
+    amount: currentOrderTotal.value > 0 ? String(currentOrderTotal.value) : "",
+    period: selectedCreditConfig.value?.months
+      ? String(selectedCreditConfig.value.months)
+      : "",
+    startDate: getTodayIsoDate(),
+  };
+};
+
+const openOrderModal = () => {
+  if (!store.product) return;
+  resetOrderForm(canUseCreditOrder.value ? "credit" : "standard");
+  orderError.value = "";
+  orderModalOpen.value = true;
+};
+
+const closeOrderModal = () => {
+  if (orderSubmitting.value) return;
+  orderModalOpen.value = false;
+  orderError.value = "";
+};
+
+const handleAddToBasket = () => {
+  if (detailAnimating.value || !configuredBasketItem.value) return;
+
+  basketStore.addToBasket(configuredBasketItem.value);
+  notification.value = {
+    show: true,
+    message: `${store.product[`name_${locale.value}`]} ${t("add_to_cart2")}`,
+  };
+  detailAnimating.value = true;
+  setTimeout(() => (detailShowCheck.value = true), 400);
+  setTimeout(() => {
+    detailShowCheck.value = false;
+    detailAnimating.value = false;
+    quantity.value = 1;
+  }, 1600);
+};
+
+const buildCreditPhoneList = () =>
+  orderForm.value.phones
+    .split(",")
+    .map((phone) => phone.trim())
+    .filter(Boolean);
+
+const buildCreditCustomerName = () =>
+  [
+    orderForm.value.lastName,
+    orderForm.value.firstName,
+    orderForm.value.middleName,
+  ]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" ");
+
+const submitProductOrder = async () => {
+  if (!orderProductsPayload.value.length) {
+    orderError.value = t("please_fill_all_fields");
+    return;
+  }
+
+  const resolvedOrderType =
+    orderForm.value.orderType === "credit" && canUseCreditOrder.value
+      ? "credit"
+      : "standard";
+
+  let payload = {
+    name: "",
+    phone: "",
+    locale: locale.value,
+    total: currentOrderTotal.value,
+    products: orderProductsPayload.value,
+    order_type: resolvedOrderType,
+  };
+
+  if (resolvedOrderType === "standard") {
+    const name = orderForm.value.name.trim();
+    const phone = orderForm.value.phone.trim();
+    const phoneDigits = phone.replace(/\D/g, "");
+
+    if (!name || !phone || phoneDigits.length < 9) {
+      orderError.value = t("please_fill_all_fields");
+      return;
+    }
+
+    payload = {
+      ...payload,
+      name,
+      phone,
+    };
+  } else {
+    const creditName = buildCreditCustomerName();
+    const phones = buildCreditPhoneList();
+    const requiredFields = [
+      orderForm.value.tariffId,
+      orderForm.value.amount,
+      orderForm.value.period,
+      orderForm.value.startDate,
+      orderForm.value.passport,
+      orderForm.value.pinfl,
+      orderForm.value.lastName,
+      orderForm.value.firstName,
+      orderForm.value.middleName,
+      orderForm.value.gender,
+      orderForm.value.birthDate,
+      orderForm.value.regionId,
+      orderForm.value.districtId,
+    ];
+
+    if (
+      requiredFields.some((value) => !String(value || "").trim()) ||
+      !creditName ||
+      !phones.length
+    ) {
+      orderError.value = t("orderModal.requiredCredit");
+      return;
+    }
+
+    payload = {
+      ...payload,
+      name: creditName,
+      phone: phones[0],
+      total: Number(orderForm.value.amount) || currentOrderTotal.value,
+      credit: {
+        tariff_id: Number(orderForm.value.tariffId),
+        amount: Number(orderForm.value.amount),
+        initial_payment: Number(orderForm.value.initialPayment) || 0,
+        period: Number(orderForm.value.period),
+        start_date: orderForm.value.startDate,
+        passport: orderForm.value.passport.trim(),
+        pinfl: orderForm.value.pinfl.trim(),
+        last_name: orderForm.value.lastName.trim(),
+        first_name: orderForm.value.firstName.trim(),
+        middle_name: orderForm.value.middleName.trim(),
+        gender: orderForm.value.gender.trim(),
+        birth_date: orderForm.value.birthDate,
+        region_id: Number(orderForm.value.regionId),
+        district_id: Number(orderForm.value.districtId),
+        phones,
+      },
+    };
+  }
+
+  orderSubmitting.value = true;
+  orderError.value = "";
+
+  try {
+    const response = await apiClient.post("/products/order", payload);
+    const creditNumber = response.data?.credit?.number;
+
+    notification.value = {
+      show: true,
+      message:
+        resolvedOrderType === "credit"
+          ? creditNumber
+            ? `${t("orderModal.creditSuccess")} #${creditNumber}`
+            : t("orderModal.creditSuccess")
+          : t("success"),
+    };
+    orderModalOpen.value = false;
+    resetOrderForm(resolvedOrderType);
+  } catch (error) {
+    orderError.value = getApiErrorMessage(error, t("send"));
+  } finally {
+    orderSubmitting.value = false;
+  }
+};
+
+const fetchProductData = async (id) => {
+  const productExists = await store.fetchProductDetail(id);
+  if (!productExists) {
+    router.replace({ name: "NotFound" });
+    return;
+  }
+
+  if (!store.products.length) {
+    await store.fetchProducts(200, 0);
+  }
+
+  syncSelectedOptions();
+  quantity.value = 1;
+  activeTab.value = "description";
+  closeOrderModal();
+
+  await nextTick();
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("animate-show");
+          observer.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.2 }
+  );
+
+  relatedProductRefs.value.forEach((el) => {
+    if (el) observer.observe(el);
+  });
+};
+
+const selectOption = (groupKey, optionId) => {
+  selectedOptions.value = ensureValidOptionSelections(store.product, {
+    ...selectedOptions.value,
+    [groupKey]: optionId,
+  });
+};
+
+const goToDetail = (id) => {
+  useLoaderStore().loader = true;
+  router.push({ name: "ProductDetail", params: { id } });
+};
+
+const handleClick = (product) => {
+  const id = product.id;
+  if (animating.value[id]) return;
+  animating.value = { ...animating.value, [id]: true };
+  setTimeout(() => (showCheck.value = { ...showCheck.value, [id]: true }), 400);
+  setTimeout(() => {
+    showCheck.value = { ...showCheck.value, [id]: false };
+    animating.value = { ...animating.value, [id]: false };
+  }, 1600);
+  basketStore.addToBasket(
+    buildConfiguredBasketItem(product, getDefaultOptionSelections(product))
+  );
+};
+
+const handleEscape = (event) => {
+  if (event.key === "Escape" && orderModalOpen.value) {
+    closeOrderModal();
+  }
+};
+
+const relatedActionLabel = () => t("add_to_cart");
 
 watch(
   () => route.params.id,
@@ -122,78 +433,47 @@ watch(
   { immediate: true }
 );
 
+watch(orderModalOpen, (isOpen) => {
+  if (typeof document !== "undefined") {
+    document.body.style.overflow = isOpen ? "hidden" : "";
+  }
+});
+
+watch(
+  () => orderForm.value.orderType,
+  (nextType) => {
+    if (nextType === "credit") {
+      if (!orderForm.value.amount && currentOrderTotal.value > 0) {
+        orderForm.value.amount = String(currentOrderTotal.value);
+      }
+      if (!orderForm.value.period && selectedCreditConfig.value?.months) {
+        orderForm.value.period = String(selectedCreditConfig.value.months);
+      }
+      if (!orderForm.value.startDate) {
+        orderForm.value.startDate = getTodayIsoDate();
+      }
+    }
+    orderError.value = "";
+  }
+);
+
 onMounted(async () => {
   await fetchProductData(Number(route.params.id));
 });
 
-const syncSelectedOptions = () => {
-  selectedOptions.value = ensureValidOptionSelections(store.product, selectedOptions.value);
-};
-
-const fetchProductData = async (id) => {
-  const productExists = await store.fetchProductDetail(id);
-  if (!productExists) {
-    router.replace({ name: "NotFound" });
-    return;
-  }
-
-  if (!store.products.length) {
-    await store.fetchProducts(200, 0);
-  }
-
-  syncSelectedOptions();
-  quantity.value = 1;
-  activeTab.value = "description";
-
-  await nextTick();
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("animate-show");
-          observer.unobserve(entry.target);
-        }
-      });
-    },
-    { threshold: 0.2 }
-  );
-
-  relatedProductRefs.value.forEach((el) => {
-    if (el) observer.observe(el);
-  });
-};
-const formatPrice = (price) => formatPriceValue(price);
-const selectOption = (groupKey, optionId) => {
-  selectedOptions.value = ensureValidOptionSelections(store.product, {
-    ...selectedOptions.value,
-    [groupKey]: optionId,
-  });
-};
-const goToDetail = (id) => {
-  useLoaderStore().loader = true;
-  router.push({ name: "ProductDetail", params: { id } });
-};
 onMounted(() => {
   if (swiperRef.value && swiperRef.value.swiper) {
     swiperInstance = swiperRef.value.swiper;
   }
+  window.addEventListener("keydown", handleEscape);
 });
 
-const handleClick = (product) => {
-  const id = product.id;
-  if (animating.value[id]) return;
-  animating.value = { ...animating.value, [id]: true };
-  setTimeout(() => (showCheck.value = { ...showCheck.value, [id]: true }), 400);
-  setTimeout(() => {
-    showCheck.value = { ...showCheck.value, [id]: false };
-    animating.value = { ...animating.value, [id]: false };
-  }, 1600);
-  basketStore.addToBasket(
-    buildConfiguredBasketItem(product, getDefaultOptionSelections(product))
-  );
-};
-
-const relatedActionLabel = () => t("add_to_cart");
+onBeforeUnmount(() => {
+  if (typeof document !== "undefined") {
+    document.body.style.overflow = "";
+  }
+  window.removeEventListener("keydown", handleEscape);
+});
 </script>
 
 <template>
@@ -371,59 +651,69 @@ const relatedActionLabel = () => t("add_to_cart");
             </div>
           </div>
 
-          <!-- Quantity -->
-          <div class="qty-box flex w-[160px] items-center overflow-hidden rounded-2xl border bg-white">
-            <button
-              @click="Number(quantity) > 1 ? (quantity = Number(quantity) - 1) : null"
-              class="qty-btn flex h-12 w-12 cursor-pointer items-center justify-center transition-all duration-300"
-            >
-              <Minus class="h-5 w-5 text-slate-700" />
-            </button>
+          <div class="detail-order-tools">
+            <div class="qty-box flex w-[160px] items-center overflow-hidden rounded-2xl border bg-white">
+              <button
+                @click="Number(quantity) > 1 ? (quantity = Number(quantity) - 1) : null"
+                class="qty-btn flex h-12 w-12 cursor-pointer items-center justify-center transition-all duration-300"
+              >
+                <Minus class="h-5 w-5 text-slate-700" />
+              </button>
 
-            <input
-              type="text"
-              v-model="quantity"
-              class="qty-input w-16 select-none text-center text-xl font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-slate-300"
-              @input="quantity = String(quantity).replace(/[^0-9]/g, '')"
-              @blur="if (!quantity || parseInt(quantity) < 1) quantity = 1;"
-            />
+              <input
+                type="text"
+                v-model="quantity"
+                class="qty-input w-16 select-none text-center text-xl font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-slate-300"
+                @input="quantity = String(quantity).replace(/[^0-9]/g, '')"
+                @blur="if (!quantity || parseInt(quantity) < 1) quantity = 1;"
+              />
 
-            <button
-              @click="quantity = Number(quantity || 0) + 1"
-              class="qty-btn flex h-12 w-12 cursor-pointer items-center justify-center transition-all duration-300"
-            >
-              <Plus class="h-5 w-5 text-slate-700" />
-            </button>
+              <button
+                @click="quantity = Number(quantity || 0) + 1"
+                class="qty-btn flex h-12 w-12 cursor-pointer items-center justify-center transition-all duration-300"
+              >
+                <Plus class="h-5 w-5 text-slate-700" />
+              </button>
+            </div>
+
+            <div class="detail-primary-actions">
+              <button
+                @click="handleAddToBasket"
+                class="detail-add-btn relative flex flex-1 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-2xl py-4 font-medium text-white transition-all duration-300 active:scale-95"
+              >
+                <span
+                  :class="
+                    detailAnimating ? 'opacity-0 scale-90' : 'opacity-100 scale-100'
+                  "
+                  class="transition-all duration-300"
+                >
+                  {{ $t("add_to_cart") }}
+                </span>
+                <ShoppingCart
+                  :class="
+                    detailAnimating
+                      ? 'translate-x-44 opacity-0'
+                      : 'translate-x-0 opacity-100'
+                  "
+                  class="absolute w-5 h-5 left-5 transition-all duration-500"
+                />
+                <Check
+                  :class="
+                    detailShowCheck ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+                  "
+                  class="absolute w-6 h-6 text-white transition-all duration-500"
+                />
+              </button>
+
+              <button
+                type="button"
+                class="detail-order-btn"
+                @click="openOrderModal"
+              >
+                {{ t("order_now") }}
+              </button>
+            </div>
           </div>
-
-          <!-- Add to cart -->
-          <button
-            @click="handleAddToBasket"
-            class="detail-add-btn relative flex w-[70%] flex-1 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-2xl py-4 font-medium text-white transition-all duration-300 active:scale-95"
-          >
-            <span
-              :class="
-                detailAnimating ? 'opacity-0 scale-90' : 'opacity-100 scale-100'
-              "
-              class="transition-all duration-300"
-            >
-              {{ $t("add_to_cart") }}
-            </span>
-            <ShoppingCart
-              :class="
-                detailAnimating
-                  ? 'translate-x-44 opacity-0'
-                  : 'translate-x-0 opacity-100'
-              "
-              class="absolute w-5 h-5 left-5 transition-all duration-500"
-            />
-            <Check
-              :class="
-                detailShowCheck ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
-              "
-              class="absolute w-6 h-6 text-white transition-all duration-500"
-            />
-          </button>
         </div>
       </div>
     </div>
@@ -536,6 +826,266 @@ const relatedActionLabel = () => t("add_to_cart");
       </div>
     </div>
   </div>
+  <teleport to="body">
+    <div
+      v-if="orderModalOpen"
+      class="order-modal-overlay"
+      @click.self="closeOrderModal"
+    >
+      <div class="order-modal-panel">
+        <div class="order-modal-head">
+          <div>
+            <p class="order-modal-kicker">{{ t("orderModal.title") }}</p>
+            <h3 class="order-modal-title">
+              {{ store.product?.[`name_${locale}`] }}
+            </h3>
+          </div>
+
+          <button
+            type="button"
+            class="order-modal-close"
+            :disabled="orderSubmitting"
+            @click="closeOrderModal"
+          >
+            <X class="h-5 w-5" />
+          </button>
+        </div>
+
+        <div class="order-modal-summary">
+          <div>
+            <span class="order-modal-summary-label">{{ t("orderModal.productSummary") }}</span>
+            <strong class="order-modal-summary-value">{{ currentOrderTotalLabel }}</strong>
+          </div>
+          <span class="order-modal-summary-qty">
+            {{ safeQuantity }} x
+          </span>
+        </div>
+
+        <div
+          v-if="selectedOptionsSummary.length"
+          class="order-option-summary"
+        >
+          <span
+            v-for="option in selectedOptionsSummary"
+            :key="option.group_key"
+            class="order-option-chip"
+          >
+            {{ t(option.title_key) }}: {{ option.label }}
+          </span>
+        </div>
+
+        <div class="order-type-switcher">
+          <button
+            type="button"
+            class="order-type-btn"
+            :class="{ 'order-type-btn-active': orderForm.orderType === 'standard' }"
+            @click="orderForm.orderType = 'standard'"
+          >
+            {{ t("orderModal.standard") }}
+          </button>
+          <button
+            v-if="canUseCreditOrder"
+            type="button"
+            class="order-type-btn"
+            :class="{ 'order-type-btn-active': orderForm.orderType === 'credit' }"
+            @click="orderForm.orderType = 'credit'"
+          >
+            {{ t("orderModal.credit") }}
+          </button>
+        </div>
+
+        <div
+          v-if="orderForm.orderType === 'credit' && canUseCreditOrder"
+          class="order-modal-form-grid"
+        >
+          <label class="order-field">
+            <span>{{ t("orderModal.tariffId") }}</span>
+            <input
+              v-model="orderForm.tariffId"
+              type="number"
+              inputmode="numeric"
+              :placeholder="t('orderModal.tariffHelp')"
+              class="order-input"
+            />
+          </label>
+
+          <label class="order-field">
+            <span>{{ t("orderModal.amount") }}</span>
+            <input
+              v-model="orderForm.amount"
+              type="number"
+              inputmode="numeric"
+              class="order-input"
+            />
+          </label>
+
+          <label class="order-field">
+            <span>{{ t("orderModal.initialPayment") }}</span>
+            <input
+              v-model="orderForm.initialPayment"
+              type="number"
+              inputmode="numeric"
+              class="order-input"
+            />
+          </label>
+
+          <label class="order-field">
+            <span>{{ t("orderModal.period") }}</span>
+            <input
+              v-model="orderForm.period"
+              type="number"
+              inputmode="numeric"
+              :placeholder="t('orderModal.periodHelp')"
+              class="order-input"
+            />
+          </label>
+
+          <label class="order-field">
+            <span>{{ t("orderModal.startDate") }}</span>
+            <input
+              v-model="orderForm.startDate"
+              type="date"
+              class="order-input"
+            />
+          </label>
+
+          <label class="order-field">
+            <span>{{ t("orderModal.passport") }}</span>
+            <input
+              v-model="orderForm.passport"
+              type="text"
+              class="order-input"
+            />
+          </label>
+
+          <label class="order-field">
+            <span>{{ t("orderModal.pinfl") }}</span>
+            <input
+              v-model="orderForm.pinfl"
+              type="text"
+              class="order-input"
+            />
+          </label>
+
+          <label class="order-field">
+            <span>{{ t("orderModal.lastName") }}</span>
+            <input
+              v-model="orderForm.lastName"
+              type="text"
+              class="order-input"
+            />
+          </label>
+
+          <label class="order-field">
+            <span>{{ t("orderModal.firstName") }}</span>
+            <input
+              v-model="orderForm.firstName"
+              type="text"
+              class="order-input"
+            />
+          </label>
+
+          <label class="order-field">
+            <span>{{ t("orderModal.middleName") }}</span>
+            <input
+              v-model="orderForm.middleName"
+              type="text"
+              class="order-input"
+            />
+          </label>
+
+          <label class="order-field">
+            <span>{{ t("orderModal.gender") }}</span>
+            <input
+              v-model="orderForm.gender"
+              type="text"
+              :placeholder="t('orderModal.genderPlaceholder')"
+              class="order-input"
+            />
+          </label>
+
+          <label class="order-field">
+            <span>{{ t("orderModal.birthDate") }}</span>
+            <input
+              v-model="orderForm.birthDate"
+              type="date"
+              class="order-input"
+            />
+          </label>
+
+          <label class="order-field">
+            <span>{{ t("orderModal.regionId") }}</span>
+            <input
+              v-model="orderForm.regionId"
+              type="number"
+              inputmode="numeric"
+              :placeholder="t('orderModal.regionHelp')"
+              class="order-input"
+            />
+          </label>
+
+          <label class="order-field">
+            <span>{{ t("orderModal.districtId") }}</span>
+            <input
+              v-model="orderForm.districtId"
+              type="number"
+              inputmode="numeric"
+              :placeholder="t('orderModal.districtHelp')"
+              class="order-input"
+            />
+          </label>
+
+          <label class="order-field order-field-full">
+            <span>{{ t("orderModal.phones") }}</span>
+            <input
+              v-model="orderForm.phones"
+              type="text"
+              :placeholder="t('orderModal.phonesHint')"
+              class="order-input"
+            />
+          </label>
+        </div>
+
+        <div v-else class="order-modal-form-grid">
+          <label class="order-field">
+            <span>{{ t("name") }}</span>
+            <input
+              v-model="orderForm.name"
+              type="text"
+              class="order-input"
+            />
+          </label>
+
+          <label class="order-field">
+            <span>{{ t("phone") }}</span>
+            <input
+              v-model="orderForm.phone"
+              type="tel"
+              placeholder="+998"
+              class="order-input"
+            />
+          </label>
+        </div>
+
+        <p v-if="orderError" class="order-error">{{ orderError }}</p>
+
+        <button
+          type="button"
+          class="order-submit-btn"
+          :disabled="orderSubmitting"
+          @click="submitProductOrder"
+        >
+          {{
+            orderSubmitting
+              ? t("sending")
+              : orderForm.orderType === "credit" && canUseCreditOrder
+                ? t("orderModal.submitCredit")
+                : t("orderModal.submitStandard")
+          }}
+        </button>
+      </div>
+    </div>
+  </teleport>
   <Notification
     v-if="notification.show"
     :message="notification.message"
@@ -821,6 +1371,20 @@ const relatedActionLabel = () => t("add_to_cart");
   border-color: rgba(20, 35, 56, 0.12);
 }
 
+.detail-order-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+}
+
+.detail-primary-actions {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+}
+
 .qty-btn {
   background: #f1f4f7;
 }
@@ -836,10 +1400,246 @@ const relatedActionLabel = () => t("add_to_cart");
 .detail-add-btn {
   background: #18304f;
   border: 1px solid rgba(20, 35, 56, 0.06);
+  min-width: 220px;
 }
 
 .detail-add-btn:hover {
   background: #142338;
+}
+
+.detail-order-btn {
+  min-width: 220px;
+  border-radius: 18px;
+  border: 1px solid rgba(24, 71, 55, 0.16);
+  background: #eef6f1;
+  color: #204336;
+  padding: 1rem 1.2rem;
+  font-weight: 700;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.detail-order-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(24, 71, 55, 0.26);
+  background: #e5f1ea;
+}
+
+.order-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(8, 15, 24, 0.52);
+  backdrop-filter: blur(8px);
+}
+
+.order-modal-panel {
+  width: min(920px, 100%);
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  border-radius: 28px;
+  border: 1px solid rgba(20, 35, 56, 0.08);
+  background: #ffffff;
+  padding: 1.35rem;
+  box-shadow: 0 26px 70px rgba(12, 23, 39, 0.18);
+}
+
+.order-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.order-modal-kicker {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6a7d71;
+}
+
+.order-modal-title {
+  margin-top: 0.3rem;
+  color: #142338;
+  font-size: clamp(1.2rem, 2vw, 1.6rem);
+  font-weight: 800;
+}
+
+.order-modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  border: 1px solid rgba(20, 35, 56, 0.1);
+  background: #f5f7fa;
+  color: #18304f;
+}
+
+.order-modal-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 20px;
+  background: #f4f7fa;
+  border: 1px solid rgba(20, 35, 56, 0.08);
+}
+
+.order-modal-summary-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.order-modal-summary-value {
+  display: block;
+  margin-top: 0.35rem;
+  color: #142338;
+  font-size: 1.15rem;
+}
+
+.order-modal-summary-qty {
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: rgba(20, 35, 56, 0.08);
+  color: #304660;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.order-option-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.9rem;
+}
+
+.order-option-chip {
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #455a74;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.order-type-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.1rem;
+}
+
+.order-type-btn {
+  border-radius: 16px;
+  border: 1px solid rgba(20, 35, 56, 0.1);
+  background: #f6f8fa;
+  color: #304660;
+  padding: 0.85rem 1rem;
+  font-weight: 700;
+  transition:
+    border-color 0.2s ease,
+    transform 0.2s ease,
+    background 0.2s ease;
+}
+
+.order-type-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(20, 35, 56, 0.18);
+}
+
+.order-type-btn-active {
+  background: #18304f;
+  color: #ffffff;
+  border-color: transparent;
+}
+
+.order-modal-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-top: 1.1rem;
+}
+
+.order-field {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.order-field span {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #304660;
+}
+
+.order-field-full {
+  grid-column: 1 / -1;
+}
+
+.order-input {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(20, 35, 56, 0.12);
+  background: #ffffff;
+  color: #1b2d44;
+  padding: 0.85rem 0.95rem;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.order-input:focus {
+  border-color: rgba(24, 71, 55, 0.32);
+  box-shadow: 0 0 0 3px rgba(24, 71, 55, 0.08);
+}
+
+.order-error {
+  margin-top: 0.9rem;
+  color: #b42318;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.order-submit-btn {
+  width: 100%;
+  margin-top: 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(20, 35, 56, 0.06);
+  background: #18304f;
+  color: #ffffff;
+  padding: 1rem 1.2rem;
+  font-weight: 800;
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.order-submit-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: #142338;
+}
+
+.order-submit-btn:disabled,
+.order-modal-close:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .detail-tabs {
@@ -1024,8 +1824,14 @@ const relatedActionLabel = () => t("add_to_cart");
     left: 9px;
   }
 
-  .detail-add-btn {
+  .detail-primary-actions,
+  .detail-add-btn,
+  .detail-order-btn {
     width: 100%;
+  }
+
+  .order-modal-panel {
+    width: min(760px, 100%);
   }
 }
 
@@ -1063,6 +1869,35 @@ const relatedActionLabel = () => t("add_to_cart");
 
   .detail-option {
     width: 100%;
+  }
+
+  .detail-order-tools,
+  .detail-primary-actions,
+  .order-type-switcher {
+    flex-direction: column;
+  }
+
+  .qty-box {
+    width: 100%;
+  }
+
+  .order-modal-panel {
+    padding: 1rem;
+    border-radius: 22px;
+  }
+
+  .order-modal-head,
+  .order-modal-summary {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .order-modal-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .order-field-full {
+    grid-column: auto;
   }
 
   .detail-swiper,
