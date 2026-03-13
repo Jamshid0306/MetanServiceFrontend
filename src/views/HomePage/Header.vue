@@ -1,24 +1,24 @@
 <script setup>
 import { Autoplay, Pagination } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
-import firstImage from "@/assets/images/1.webp";
-import serviceImage from "@/assets/images/service.jpg";
-import supportImage from "@/assets/images/support.jpg";
+import heroProducts from "@/assets/images/hero-products.jpg";
+import heroService from "@/assets/images/hero-service.jpg";
+import heroSupport from "@/assets/images/hero-support.jpg";
 import "swiper/css";
 import "swiper/css/pagination";
 
 const heroSlides = [
   {
-    src: firstImage,
-    alt: "Metan uskunalari",
+    src: heroProducts,
+    alt: "Metan uskunalari va jihozlari",
   },
   {
-    src: serviceImage,
-    alt: "Servis ishlari",
+    src: heroService,
+    alt: "Urganch Metan Service servis ishlari",
   },
   {
-    src: supportImage,
-    alt: "Texnik qo‘llab-quvvatlash",
+    src: heroSupport,
+    alt: "Metan tizimlari bo‘yicha texnik qo‘llab-quvvatlash",
   },
 ];
 </script>
@@ -26,7 +26,7 @@ const heroSlides = [
 <template>
   <div
     id="header"
-    class="container mx-auto mb-16 md:mb-24 mt-[72px] select-none"
+    class="mx-auto mb-16 md:mb-24 mt-[72px] max-w-[1440px] px-4 sm:px-5 lg:px-6 select-none"
   >
     <section class="hero-shell">
       <Swiper
@@ -63,7 +63,7 @@ const heroSlides = [
 .hero-swiper {
   position: relative;
   z-index: 1;
-  width: min(1120px, 100%);
+  width: 100%;
   margin: 0 auto;
   border-radius: 22px;
   overflow: hidden;
@@ -73,8 +73,8 @@ const heroSlides = [
 
 .hero-slide {
   position: relative;
-  aspect-ratio: 16 / 5;
-  min-height: 220px;
+  aspect-ratio: 16 / 6;
+  min-height: 245px;
 }
 
 .hero-slide::after {
@@ -112,7 +112,7 @@ const heroSlides = [
 
 @media (max-width: 1100px) {
   .hero-slide {
-    min-height: 190px;
+    min-height: 210px;
   }
 }
 
@@ -127,7 +127,7 @@ const heroSlides = [
   }
 
   .hero-slide {
-    min-height: 150px;
+    min-height: 170px;
   }
 }
 

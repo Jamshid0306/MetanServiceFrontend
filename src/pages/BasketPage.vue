@@ -28,6 +28,8 @@ const checkoutLoading = ref(false);
 const checkoutError = ref("");
 const notification = ref({ show: false, message: "" });
 
+basketStore.normalizeBasket();
+
 const normalizeImages = (images) => {
   if (!images) return [];
   if (Array.isArray(images)) {
@@ -65,7 +67,7 @@ const updateItemOption = (item, groupKey, optionId) => {
 
   basketStore.replaceBasketItem(
     getItemKey(item),
-    buildConfiguredBasketItem(item, nextSelections, item.quantity)
+    buildConfiguredBasketItem(item, nextSelections, 1)
   );
 };
 
@@ -76,7 +78,7 @@ const totalPrice = computed(() => {
   basketStore.basket.forEach((p) => {
     const val = extractNumericOrText(getBasketPrice(p, locale.value));
     if (typeof val === "number") {
-      sum += val * p.quantity;
+      sum += val;
     } else {
       hasText = true;
     }
@@ -94,7 +96,7 @@ const numericTotal = computed(() =>
     if (price === null) {
       return sum;
     }
-    return sum + price * item.quantity;
+    return sum + price;
   }, 0)
 );
 
@@ -126,7 +128,7 @@ const submitOrder = async () => {
       products: basketStore.basket.map((item) => ({
         id: item.id,
         name: item[`name_${locale.value}`],
-        quantity: item.quantity,
+        quantity: 1,
         price: getBasketPrice(item, locale.value),
         selected_options: item.selected_options || [],
       })),
@@ -246,40 +248,10 @@ const submitOrder = async () => {
           <div
             class="basket-controls flex items-center justify-end gap-6 px-5 py-4 border-t sm:border-t-0 sm:border-l border-gray-100"
           >
-            <span class="basket-qty flex items-center overflow-hidden rounded-xl border">
-              <button
-                @click="basketStore.decreaseQuantity(getItemKey(item))"
-                class="basket-qty-btn flex h-10 w-10 cursor-pointer items-center justify-center text-lg font-bold text-slate-700 transition-all duration-300"
-              >
-                –
-              </button>
-
-              <input
-                type="text"
-                v-model="item.quantity"
-                class="basket-qty-input w-14 text-center font-semibold text-gray-700 outline-none focus:ring-2 focus:ring-slate-300"
-                @input="item.quantity = String(item.quantity).replace(/[^0-9]/g, '')"
-                @blur="
-                  if (!item.quantity || parseInt(item.quantity) < 1)
-                    item.quantity = 1;
-                "
-                @change="basketStore.updateQuantity(getItemKey(item), parseInt(item.quantity))"
-              />
-
-              <button
-                @click="basketStore.updateQuantity(getItemKey(item), Number(item.quantity || 0) + 1)"
-                class="basket-qty-btn flex h-10 w-10 cursor-pointer items-center justify-center text-lg font-bold text-slate-700 transition-all duration-300"
-              >
-                +
-              </button>
-            </span>
-
             <span class="basket-item-price min-w-[140px] text-right text-xl font-bold">
               {{
                 typeof extractNumericOrText(getBasketPrice(item, locale)) === "number"
-                  ? formatPrice(
-                      extractNumericOrText(getBasketPrice(item, locale)) * item.quantity
-                    )
+                  ? formatPrice(extractNumericOrText(getBasketPrice(item, locale)))
                   : extractNumericOrText(getBasketPrice(item, locale))
               }}
             </span>
@@ -464,22 +436,6 @@ const submitOrder = async () => {
 
 .basket-controls {
   border-color: rgba(20, 35, 56, 0.08);
-}
-
-.basket-qty {
-  border-color: rgba(20, 35, 56, 0.12);
-}
-
-.basket-qty-btn {
-  background: #f1f4f7;
-}
-
-.basket-qty-btn:hover {
-  background: #e8edf2;
-}
-
-.basket-qty-input {
-  color: #22334b;
 }
 
 .basket-item-price {

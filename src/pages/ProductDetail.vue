@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
 import { useProductsStore } from "../store/productsStore";
 import { useBasketStore } from "../store/basketStore";
-import { ShoppingCart, Check, Plus, Minus, X } from "lucide-vue-next";
+import { ShoppingCart, Check, X } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { useRoute, useRouter } from "vue-router";
@@ -33,7 +33,6 @@ const detailAnimating = ref(false);
 const detailShowCheck = ref(false);
 const animating = ref({});
 const showCheck = ref({});
-const quantity = ref(1);
 const activeTab = ref("description");
 const relatedProductRefs = ref([]);
 const swiperRef = ref(null);
@@ -75,11 +74,6 @@ const getTodayIsoDate = () => {
   return timezoneAdjusted.toISOString().slice(0, 10);
 };
 
-const safeQuantity = computed(() => {
-  const parsed = Number(quantity.value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
-});
-
 const normalizeImages = (images) => resolveAssetUrls(images);
 const formatPrice = (price) => formatPriceValue(price);
 
@@ -110,16 +104,12 @@ const selectedCreditPlan = computed(() => {
 });
 const configuredBasketItem = computed(() =>
   store.product
-    ? buildConfiguredBasketItem(
-        store.product,
-        selectedOptions.value,
-        safeQuantity.value
-      )
+    ? buildConfiguredBasketItem(store.product, selectedOptions.value, 1)
     : null
 );
 const currentOrderTotal = computed(() => {
   const numericPrice = parseNumericPrice(selectedPrice.value);
-  return numericPrice === null ? 0 : numericPrice * safeQuantity.value;
+  return numericPrice === null ? 0 : numericPrice;
 });
 const currentOrderTotalLabel = computed(() => {
   if (currentOrderTotal.value > 0) {
@@ -212,7 +202,6 @@ const handleAddToBasket = () => {
   setTimeout(() => {
     detailShowCheck.value = false;
     detailAnimating.value = false;
-    quantity.value = 1;
   }, 1600);
 };
 
@@ -357,7 +346,6 @@ const fetchProductData = async (id) => {
   }
 
   syncSelectedOptions();
-  quantity.value = 1;
   activeTab.value = "description";
   closeOrderModal();
 
@@ -483,7 +471,7 @@ onBeforeUnmount(() => {
     >
       <button
         @click="$router.back()"
-        class="detail-back cursor-pointer absolute left-[10px] hover:scale-105"
+        class="detail-back cursor-pointer absolute left-[10px]"
       >
         <LeftArrow :size="40" />
       </button>
@@ -494,34 +482,39 @@ onBeforeUnmount(() => {
     </div>
     <div class="detail-main flex flex-col lg:flex-row gap-12 pb-[20px] animate-slide-in-up">
       <div class="detail-gallery lg:w-1/2 flex justify-center items-center flex-col gap-4">
-        <Swiper
-          ref="swiperRef"
-          class="detail-swiper h-[450px] w-full rounded-2xl bg-white"
-          space-between="10"
-          slides-per-view="1"
-          :onSwiper="(swiper) => (swiperInstance = swiper)"
-        >
-          <SwiperSlide v-for="(img, index) in images" :key="index">
-            <img
-              :src="img"
-              alt="Product"
-              class="detail-slide-image h-[450px] w-full rounded-2xl object-contain transition-transform duration-500 hover:scale-105"
-            />
-          </SwiperSlide>
-        </Swiper>
+        <div class="detail-gallery-stage">
+          <Swiper
+            ref="swiperRef"
+            class="detail-swiper h-[450px] w-full rounded-2xl bg-white"
+            space-between="10"
+            slides-per-view="1"
+            :onSwiper="(swiper) => (swiperInstance = swiper)"
+          >
+            <SwiperSlide v-for="(img, index) in images" :key="index">
+              <img
+                :src="img"
+                alt="Product"
+                class="detail-slide-image h-[450px] w-full rounded-2xl object-contain transition-transform duration-500"
+              />
+            </SwiperSlide>
+          </Swiper>
+        </div>
         <div class="detail-thumbs flex gap-2 overflow-x-auto mt-2">
           <img
             v-for="(img, index) in images"
             :key="index"
             :src="img"
-            class="detail-thumb h-24 w-24 cursor-pointer rounded-xl border object-cover transition-transform duration-300 hover:scale-105"
+            class="detail-thumb h-24 w-24 cursor-pointer rounded-xl border object-cover transition-all duration-300"
             @click="goToSlide(index)"
           />
         </div>
       </div>
 
       <div class="detail-info lg:w-1/2 flex flex-col gap-[20px] justify-center">
-        <div class="detail-summary">
+        <div class="detail-summary detail-section">
+          <div class="detail-summary-head">
+            <span class="detail-product-id">ID {{ store.product?.id }}</span>
+          </div>
           <h1
             class="detail-name text-4xl font-bold text-gray-900 tracking-tight leading-snug"
           >
@@ -544,7 +537,7 @@ onBeforeUnmount(() => {
         <div class="detail-actions">
           <div
             v-if="optionGroups.length"
-            class="detail-options grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4"
+            class="detail-options detail-section"
           >
             <div class="detail-options-head">
               <p class="detail-options-kicker">
@@ -577,7 +570,7 @@ onBeforeUnmount(() => {
                   <span>{{ option.label }}</span>
                   <span
                     v-if="group.key === 'cylinder_volume'"
-                    class="text-xs font-medium text-slate-500"
+                    class="detail-option-meta"
                   >
                     {{
                       option.price_delta
@@ -592,20 +585,12 @@ onBeforeUnmount(() => {
 
           <div
             v-if="selectedCreditPlan && selectedCreditConfig"
-            class="credit-card"
+            class="credit-card detail-section"
           >
             <div class="credit-card-head">
               <div>
                 <p class="credit-kicker">{{ t("credit.title") }}</p>
                 <h3 class="credit-heading">{{ t("credit.subtitle") }}</h3>
-              </div>
-              <div class="credit-pill-group">
-                <div class="credit-rate-pill">
-                  {{ selectedCreditConfig.percent }}%
-                </div>
-                <div class="credit-rate-pill">
-                  {{ selectedCreditConfig.months }} {{ t("credit.months") }}
-                </div>
               </div>
             </div>
 
@@ -628,52 +613,23 @@ onBeforeUnmount(() => {
                 <span>
                   {{ plan.months }} {{ t("credit.months") }}
                 </span>
-                <strong>+{{ plan.percent }}%</strong>
               </button>
             </div>
 
             <div v-if="selectedCreditPlan" class="credit-summary">
-              <div class="credit-metric">
-                <span class="credit-metric-label">{{ t("credit.total") }}</span>
-                <strong class="credit-metric-value">
-                  {{ formatPrice(selectedCreditPlan.total) }}
-                </strong>
-              </div>
               <div class="credit-metric">
                 <span class="credit-metric-label">{{ t("credit.monthlyPayment") }}</span>
                 <strong class="credit-metric-value">
                   {{ formatPrice(selectedCreditPlan.monthlyPayment) }}
                 </strong>
               </div>
-              <div class="credit-note">
-                +{{ selectedCreditPlan.appliedPercent }}% {{ t("credit.appliedRate") }}
-              </div>
             </div>
           </div>
 
-          <div class="detail-order-tools">
-            <div class="qty-box flex w-[160px] items-center overflow-hidden rounded-2xl border bg-white">
-              <button
-                @click="Number(quantity) > 1 ? (quantity = Number(quantity) - 1) : null"
-                class="qty-btn flex h-12 w-12 cursor-pointer items-center justify-center transition-all duration-300"
-              >
-                <Minus class="h-5 w-5 text-slate-700" />
-              </button>
-
-              <input
-                type="text"
-                v-model="quantity"
-                class="qty-input w-16 select-none text-center text-xl font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-slate-300"
-                @input="quantity = String(quantity).replace(/[^0-9]/g, '')"
-                @blur="if (!quantity || parseInt(quantity) < 1) quantity = 1;"
-              />
-
-              <button
-                @click="quantity = Number(quantity || 0) + 1"
-                class="qty-btn flex h-12 w-12 cursor-pointer items-center justify-center transition-all duration-300"
-              >
-                <Plus class="h-5 w-5 text-slate-700" />
-              </button>
+          <div class="detail-order-tools detail-section">
+            <div class="detail-order-head">
+              <p class="detail-options-kicker">{{ t("order_now") }}</p>
+              <strong class="detail-order-total">{{ currentOrderTotalLabel }}</strong>
             </div>
 
             <div class="detail-primary-actions">
@@ -718,113 +674,122 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div class="detail-tabs flex gap-4 mt-4 mb-2 animate-fade-in-up">
-      <span
-        @click="activeTab = 'description'"
-        :class="
-            activeTab === 'description'
-            ? 'detail-tab detail-tab-active'
-            : 'detail-tab'
-        "
-        class="pb-1 font-semibold transition-all"
-      >
-        {{ $t("description") }}
-      </span>
-      <span
-        @click="activeTab = 'characteristic'"
-        :class="
-            activeTab === 'characteristic'
-            ? 'detail-tab detail-tab-active'
-            : 'detail-tab'
-        "
-        class="pb-1 font-semibold transition-all"
-        >{{ $t("characteristic") }}
-      </span>
-    </div>
-    <span
-      v-if="activeTab !== 'characteristic'"
-      v-html="store.product[`description_${locale}`]"
-      class="detail-content animate-fade-in"
-    ></span>
-    <span
-      v-if="activeTab === 'characteristic'"
-      v-html="
-        store.product[`characteristic_${locale}`]?.replace(/\r?\n/g, '<br>')
-      "
-      class="detail-content animate-fade-in"
-    ></span>
-    <h3
+    <section class="detail-copy-section animate-fade-in-up">
+      <div class="detail-tabs flex gap-4 mt-4 mb-2">
+        <span
+          @click="activeTab = 'description'"
+          :class="
+              activeTab === 'description'
+              ? 'detail-tab detail-tab-active'
+              : 'detail-tab'
+          "
+          class="pb-1 font-semibold transition-all"
+        >
+          {{ $t("description") }}
+        </span>
+        <span
+          @click="activeTab = 'characteristic'"
+          :class="
+              activeTab === 'characteristic'
+              ? 'detail-tab detail-tab-active'
+              : 'detail-tab'
+          "
+          class="pb-1 font-semibold transition-all"
+          >{{ $t("characteristic") }}
+        </span>
+      </div>
+      <div class="detail-copy-body">
+        <span
+          v-if="activeTab !== 'characteristic'"
+          v-html="store.product[`description_${locale}`]"
+          class="detail-content animate-fade-in"
+        ></span>
+        <span
+          v-if="activeTab === 'characteristic'"
+          v-html="
+            store.product[`characteristic_${locale}`]?.replace(/\r?\n/g, '<br>')
+          "
+          class="detail-content animate-fade-in"
+        ></span>
+      </div>
+    </section>
+
+    <section
       v-if="relatedProducts.length"
-      class="related-heading mt-[40px] mb-6 text-3xl font-bold animate-fade-in-up"
+      class="related-section animate-fade-in-up"
     >
-      {{ t("related_products") }}
-    </h3>
-    <div
-      class="related-grid grid grid-cols-1 mb-[30px] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8"
-    >
+      <div class="related-section-head">
+        <h3 class="related-heading text-3xl font-bold">
+          {{ t("related_products") }}
+        </h3>
+      </div>
       <div
-        v-for="(product, index) in relatedProducts"
-        :key="product.id"
-        :ref="(el) => (relatedProductRefs[index] = el)"
-        :style="{ 'transition-delay': `${index * 100}ms` }"
-        class="related-card group"
+        class="related-grid grid grid-cols-1 mb-[30px] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8"
       >
         <div
-          @click="goToDetail(product.id)"
-          class="related-media cursor-pointer"
+          v-for="(product, index) in relatedProducts"
+          :key="product.id"
+          :ref="(el) => (relatedProductRefs[index] = el)"
+          :style="{ 'transition-delay': `${index * 100}ms` }"
+          class="related-card group"
         >
-          <span class="related-chip">#{{ product.id }}</span>
-          <img
-            :src="normalizeImages(product.images)[0]"
-            alt="Image"
-            class="related-image"
-          />
-        </div>
-        <h3
-          @click="goToDetail(product.id)"
-          class="related-title"
-        >
-          {{ product[`name_${locale}`] }}
-        </h3>
-        <p class="related-price">
-          {{ formatPrice(product[`price_${locale}`]) }}
-        </p>
-
-        <div class="flex gap-2">
-          <button
-            @click="handleClick(product)"
-            class="relative flex-1 cursor-pointer flex items-center justify-center gap-2 buttonShop related-btn text-white py-2.5 rounded-xl font-medium overflow-hidden"
+          <div
+            @click="goToDetail(product.id)"
+            class="related-media cursor-pointer"
           >
-            <span
-              class="transition-all duration-300"
-              :class="
-                animating[product.id]
-                  ? 'opacity-0 scale-0'
-                  : 'opacity-100 scale-100'
-              "
+            <span class="related-chip">#{{ product.id }}</span>
+            <img
+              :src="normalizeImages(product.images)[0]"
+              alt="Image"
+              class="related-image"
+            />
+          </div>
+          <h3
+            @click="goToDetail(product.id)"
+            class="related-title"
+          >
+            {{ product[`name_${locale}`] }}
+          </h3>
+          <p class="related-price">
+            {{ formatPrice(product[`price_${locale}`]) }}
+          </p>
+
+          <div class="flex gap-2">
+            <button
+              @click="handleClick(product)"
+              class="relative flex-1 cursor-pointer flex items-center justify-center gap-2 buttonShop related-btn text-white py-2.5 rounded-xl font-medium overflow-hidden"
             >
-              {{ relatedActionLabel(product) }}
-            </span>
-            <ShoppingCart
-              class="related-cart-icon absolute w-5 h-5 transition-all duration-500"
-              :class="
-                animating[product.id]
-                  ? 'translate-x-44 opacity-0'
-                  : 'translate-x-0 opacity-100'
-              "
-            />
-            <Check
-              class="absolute w-6 h-6 text-white transition-all duration-500"
-              :class="
-                showCheck[product.id]
-                  ? 'opacity-100 scale-100'
-                  : 'opacity-0 scale-0'
-              "
-            />
-          </button>
+              <span
+                class="transition-all duration-300"
+                :class="
+                  animating[product.id]
+                    ? 'opacity-0 scale-0'
+                    : 'opacity-100 scale-100'
+                "
+              >
+                {{ relatedActionLabel(product) }}
+              </span>
+              <ShoppingCart
+                class="related-cart-icon absolute w-5 h-5 transition-all duration-500"
+                :class="
+                  animating[product.id]
+                    ? 'translate-x-44 opacity-0'
+                    : 'translate-x-0 opacity-100'
+                "
+              />
+              <Check
+                class="absolute w-6 h-6 text-white transition-all duration-500"
+                :class="
+                  showCheck[product.id]
+                    ? 'opacity-100 scale-100'
+                    : 'opacity-0 scale-0'
+                "
+              />
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
   </div>
   <teleport to="body">
     <div
@@ -856,9 +821,6 @@ onBeforeUnmount(() => {
             <span class="order-modal-summary-label">{{ t("orderModal.productSummary") }}</span>
             <strong class="order-modal-summary-value">{{ currentOrderTotalLabel }}</strong>
           </div>
-          <span class="order-modal-summary-qty">
-            {{ safeQuantity }} x
-          </span>
         </div>
 
         <div
@@ -1097,118 +1059,188 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .detail-page {
+  --detail-border: rgba(20, 35, 56, 0.1);
+  --detail-border-strong: rgba(20, 35, 56, 0.18);
+  --detail-surface: #ffffff;
+  --detail-surface-muted: #f5f6f7;
+  --detail-surface-quiet: #fafaf8;
+  --detail-ink: #142338;
+  --detail-subtle: #64748b;
+  --detail-accent: #18304f;
+  --detail-accent-soft: #eef2f5;
+  --detail-credit: #f7faf8;
   background: transparent;
-  padding-bottom: 1.6rem;
+  padding-bottom: 3rem;
+  color: var(--detail-ink);
 }
 
 .detail-topbar {
-  min-height: 44px;
+  min-height: 48px;
+  padding-inline: 3.8rem;
 }
 
 .detail-page-title {
-  color: #142338;
-  letter-spacing: -0.015em;
+  color: var(--detail-ink);
+  letter-spacing: -0.02em;
 }
 
 .detail-back {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(20, 35, 56, 0.12);
-  border-radius: 12px;
-  background: #ffffff;
-  color: #18304f;
-  padding: 2px;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--detail-border);
+  border-radius: 16px;
+  background: var(--detail-surface);
+  color: var(--detail-accent);
+  padding: 0;
   transition:
-    transform 0.2s ease,
+    background 0.2s ease,
     border-color 0.2s ease;
 }
 
 .detail-back:hover {
-  transform: translateX(-1px);
-  border-color: rgba(20, 35, 56, 0.2);
+  background: var(--detail-surface-muted);
+  border-color: var(--detail-border-strong);
 }
 
 .detail-main {
-  border-radius: 24px;
-  border: 1px solid rgba(20, 35, 56, 0.1);
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
-  padding: clamp(0.9rem, 2vw, 1.3rem);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: clamp(1rem, 3vw, 2rem);
+  padding: 0;
+  border: none;
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.detail-gallery {
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-start;
+  align-items: stretch;
+  gap: 1rem;
+}
+
+.detail-gallery-stage {
+  width: 100%;
+  padding: 0;
+  border-radius: 30px;
+  border: 1px solid var(--detail-border);
+  background: var(--detail-surface-muted);
 }
 
 .detail-swiper {
-  border: 1px solid rgba(20, 35, 56, 0.08);
+  border: none;
+  background: transparent;
 }
 
 .detail-slide-image {
-  background: #f3f5f7;
+  border: 1px solid rgba(20, 35, 56, 0.06);
+  background: var(--detail-surface);
 }
 
 .detail-thumbs {
   width: 100%;
+  padding-bottom: 0.1rem;
 }
 
 .detail-thumb {
-  border-color: rgba(20, 35, 56, 0.1);
-  background: #f8fafc;
+  border-color: var(--detail-border);
+  background: var(--detail-surface);
   flex-shrink: 0;
+  opacity: 0.82;
+}
+
+.detail-thumb:hover {
+  border-color: var(--detail-border-strong);
+  opacity: 1;
 }
 
 .detail-info {
-  color: #1b2d44;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-start;
+  gap: 1rem;
+  color: var(--detail-ink);
+}
+
+.detail-section {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--detail-border);
+  border-radius: 28px;
+  background: var(--detail-surface);
+  padding: clamp(1rem, 2vw, 1.2rem);
 }
 
 .detail-summary {
-  display: grid;
-  gap: 1rem;
+  background: var(--detail-surface-quiet);
+}
+
+.detail-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.detail-product-id {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  border: 1px solid var(--detail-border);
+  background: var(--detail-surface);
+  color: var(--detail-subtle);
+  padding: 0.42rem 0.8rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
 .detail-name {
-  color: #142338;
+  color: var(--detail-ink);
   font-size: clamp(1.7rem, 2.8vw, 2.4rem);
+  margin: 0;
 }
 
 .detail-price-box {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  align-items: flex-start;
-  width: fit-content;
-  max-width: 100%;
-  padding: 1rem 1.15rem;
-  border-radius: 20px;
-  border: 1px solid rgba(20, 35, 56, 0.1);
-  background: #f4f6f8;
+  display: grid;
+  gap: 0.45rem;
+  width: 100%;
+  padding-top: 1rem;
+  border-top: 1px solid var(--detail-border);
 }
 
 .detail-price {
-  color: #142338;
+  color: var(--detail-ink);
+  font-size: clamp(2rem, 4vw, 2.35rem);
+  line-height: 1.05;
 }
 
 .detail-price-label {
-  color: #64748b;
+  color: var(--detail-subtle);
 }
 
 .detail-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
+  display: grid;
+  gap: 1rem;
 }
 
 .credit-card {
-  display: grid;
-  gap: 1rem;
-  padding: 1.05rem 1.1rem;
-  border-radius: 22px;
-  border: 1px solid rgba(24, 71, 55, 0.12);
-  background: #f4f8f4;
+  border-color: rgba(31, 58, 49, 0.12);
+  background: var(--detail-credit);
 }
 
 .credit-card-head {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 1rem;
 }
 
@@ -1217,7 +1249,7 @@ onBeforeUnmount(() => {
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #5f7468;
+  color: #688171;
 }
 
 .credit-heading {
@@ -1225,22 +1257,6 @@ onBeforeUnmount(() => {
   font-size: 1.05rem;
   font-weight: 800;
   color: #1f3a31;
-}
-
-.credit-rate-pill {
-  flex-shrink: 0;
-  border-radius: 999px;
-  background: rgba(24, 71, 55, 0.08);
-  color: #315646;
-  padding: 0.45rem 0.8rem;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.credit-pill-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
 }
 
 .credit-plan-switcher {
@@ -1251,43 +1267,48 @@ onBeforeUnmount(() => {
 
 .credit-plan-btn {
   border: 1px solid rgba(24, 71, 55, 0.12);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.7);
+  border-radius: 18px;
+  background: transparent;
   color: #315646;
-  padding: 0.7rem 0.9rem;
-  min-width: 128px;
-  display: grid;
-  gap: 0.2rem;
-  text-align: left;
+  padding: 0.8rem 0.95rem;
+  min-width: 124px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   transition:
     border-color 0.2s ease,
     background 0.2s ease,
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+    color 0.2s ease;
 }
 
-.credit-plan-btn:hover {
-  transform: translateY(-1px);
+.credit-plan-btn:not(.credit-plan-btn-active):hover {
   border-color: rgba(24, 71, 55, 0.2);
+  background: rgba(255, 255, 255, 0.74);
 }
 
 .credit-plan-btn-active {
   background: #1f3a31;
   color: #ffffff;
-  border-color: transparent;
-  box-shadow: 0 14px 26px rgba(24, 71, 55, 0.18);
+  border-color: #1f3a31;
+}
+
+.credit-plan-btn-active:hover {
+  background: #1f3a31;
+  color: #ffffff;
+  border-color: #1f3a31;
 }
 
 .credit-summary {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.8rem;
+  grid-template-columns: 1fr;
+  gap: 0.7rem;
 }
 
 .credit-metric {
   padding: 0.95rem 1rem;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.88);
+  border-radius: 20px;
+  background: #ffffff;
   border: 1px solid rgba(24, 71, 55, 0.08);
 }
 
@@ -1300,25 +1321,20 @@ onBeforeUnmount(() => {
 .credit-metric-value {
   display: block;
   margin-top: 0.35rem;
-  font-size: 1.12rem;
+  font-size: 1.25rem;
   color: #1f3a31;
 }
 
-.credit-note {
-  grid-column: 1 / -1;
-  font-size: 0.86rem;
-  color: #5f7468;
-}
-
 .detail-options {
-  border-color: rgba(20, 35, 56, 0.1);
-  background: #f6f7f9;
+  background: var(--detail-surface);
 }
 
 .detail-options-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding-bottom: 0.15rem;
+  border-bottom: 1px solid rgba(20, 35, 56, 0.08);
 }
 
 .detail-options-kicker {
@@ -1332,6 +1348,13 @@ onBeforeUnmount(() => {
 .detail-option-group {
   display: grid;
   gap: 0.8rem;
+  padding-top: 0.95rem;
+  border-top: 1px solid rgba(20, 35, 56, 0.08);
+}
+
+.detail-option-group:first-of-type {
+  padding-top: 0;
+  border-top: none;
 }
 
 .detail-option-headline {
@@ -1343,10 +1366,10 @@ onBeforeUnmount(() => {
 
 .detail-option {
   min-width: 132px;
-  border-radius: 14px;
-  border: 1px solid rgba(20, 35, 56, 0.1);
-  background: #ffffff;
-  color: #1b2d44;
+  border-radius: 16px;
+  border: 1px solid var(--detail-border);
+  background: var(--detail-surface-muted);
+  color: var(--detail-ink);
   padding: 0.8rem 0.95rem;
   display: flex;
   flex-direction: column;
@@ -1354,28 +1377,48 @@ onBeforeUnmount(() => {
   text-align: left;
   transition:
     border-color 0.2s ease,
-    transform 0.2s ease;
+    background 0.2s ease,
+    color 0.2s ease;
 }
 
 .detail-option:hover {
-  border-color: rgba(20, 35, 56, 0.18);
-  transform: translateY(-1px);
+  border-color: var(--detail-border-strong);
+  background: var(--detail-surface);
 }
 
 .detail-option-active {
-  border-color: rgba(20, 35, 56, 0.18);
-  background: #edf2f6;
+  border-color: var(--detail-accent);
+  background: var(--detail-accent);
+  color: #ffffff;
 }
 
-.qty-box {
-  border-color: rgba(20, 35, 56, 0.12);
+.detail-option-meta {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #708198;
+}
+
+.detail-option-active .detail-option-meta {
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .detail-order-tools {
-  display: flex;
-  flex-wrap: wrap;
   gap: 1rem;
+}
+
+.detail-order-head {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.15rem;
+  border-bottom: 1px solid rgba(20, 35, 56, 0.08);
+}
+
+.detail-order-total {
+  color: var(--detail-ink);
+  font-size: 1.2rem;
+  line-height: 1.2;
 }
 
 .detail-primary-actions {
@@ -1385,46 +1428,33 @@ onBeforeUnmount(() => {
   gap: 0.85rem;
 }
 
-.qty-btn {
-  background: #f1f4f7;
-}
-
-.qty-btn:hover {
-  background: #e8edf2;
-}
-
-.qty-input {
-  color: #22334b;
-}
-
 .detail-add-btn {
-  background: #18304f;
-  border: 1px solid rgba(20, 35, 56, 0.06);
+  background: var(--detail-accent);
+  border: 1px solid var(--detail-accent);
   min-width: 220px;
 }
 
 .detail-add-btn:hover {
-  background: #142338;
+  background: #12263d;
+  border-color: #12263d;
 }
 
 .detail-order-btn {
   min-width: 220px;
   border-radius: 18px;
-  border: 1px solid rgba(24, 71, 55, 0.16);
-  background: #eef6f1;
-  color: #204336;
+  border: 1px solid var(--detail-border-strong);
+  background: var(--detail-surface);
+  color: var(--detail-ink);
   padding: 1rem 1.2rem;
   font-weight: 700;
   transition:
-    transform 0.2s ease,
     border-color 0.2s ease,
     background 0.2s ease;
 }
 
 .detail-order-btn:hover {
-  transform: translateY(-1px);
-  border-color: rgba(24, 71, 55, 0.26);
-  background: #e5f1ea;
+  border-color: var(--detail-accent);
+  background: var(--detail-accent-soft);
 }
 
 .order-modal-overlay {
@@ -1435,8 +1465,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  background: rgba(8, 15, 24, 0.52);
-  backdrop-filter: blur(8px);
+  background: rgba(8, 15, 24, 0.44);
 }
 
 .order-modal-panel {
@@ -1444,10 +1473,9 @@ onBeforeUnmount(() => {
   max-height: calc(100vh - 2rem);
   overflow-y: auto;
   border-radius: 28px;
-  border: 1px solid rgba(20, 35, 56, 0.08);
-  background: #ffffff;
+  border: 1px solid var(--detail-border);
+  background: #fcfcfb;
   padding: 1.35rem;
-  box-shadow: 0 26px 70px rgba(12, 23, 39, 0.18);
 }
 
 .order-modal-head {
@@ -1479,9 +1507,17 @@ onBeforeUnmount(() => {
   width: 42px;
   height: 42px;
   border-radius: 14px;
-  border: 1px solid rgba(20, 35, 56, 0.1);
-  background: #f5f7fa;
-  color: #18304f;
+  border: 1px solid var(--detail-border);
+  background: var(--detail-surface);
+  color: var(--detail-accent);
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.order-modal-close:hover:not(:disabled) {
+  background: var(--detail-surface-muted);
+  border-color: var(--detail-border-strong);
 }
 
 .order-modal-summary {
@@ -1492,7 +1528,7 @@ onBeforeUnmount(() => {
   margin-top: 1rem;
   padding: 1rem 1.1rem;
   border-radius: 20px;
-  background: #f4f7fa;
+  background: var(--detail-surface-muted);
   border: 1px solid rgba(20, 35, 56, 0.08);
 }
 
@@ -1512,16 +1548,6 @@ onBeforeUnmount(() => {
   font-size: 1.15rem;
 }
 
-.order-modal-summary-qty {
-  flex-shrink: 0;
-  border-radius: 999px;
-  background: rgba(20, 35, 56, 0.08);
-  color: #304660;
-  padding: 0.5rem 0.9rem;
-  font-size: 0.82rem;
-  font-weight: 800;
-}
-
 .order-option-summary {
   display: flex;
   flex-wrap: wrap;
@@ -1531,7 +1557,8 @@ onBeforeUnmount(() => {
 
 .order-option-chip {
   border-radius: 999px;
-  background: #eef2f7;
+  border: 1px solid rgba(20, 35, 56, 0.08);
+  background: #ffffff;
   color: #455a74;
   padding: 0.45rem 0.8rem;
   font-size: 0.78rem;
@@ -1547,26 +1574,25 @@ onBeforeUnmount(() => {
 
 .order-type-btn {
   border-radius: 16px;
-  border: 1px solid rgba(20, 35, 56, 0.1);
-  background: #f6f8fa;
+  border: 1px solid var(--detail-border);
+  background: var(--detail-surface);
   color: #304660;
   padding: 0.85rem 1rem;
   font-weight: 700;
   transition:
     border-color 0.2s ease,
-    transform 0.2s ease,
     background 0.2s ease;
 }
 
 .order-type-btn:hover {
-  transform: translateY(-1px);
-  border-color: rgba(20, 35, 56, 0.18);
+  border-color: var(--detail-border-strong);
+  background: var(--detail-surface-muted);
 }
 
 .order-type-btn-active {
-  background: #18304f;
+  background: var(--detail-accent);
   color: #ffffff;
-  border-color: transparent;
+  border-color: var(--detail-accent);
 }
 
 .order-modal-form-grid {
@@ -1594,19 +1620,19 @@ onBeforeUnmount(() => {
 .order-input {
   width: 100%;
   border-radius: 14px;
-  border: 1px solid rgba(20, 35, 56, 0.12);
+  border: 1px solid var(--detail-border);
   background: #ffffff;
   color: #1b2d44;
   padding: 0.85rem 0.95rem;
   outline: none;
   transition:
     border-color 0.2s ease,
-    box-shadow 0.2s ease;
+    background 0.2s ease;
 }
 
 .order-input:focus {
-  border-color: rgba(24, 71, 55, 0.32);
-  box-shadow: 0 0 0 3px rgba(24, 71, 55, 0.08);
+  border-color: var(--detail-accent);
+  background: #ffffff;
 }
 
 .order-error {
@@ -1620,20 +1646,20 @@ onBeforeUnmount(() => {
   width: 100%;
   margin-top: 1rem;
   border-radius: 18px;
-  border: 1px solid rgba(20, 35, 56, 0.06);
-  background: #18304f;
+  border: 1px solid var(--detail-accent);
+  background: var(--detail-accent);
   color: #ffffff;
   padding: 1rem 1.2rem;
   font-weight: 800;
   transition:
-    transform 0.2s ease,
     background 0.2s ease,
+    border-color 0.2s ease,
     opacity 0.2s ease;
 }
 
 .order-submit-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  background: #142338;
+  background: #12263d;
+  border-color: #12263d;
 }
 
 .order-submit-btn:disabled,
@@ -1642,54 +1668,108 @@ onBeforeUnmount(() => {
   cursor: not-allowed;
 }
 
+.detail-copy-section {
+  margin-top: 0.35rem;
+  border-top: 1px solid var(--detail-border);
+  padding-top: 1rem;
+}
+
 .detail-tabs {
-  border-bottom: 1px solid rgba(20, 35, 56, 0.1);
-  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--detail-border);
+  padding-bottom: 0.6rem;
+  margin-bottom: 0;
+  gap: 1.25rem;
 }
 
 .detail-tab {
-  color: #64748b;
+  color: var(--detail-subtle);
   cursor: pointer;
-  border-bottom: 2px solid transparent;
-  padding-bottom: 0.25rem;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 0.45rem;
 }
 
 .detail-tab-active {
-  color: #18304f;
-  border-bottom-color: #18304f;
+  color: var(--detail-accent);
+  border-bottom-color: var(--detail-accent);
+}
+
+.detail-copy-body {
+  padding-top: 0.75rem;
 }
 
 .detail-content {
   display: block;
   color: #46566c;
-  line-height: 1.7;
-  font-size: 0.97rem;
+  line-height: 1.78;
+  font-size: 0.98rem;
+}
+
+.detail-content :deep(p),
+.detail-content :deep(ul),
+.detail-content :deep(ol) {
+  margin-bottom: 0.95rem;
+}
+
+.detail-content :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.detail-content :deep(td),
+.detail-content :deep(th) {
+  border: 1px solid rgba(20, 35, 56, 0.08);
+  padding: 0.65rem;
+}
+
+.detail-content :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 18px;
+}
+
+.related-section {
+  margin-top: 2.25rem;
+  border-top: 1px solid var(--detail-border);
+  padding-top: 1.4rem;
+}
+
+.related-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
 
 .related-heading {
-  color: #142338;
+  color: var(--detail-ink);
+  letter-spacing: -0.02em;
 }
 
 .related-grid {
-  gap: 1.2rem;
+  gap: 1.1rem;
 }
 
 .buttonShop {
-  background: #18304f;
-  border: 1px solid rgba(20, 35, 56, 0.06);
-  transition: transform 0.25s ease;
+  background: var(--detail-accent);
+  border: 1px solid var(--detail-accent);
+  transition:
+    transform 0.25s ease,
+    background 0.25s ease,
+    border-color 0.25s ease;
 }
 
 .related-btn:hover {
   transform: translateY(-1px);
-  background: #142338;
+  background: #12263d;
+  border-color: #12263d;
 }
 
 .related-card {
-  border-radius: 20px;
-  border: 1px solid rgba(20, 35, 56, 0.1);
-  background: #ffffff;
-  padding: 12px;
+  border-radius: 24px;
+  border: 1px solid var(--detail-border);
+  background: var(--detail-surface);
+  padding: 14px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1702,7 +1782,7 @@ onBeforeUnmount(() => {
 }
 
 .related-card:hover {
-  border-color: rgba(20, 35, 56, 0.18);
+  border-color: var(--detail-border-strong);
 }
 
 .related-card.animate-show {
@@ -1712,11 +1792,11 @@ onBeforeUnmount(() => {
 
 .related-media {
   position: relative;
-  min-height: 170px;
-  height: 170px;
-  border-radius: 16px;
+  min-height: 188px;
+  height: 188px;
+  border-radius: 20px;
   border: 1px solid rgba(20, 35, 56, 0.08);
-  background: #f3f5f7;
+  background: var(--detail-surface-muted);
   overflow: hidden;
 }
 
@@ -1725,7 +1805,8 @@ onBeforeUnmount(() => {
   left: 10px;
   top: 10px;
   border-radius: 999px;
-  background: rgba(20, 35, 56, 0.06);
+  border: 1px solid rgba(20, 35, 56, 0.08);
+  background: #ffffff;
   color: #41536f;
   padding: 3px 8px;
   font-size: 10px;
@@ -1736,12 +1817,13 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
+  padding: 1rem;
   transition: transform 0.45s ease;
 }
 
 .related-card:hover .related-image {
-  transform: translateY(-3px) scale(1.06);
+  transform: scale(1.04);
 }
 
 .related-title {
@@ -1812,6 +1894,10 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1024px) {
+  .detail-main {
+    grid-template-columns: 1fr;
+  }
+
   .related-title {
     font-size: 0.88rem;
   }
@@ -1841,9 +1927,18 @@ onBeforeUnmount(() => {
     padding-right: 0.8rem;
   }
 
+  .detail-topbar {
+    padding-inline: 3.2rem;
+  }
+
   .detail-main {
-    border-radius: 14px;
-    padding: 0.75rem;
+    gap: 1rem;
+  }
+
+  .detail-gallery-stage,
+  .detail-section {
+    border-radius: 22px;
+    padding: 0.9rem;
   }
 
   .detail-price-box {
@@ -1877,8 +1972,9 @@ onBeforeUnmount(() => {
     flex-direction: column;
   }
 
-  .qty-box {
-    width: 100%;
+  .detail-order-head {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .order-modal-panel {

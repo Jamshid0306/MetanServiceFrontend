@@ -10,25 +10,42 @@ export const useBasketStore = defineStore("basket", {
     basket: [],
   }),
   actions: {
+    normalizeBasket() {
+      const normalized = [];
+      const seenKeys = new Set();
+
+      this.basket.forEach((item) => {
+        const basketKey = resolveBasketKey(item);
+        if (seenKeys.has(basketKey)) {
+          return;
+        }
+
+        seenKeys.add(basketKey);
+        normalized.push({
+          ...item,
+          basket_key: basketKey,
+          quantity: 1,
+        });
+      });
+
+      this.basket = normalized;
+    },
     updateQuantity(key, quantity) {
       const item = this.basket.find((p) => resolveBasketKey(p) === key);
       if (item) {
-        const nextQuantity = Number(quantity);
-        item.quantity = Number.isFinite(nextQuantity) && nextQuantity > 0 ? nextQuantity : 1;
+        item.quantity = 1;
       }
     },
     addToBasket(product) {
       const basketKey = resolveBasketKey(product);
       const existing = this.basket.find((p) => resolveBasketKey(p) === basketKey);
-      const nextQuantity = Number(product.quantity);
-      const safeQuantity = Number.isFinite(nextQuantity) && nextQuantity > 0 ? nextQuantity : 1;
       if (existing) {
-        existing.quantity += safeQuantity;
+        existing.quantity = 1;
       } else {
         this.basket.push({
           ...product,
           basket_key: basketKey,
-          quantity: safeQuantity,
+          quantity: 1,
         });
       }
     },
@@ -37,20 +54,16 @@ export const useBasketStore = defineStore("basket", {
       if (sourceIndex === -1) return;
 
       const basketKey = resolveBasketKey(product);
-      const nextQuantity = Number(product.quantity);
-      const safeQuantity = Number.isFinite(nextQuantity) && nextQuantity > 0 ? nextQuantity : 1;
       const targetIndex = this.basket.findIndex(
         (p, index) => index !== sourceIndex && resolveBasketKey(p) === basketKey
       );
 
       if (targetIndex !== -1) {
-        const mergedQuantity =
-          Number(this.basket[targetIndex]?.quantity || 0) + safeQuantity;
         this.basket[targetIndex] = {
           ...this.basket[targetIndex],
           ...product,
           basket_key: basketKey,
-          quantity: mergedQuantity,
+          quantity: 1,
         };
         this.basket.splice(sourceIndex, 1);
         return;
@@ -60,7 +73,7 @@ export const useBasketStore = defineStore("basket", {
         ...this.basket[sourceIndex],
         ...product,
         basket_key: basketKey,
-        quantity: safeQuantity,
+        quantity: 1,
       };
     },
 
@@ -68,12 +81,7 @@ export const useBasketStore = defineStore("basket", {
       this.basket = this.basket.filter((p) => resolveBasketKey(p) !== key);
     },
     decreaseQuantity(key) {
-      const item = this.basket.find((p) => resolveBasketKey(p) === key);
-      if (item && item.quantity > 1) {
-        item.quantity -= 1;
-      } else {
-        this.removeFromBasket(key);
-      }
+      this.removeFromBasket(key);
     },
     clearBasket() {
       this.basket = [];
