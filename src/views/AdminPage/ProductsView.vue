@@ -22,7 +22,6 @@ import {
   createEmptyTransmissionItem,
   formatPriceValue,
   getCreditPlans,
-  getCylinderOptionTotalPrice,
   getProductOptionSummary,
   normalizeProductOptions,
   serializeProductOptions,
@@ -171,7 +170,7 @@ const getMinimumOptionPrice = (rawOptions) => {
           : [];
 
         cylinderVolumes.forEach((volume) => {
-          const numericPrice = getCylinderOptionTotalPrice(volume);
+          const numericPrice = Number(String(volume?.price_delta || "").replace(/[^\d]/g, ""));
           if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
             return;
           }

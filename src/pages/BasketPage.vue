@@ -13,7 +13,6 @@ import {
   formatCylinderOptionLabel,
   formatPriceValue,
   getBasketPrice,
-  getCylinderOptionTotalPrice,
   getProductOptionGroups,
   hasConfigurableOptions,
   parseNumericPrice,
@@ -130,10 +129,9 @@ const numericTotal = computed(() =>
 const formatPrice = (price) => formatPriceValue(price);
 const formatCylinderOptionMeta = (option) => {
   const parts = [];
-  const totalPrice = getCylinderOptionTotalPrice(option);
 
-  if (totalPrice !== null && totalPrice > 0) {
-    parts.push(formatPrice(totalPrice));
+  if (option?.price_delta) {
+    parts.push(formatPrice(option.price_delta));
   }
 
   return parts.join(" · ");
