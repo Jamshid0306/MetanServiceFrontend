@@ -15,7 +15,8 @@ import {
   calculateCreditPlan,
   buildConfiguredBasketItem,
   calculateConfiguredPrice,
-  ensureValidOptionSelections,
+  formatCylinderCountLabel,
+  formatCylinderOptionLabel,
   formatPriceValue,
   getDefaultOptionSelections,
   getCreditPlans,
@@ -36,6 +37,7 @@ const showCheck = ref({});
 const activeTab = ref("description");
 const relatedProductRefs = ref([]);
 const swiperRef = ref(null);
+const summaryRef = ref(null);
 const notification = ref({ show: false, message: "" });
 const selectedOptions = ref({});
 const selectedCreditMonths = ref(null);
@@ -43,7 +45,10 @@ const orderModalOpen = ref(false);
 const orderSubmitting = ref(false);
 const orderError = ref("");
 const orderForm = ref(createEmptyOrderForm());
+const stickyPriceVisible = ref(false);
 let swiperInstance = null;
+let priceSummaryObserver = null;
+const OPTION_FLOW = ["fuel_type", "transmission", "generation", "cylinder_volume"];
 
 function createEmptyOrderForm(orderType = "standard") {
   return {
@@ -76,13 +81,55 @@ const getTodayIsoDate = () => {
 
 const normalizeImages = (images) => resolveAssetUrls(images);
 const formatPrice = (price) => formatPriceValue(price);
+const formatCylinderOptionMeta = (option) => {
+  const parts = [];
+
+  if (option?.price_delta) {
+    parts.push(formatPrice(option.price_delta));
+  }
+
+  return parts.join(" · ");
+};
+const formatSelectedOptionLabel = (option) => {
+  const label = String(option?.label || "").trim();
+  if (!label) {
+    return "";
+  }
+
+  const countLabel = formatCylinderCountLabel(option?.count);
+  if (option?.group_key === "cylinder_volume" && countLabel) {
+    return formatCylinderOptionLabel(option);
+  }
+
+  return label;
+};
+const getCylinderSelectPlaceholder = () => {
+  if (locale.value === "ru") {
+    return "Выберите размер баллона";
+  }
+
+  if (locale.value === "en") {
+    return "Select cylinder size";
+  }
+
+  return "Balon razmerini tanlang";
+};
+const formatCylinderSelectOption = (option) => {
+  const optionLabel = formatCylinderOptionLabel(option);
+  const optionMeta = formatCylinderOptionMeta(option);
+  return optionMeta ? `${optionLabel} - ${optionMeta}` : optionLabel;
+};
 
 const images = computed(() => normalizeImages(store.product?.images || []));
 const optionGroups = computed(() =>
-  getProductOptionGroups(store.product, selectedOptions.value)
+  getProductOptionGroups(store.product, selectedOptions.value, {
+    useFallbackPath: false,
+  })
 );
 const selectedPrice = computed(() =>
-  calculateConfiguredPrice(store.product, locale.value, selectedOptions.value)
+  calculateConfiguredPrice(store.product, locale.value, selectedOptions.value, {
+    useFallbackPath: false,
+  })
 );
 const creditPlans = computed(() => getCreditPlans(store.product));
 const selectedCreditConfig = computed(
@@ -104,7 +151,9 @@ const selectedCreditPlan = computed(() => {
 });
 const configuredBasketItem = computed(() =>
   store.product
-    ? buildConfiguredBasketItem(store.product, selectedOptions.value, 1)
+    ? buildConfiguredBasketItem(store.product, selectedOptions.value, 1, {
+        useFallbackPath: false,
+      })
     : null
 );
 const currentOrderTotal = computed(() => {
@@ -160,9 +209,52 @@ const goToSlide = (index) => {
     swiperInstance.slideTo(index);
   }
 };
+const observeStickyPrice = () => {
+  if (priceSummaryObserver) {
+    priceSummaryObserver.disconnect();
+    priceSummaryObserver = null;
+  }
 
-const syncSelectedOptions = () => {
-  selectedOptions.value = ensureValidOptionSelections(store.product, selectedOptions.value);
+  if (
+    typeof window === "undefined" ||
+    typeof IntersectionObserver === "undefined" ||
+    !summaryRef.value
+  ) {
+    stickyPriceVisible.value = false;
+    return;
+  }
+
+  priceSummaryObserver = new IntersectionObserver(
+    ([entry]) => {
+      stickyPriceVisible.value = !entry.isIntersecting;
+    },
+    {
+      root: null,
+      threshold: 0.18,
+      rootMargin: "-92px 0px 0px 0px",
+    }
+  );
+
+  priceSummaryObserver.observe(summaryRef.value);
+};
+const buildNextSelections = (currentSelections, groupKey, optionId) => {
+  const groupIndex = OPTION_FLOW.indexOf(groupKey);
+  if (groupIndex === -1) {
+    return {
+      ...(currentSelections || {}),
+      [groupKey]: optionId,
+    };
+  }
+
+  return OPTION_FLOW.reduce((nextSelections, key, index) => {
+    if (index < groupIndex && currentSelections?.[key]) {
+      nextSelections[key] = currentSelections[key];
+    }
+    if (index === groupIndex) {
+      nextSelections[key] = optionId;
+    }
+    return nextSelections;
+  }, {});
 };
 
 const resetOrderForm = (orderType = canUseCreditOrder.value ? "credit" : "standard") => {
@@ -335,7 +427,14 @@ const submitProductOrder = async () => {
 };
 
 const fetchProductData = async (id) => {
-  const productExists = await store.fetchProductDetail(id);
+  const productId = Number(id);
+  if (!Number.isFinite(productId) || productId <= 0) {
+    store.product = null;
+    router.replace({ name: "NotFound" });
+    return;
+  }
+
+  const productExists = await store.fetchProductDetail(productId);
   if (!productExists) {
     router.replace({ name: "NotFound" });
     return;
@@ -345,11 +444,13 @@ const fetchProductData = async (id) => {
     await store.fetchProducts(200, 0);
   }
 
-  syncSelectedOptions();
+  selectedOptions.value = {};
   activeTab.value = "description";
   closeOrderModal();
+  stickyPriceVisible.value = false;
 
   await nextTick();
+  observeStickyPrice();
   const observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
@@ -368,10 +469,11 @@ const fetchProductData = async (id) => {
 };
 
 const selectOption = (groupKey, optionId) => {
-  selectedOptions.value = ensureValidOptionSelections(store.product, {
-    ...selectedOptions.value,
-    [groupKey]: optionId,
-  });
+  selectedOptions.value = buildNextSelections(
+    selectedOptions.value,
+    groupKey,
+    optionId
+  );
 };
 
 const goToDetail = (id) => {
@@ -460,12 +562,19 @@ onBeforeUnmount(() => {
   if (typeof document !== "undefined") {
     document.body.style.overflow = "";
   }
+  if (priceSummaryObserver) {
+    priceSummaryObserver.disconnect();
+    priceSummaryObserver = null;
+  }
   window.removeEventListener("keydown", handleEscape);
 });
 </script>
 
 <template>
-  <div class="detail-page container mx-auto mt-[100px] px-6">
+  <div
+    v-if="store.product"
+    class="detail-page container mx-auto mt-[100px] px-6"
+  >
     <div
       class="detail-topbar mb-[20px] flex justify-center items-center relative animate-fade-in-down"
     >
@@ -480,6 +589,21 @@ onBeforeUnmount(() => {
         {{ t("product.about") }}
       </h2>
     </div>
+
+    <transition name="detail-price-sticky-fade">
+      <div
+        v-if="stickyPriceVisible"
+        class="detail-price-sticky"
+      >
+        <span class="detail-price-sticky-label">
+          {{ t("productOptions.totalPrice") }}
+        </span>
+        <strong class="detail-price-sticky-value">
+          {{ formatPrice(selectedPrice) }}
+        </strong>
+      </div>
+    </transition>
+
     <div class="detail-main flex flex-col lg:flex-row gap-12 pb-[20px] animate-slide-in-up">
       <div class="detail-gallery lg:w-1/2 flex justify-center items-center flex-col gap-4">
         <div class="detail-gallery-stage">
@@ -511,7 +635,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="detail-info lg:w-1/2 flex flex-col gap-[20px] justify-center">
-        <div class="detail-summary detail-section">
+        <div ref="summaryRef" class="detail-summary detail-section">
           <div class="detail-summary-head">
             <span class="detail-product-id">ID {{ store.product?.id }}</span>
           </div>
@@ -554,7 +678,39 @@ onBeforeUnmount(() => {
                   {{ t(group.titleKey) }}
                 </h3>
               </div>
-              <div class="detail-option-grid flex flex-wrap gap-2">
+              <div
+                v-if="group.key === 'cylinder_volume'"
+                class="detail-select-shell"
+              >
+                <div
+                  class="detail-select-wrap"
+                  :class="{
+                    'detail-select-wrap-active': selectedOptions[group.key],
+                  }"
+                >
+                  <select
+                    :value="selectedOptions[group.key] || ''"
+                    class="detail-select-input"
+                    @change="selectOption(group.key, $event.target.value)"
+                  >
+                    <option value="" disabled>
+                      {{ getCylinderSelectPlaceholder() }}
+                    </option>
+                    <option
+                      v-for="option in group.options"
+                      :key="option.id"
+                      :value="option.id"
+                    >
+                      {{ formatCylinderSelectOption(option) }}
+                    </option>
+                  </select>
+                  <span class="detail-select-icon" aria-hidden="true">⌄</span>
+                </div>
+              </div>
+              <div
+                v-else
+                class="detail-option-grid flex flex-wrap gap-2"
+              >
                 <button
                   v-for="option in group.options"
                   :key="option.id"
@@ -567,16 +723,18 @@ onBeforeUnmount(() => {
                       : ''
                   "
                 >
-                  <span>{{ option.label }}</span>
+                  <span>
+                    {{
+                      group.key === "cylinder_volume"
+                        ? formatCylinderOptionLabel(option)
+                        : option.label
+                    }}
+                  </span>
                   <span
-                    v-if="group.key === 'cylinder_volume'"
+                    v-if="group.key === 'cylinder_volume' && formatCylinderOptionMeta(option)"
                     class="detail-option-meta"
                   >
-                    {{
-                      option.price_delta
-                        ? formatPrice(option.price_delta)
-                        : ""
-                    }}
+                    {{ formatCylinderOptionMeta(option) }}
                   </span>
                 </button>
               </div>
@@ -832,7 +990,7 @@ onBeforeUnmount(() => {
             :key="option.group_key"
             class="order-option-chip"
           >
-            {{ t(option.title_key) }}: {{ option.label }}
+            {{ t(option.title_key) }}: {{ formatSelectedOptionLabel(option) }}
           </span>
         </div>
 
@@ -1227,6 +1385,53 @@ onBeforeUnmount(() => {
   color: var(--detail-subtle);
 }
 
+.detail-price-sticky {
+  position: fixed;
+  top: 88px;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: min(620px, calc(100vw - 1.5rem));
+  margin: 0 auto;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(20, 35, 56, 0.1);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.detail-price-sticky-label {
+  color: #6a7a90;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.detail-price-sticky-value {
+  color: var(--detail-ink);
+  font-size: clamp(1.15rem, 2.2vw, 1.45rem);
+  line-height: 1.05;
+}
+
+.detail-price-sticky-fade-enter-active,
+.detail-price-sticky-fade-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.detail-price-sticky-fade-enter-from,
+.detail-price-sticky-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
 .detail-actions {
   display: grid;
   gap: 1rem;
@@ -1357,6 +1562,64 @@ onBeforeUnmount(() => {
   border-top: none;
 }
 
+.detail-select-shell {
+  width: 100%;
+}
+
+.detail-select-wrap {
+  position: relative;
+  width: 100%;
+  border-radius: 20px;
+  border: 1px solid rgba(20, 35, 56, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(242, 246, 251, 0.96));
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.detail-select-wrap:hover {
+  border-color: rgba(24, 48, 79, 0.22);
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.detail-select-wrap:focus-within {
+  border-color: rgba(24, 48, 79, 0.3);
+  box-shadow: 0 0 0 4px rgba(24, 48, 79, 0.08);
+}
+
+.detail-select-wrap-active {
+  border-color: rgba(24, 48, 79, 0.18);
+  background:
+    linear-gradient(180deg, rgba(249, 251, 253, 0.98), rgba(238, 243, 248, 0.98));
+}
+
+.detail-select-input {
+  width: 100%;
+  min-height: 58px;
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--detail-ink);
+  font-size: 0.97rem;
+  font-weight: 700;
+  padding: 0.95rem 3rem 0.95rem 1rem;
+  outline: none;
+}
+
+.detail-select-icon {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #5d728f;
+  font-size: 1.1rem;
+  pointer-events: none;
+}
+
 .detail-option-headline {
   display: flex;
   align-items: center;
@@ -1382,11 +1645,22 @@ onBeforeUnmount(() => {
 }
 
 .detail-option:hover {
-  border-color: var(--detail-border-strong);
-  background: var(--detail-surface);
+  border-color: rgba(24, 48, 79, 0.24);
+  background: var(--detail-accent-soft);
+  color: var(--detail-ink);
+}
+
+.detail-option:hover .detail-option-meta {
+  color: #5f7087;
 }
 
 .detail-option-active {
+  border-color: var(--detail-accent);
+  background: var(--detail-accent);
+  color: #ffffff;
+}
+
+.detail-option-active:hover {
   border-color: var(--detail-accent);
   background: var(--detail-accent);
   color: #ffffff;
@@ -1898,6 +2172,10 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 
+  .detail-price-sticky {
+    top: 84px;
+  }
+
   .related-title {
     font-size: 0.88rem;
   }
@@ -1943,6 +2221,16 @@ onBeforeUnmount(() => {
 
   .detail-price-box {
     width: 100%;
+  }
+
+  .detail-price-sticky {
+    top: 74px;
+    padding: 0.82rem 0.9rem;
+    border-radius: 18px;
+  }
+
+  .detail-price-sticky-value {
+    font-size: 1.04rem;
   }
 
   .credit-card-head {

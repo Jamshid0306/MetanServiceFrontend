@@ -19,10 +19,15 @@ export const PRODUCT_OPTION_GROUPS = [
 
 export const CREDIT_MONTH_OPTIONS = [3, 6, 9, 12];
 
-const CONFIG_SCHEMA_VERSION = 3;
+const CONFIG_SCHEMA_VERSION = 4;
 const DEFAULT_FUEL_TYPE_LABEL = "Standart";
 const DEFAULT_TRANSMISSION_LABEL = "Standart";
 const DEFAULT_GENERATION_LABEL = "Standart";
+const ASK_PRICE_BY_LOCALE = {
+  uz: "Narxni so’rang",
+  ru: "Цену уточняйте",
+  en: "Request price",
+};
 
 const createOptionId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -35,6 +40,20 @@ const createOptionId = () => {
 const toOptionId = (value, fallback) => String(value || fallback).trim();
 
 const normalizePriceDelta = (value) => parseNumericPrice(value) ?? 0;
+const normalizePositiveInteger = (value, fallback = null) => {
+  const digits = String(value ?? "").replace(/[^\d]/g, "");
+  if (!digits) {
+    return fallback;
+  }
+
+  const numeric = Number(digits);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return fallback;
+  }
+
+  return numeric;
+};
+const normalizeCylinderCount = (value) => normalizePositiveInteger(value, 1);
 
 const normalizeCylinderVolumeItem = (option = {}, index = 0, prefix = "cylinder-volume") => {
   const label = String(option?.label || "").trim();
@@ -45,6 +64,7 @@ const normalizeCylinderVolumeItem = (option = {}, index = 0, prefix = "cylinder-
   return {
     id: toOptionId(option?.id, `${prefix}-${index + 1}`),
     label,
+    count: normalizeCylinderCount(option?.count),
     price_delta: normalizePriceDelta(option?.price_delta),
   };
 };
@@ -248,18 +268,49 @@ const findOptionById = (options = [], optionId = "") =>
 
 const toVisibleOptions = (options = []) => options.filter((option) => !option.hidden);
 
-const resolveSelectedPath = (product, selections = {}) => {
+const resolveOptionFromSelection = (options = [], optionId = "", config = {}) => {
+  const selectedOption = findOptionById(options, optionId);
+  if (selectedOption) {
+    return selectedOption;
+  }
+
+  if (config.useFallbackPath !== false) {
+    return options[0] || null;
+  }
+
+  const visibleOptions = toVisibleOptions(options);
+  if (!visibleOptions.length) {
+    return options[0] || null;
+  }
+
+  return null;
+};
+
+const resolveSelectedPath = (product, selections = {}, pathConfig = {}) => {
   const config = getNormalizedConfig(product?.config_options);
-  const fuelType =
-    findOptionById(config.fuel_types, selections.fuel_type) || config.fuel_types[0] || null;
+  const fuelType = resolveOptionFromSelection(
+    config.fuel_types,
+    selections.fuel_type,
+    pathConfig
+  );
   const transmissions = fuelType?.transmissions || [];
-  const transmission =
-    findOptionById(transmissions, selections.transmission) || transmissions[0] || null;
+  const transmission = resolveOptionFromSelection(
+    transmissions,
+    selections.transmission,
+    pathConfig
+  );
   const generations = transmission?.generations || [];
-  const generation = findOptionById(generations, selections.generation) || generations[0] || null;
+  const generation = resolveOptionFromSelection(
+    generations,
+    selections.generation,
+    pathConfig
+  );
   const cylinderVolumes = generation?.cylinder_volumes || [];
-  const cylinderVolume =
-    findOptionById(cylinderVolumes, selections.cylinder_volume) || cylinderVolumes[0] || null;
+  const cylinderVolume = resolveOptionFromSelection(
+    cylinderVolumes,
+    selections.cylinder_volume,
+    pathConfig
+  );
 
   return {
     config,
@@ -273,6 +324,7 @@ const resolveSelectedPath = (product, selections = {}) => {
 export const createEmptyCylinderVolumeItem = () => ({
   id: createOptionId(),
   label: "",
+  count: "1",
   price_delta: "",
 });
 
@@ -344,7 +396,37 @@ export const formatPriceValue = (value) => {
   return `${numeric.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")} UZS`;
 };
 
+export const formatCylinderCountLabel = (count) => {
+  const numeric = normalizePositiveInteger(count);
+  return Number.isFinite(numeric) && numeric > 1 ? `x${numeric} ta` : "";
+};
+
+export const formatCylinderOptionLabel = (option) => {
+  const label = String(option?.label || "").trim();
+  if (!label) {
+    return "";
+  }
+
+  const countLabel = formatCylinderCountLabel(option?.count);
+  return countLabel ? `${label} ${countLabel}` : label;
+};
+
 export const normalizeProductOptions = (rawOptions = {}) => getNormalizedConfig(rawOptions);
+
+export const getProductDefaultPrice = (product, locale = "uz") => {
+  const defaultPrice = String(product?.default_price || "").trim();
+  if (defaultPrice) {
+    const numericDefaultPrice = parseNumericPrice(defaultPrice);
+    return numericDefaultPrice === null ? defaultPrice : numericDefaultPrice;
+  }
+
+  const localizedPrice = product?.[`price_${locale}`];
+  if (localizedPrice !== null && localizedPrice !== undefined && localizedPrice !== "") {
+    return localizedPrice;
+  }
+
+  return ASK_PRICE_BY_LOCALE[locale] || ASK_PRICE_BY_LOCALE.uz;
+};
 
 export const serializeProductOptions = (rawOptions = {}) => {
   const normalized = getNormalizedConfig(rawOptions);
@@ -368,6 +450,7 @@ export const serializeProductOptions = (rawOptions = {}) => {
           cylinder_volumes: generation.cylinder_volumes.map((volume) => ({
             id: volume.id || createOptionId(),
             label: volume.label,
+            count: normalizeCylinderCount(volume.count),
             price_delta: volume.price_delta || 0,
           })),
         })),
@@ -423,10 +506,11 @@ export const ensureValidOptionSelections = (product, selections = {}) => {
   return nextSelections;
 };
 
-export const getProductOptionGroups = (product, selections = {}) => {
+export const getProductOptionGroups = (product, selections = {}, pathConfig = {}) => {
   const { config, fuelType, transmission, generation } = resolveSelectedPath(
     product,
-    selections
+    selections,
+    pathConfig
   );
   const groups = [];
   const visibleFuelTypes = toVisibleOptions(config.fuel_types);
@@ -478,6 +562,7 @@ export const getProductOptionGroups = (product, selections = {}) => {
       options: cylinderVolumes.map((option) => ({
         id: option.id,
         label: option.label,
+        count: normalizeCylinderCount(option.count),
         price_delta: option.price_delta || 0,
       })),
     });
@@ -489,10 +574,11 @@ export const getProductOptionGroups = (product, selections = {}) => {
 export const getDefaultOptionSelections = (product) =>
   ensureValidOptionSelections(product);
 
-export const getSelectedProductOptions = (product, selections = {}) => {
+export const getSelectedProductOptions = (product, selections = {}, pathConfig = {}) => {
   const { fuelType, transmission, generation, cylinderVolume } = resolveSelectedPath(
     product,
-    selections
+    selections,
+    pathConfig
   );
   const selectedOptions = [];
 
@@ -532,6 +618,7 @@ export const getSelectedProductOptions = (product, selections = {}) => {
       title_key: "productOptions.cylinderVolume",
       id: cylinderVolume.id,
       label: cylinderVolume.label,
+      count: normalizeCylinderCount(cylinderVolume.count),
       price_delta: cylinderVolume.price_delta || 0,
     });
   }
@@ -539,19 +626,14 @@ export const getSelectedProductOptions = (product, selections = {}) => {
   return selectedOptions;
 };
 
-export const calculateConfiguredPrice = (product, locale, selections = {}) => {
-  const { cylinderVolume } = resolveSelectedPath(product, selections);
+export const calculateConfiguredPrice = (product, locale, selections = {}, pathConfig = {}) => {
+  const { cylinderVolume } = resolveSelectedPath(product, selections, pathConfig);
   const configuredPrice = parseNumericPrice(cylinderVolume?.price_delta);
   if (configuredPrice !== null) {
     return configuredPrice;
   }
 
-  const basePrice = parseNumericPrice(product?.[`price_${locale}`]);
-  if (basePrice === null) {
-    return product?.[`price_${locale}`] || "";
-  }
-
-  return basePrice;
+  return getProductDefaultPrice(product, locale);
 };
 
 export const getProductOptionSummary = (product) => {
@@ -590,17 +672,29 @@ export const buildBasketKey = (productId, selectedOptions = []) => {
   return `${productId}:${suffix}`;
 };
 
-export const buildConfiguredBasketItem = (product, selections = {}, quantity = 1) => {
-  const normalizedSelections = ensureValidOptionSelections(product, selections);
-  const selectedOptions = getSelectedProductOptions(product, normalizedSelections);
+export const buildConfiguredBasketItem = (
+  product,
+  selections = {},
+  quantity = 1,
+  pathConfig = {}
+) => {
+  const normalizedSelections =
+    pathConfig.useFallbackPath === false
+      ? { ...(selections || {}) }
+      : ensureValidOptionSelections(product, selections);
+  const selectedOptions = getSelectedProductOptions(
+    product,
+    normalizedSelections,
+    pathConfig
+  );
 
   return {
     ...product,
     quantity,
     selected_options: selectedOptions,
-    selected_price_uz: calculateConfiguredPrice(product, "uz", normalizedSelections),
-    selected_price_ru: calculateConfiguredPrice(product, "ru", normalizedSelections),
-    selected_price_en: calculateConfiguredPrice(product, "en", normalizedSelections),
+    selected_price_uz: calculateConfiguredPrice(product, "uz", normalizedSelections, pathConfig),
+    selected_price_ru: calculateConfiguredPrice(product, "ru", normalizedSelections, pathConfig),
+    selected_price_en: calculateConfiguredPrice(product, "en", normalizedSelections, pathConfig),
     basket_key: buildBasketKey(product.id, selectedOptions),
   };
 };
@@ -686,6 +780,25 @@ export const hasCreditPricing = (product) =>
 
 export const getCreditConfig = (product) => {
   return getCreditPlans(product)[0] || null;
+};
+
+export const getInstallmentPlan = (product, locale = "uz", months = 12) => {
+  const targetMonths = Number(months);
+  if (!Number.isFinite(targetMonths) || targetMonths <= 0) {
+    return null;
+  }
+
+  const basePrice = parseNumericPrice(product?.[`price_${locale}`]);
+  if (basePrice === null) {
+    return null;
+  }
+
+  const creditPlan = getCreditPlans(product).find((plan) => plan.months === targetMonths);
+  if (!creditPlan) {
+    return null;
+  }
+
+  return calculateCreditPlan(basePrice, creditPlan.percent, creditPlan.months);
 };
 
 export const calculateCreditPlan = (basePrice, totalPercent, months) => {

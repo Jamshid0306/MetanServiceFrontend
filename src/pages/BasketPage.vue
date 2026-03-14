@@ -9,7 +9,8 @@ import LeftArrow from "@/components/icons/LeftArrow.vue";
 import { apiClient, getApiErrorMessage, resolveAssetUrl, resolveAssetUrls } from "@/lib/api";
 import {
   buildConfiguredBasketItem,
-  ensureValidOptionSelections,
+  formatCylinderCountLabel,
+  formatCylinderOptionLabel,
   formatPriceValue,
   getBasketPrice,
   getProductOptionGroups,
@@ -55,19 +56,44 @@ const getItemSelectionMap = (item) =>
         return acc;
       }, {})
     : {};
+const OPTION_FLOW = ["fuel_type", "transmission", "generation", "cylinder_volume"];
+const buildNextSelections = (currentSelections, groupKey, optionId) => {
+  const groupIndex = OPTION_FLOW.indexOf(groupKey);
+  if (groupIndex === -1) {
+    return {
+      ...(currentSelections || {}),
+      [groupKey]: optionId,
+    };
+  }
+
+  return OPTION_FLOW.reduce((nextSelections, key, index) => {
+    if (index < groupIndex && currentSelections?.[key]) {
+      nextSelections[key] = currentSelections[key];
+    }
+    if (index === groupIndex) {
+      nextSelections[key] = optionId;
+    }
+    return nextSelections;
+  }, {});
+};
 
 const getItemOptionGroups = (item) =>
-  getProductOptionGroups(item, getItemSelectionMap(item));
+  getProductOptionGroups(item, getItemSelectionMap(item), {
+    useFallbackPath: false,
+  });
 
 const updateItemOption = (item, groupKey, optionId) => {
-  const nextSelections = ensureValidOptionSelections(item, {
-    ...getItemSelectionMap(item),
-    [groupKey]: optionId,
-  });
+  const nextSelections = buildNextSelections(
+    getItemSelectionMap(item),
+    groupKey,
+    optionId
+  );
 
   basketStore.replaceBasketItem(
     getItemKey(item),
-    buildConfiguredBasketItem(item, nextSelections, 1)
+    buildConfiguredBasketItem(item, nextSelections, 1, {
+      useFallbackPath: false,
+    })
   );
 };
 
@@ -101,6 +127,28 @@ const numericTotal = computed(() =>
 );
 
 const formatPrice = (price) => formatPriceValue(price);
+const formatCylinderOptionMeta = (option) => {
+  const parts = [];
+
+  if (option?.price_delta) {
+    parts.push(formatPrice(option.price_delta));
+  }
+
+  return parts.join(" · ");
+};
+const formatSelectedOptionLabel = (option) => {
+  const label = String(option?.label || "").trim();
+  if (!label) {
+    return "";
+  }
+
+  const countLabel = formatCylinderCountLabel(option?.count);
+  if (option?.group_key === "cylinder_volume" && countLabel) {
+    return formatCylinderOptionLabel(option);
+  }
+
+  return label;
+};
 
 const removeItem = (item) => basketStore.removeFromBasket(getItemKey(item));
 const goToProduct = (id) =>
@@ -200,7 +248,7 @@ const submitOrder = async () => {
                 :key="`${getItemKey(item)}-${option.group_key}`"
                 class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600"
               >
-                {{ t(option.title_key) }}: {{ option.label }}
+                {{ t(option.title_key) }}: {{ formatSelectedOptionLabel(option) }}
               </span>
             </div>
 
@@ -233,12 +281,18 @@ const submitOrder = async () => {
                     }"
                     @click.stop="updateItemOption(item, group.key, option.id)"
                   >
-                    <span>{{ option.label }}</span>
+                    <span>
+                      {{
+                        group.key === "cylinder_volume"
+                          ? formatCylinderOptionLabel(option)
+                          : option.label
+                      }}
+                    </span>
                     <span
-                      v-if="group.key === 'cylinder_volume' && option.price_delta"
+                      v-if="group.key === 'cylinder_volume' && formatCylinderOptionMeta(option)"
                       class="basket-option-delta"
                     >
-                      {{ formatPrice(option.price_delta) }}
+                      {{ formatCylinderOptionMeta(option) }}
                     </span>
                   </button>
                 </div>
@@ -420,13 +474,20 @@ const submitOrder = async () => {
 
 .basket-option-chip:hover {
   transform: translateY(-1px);
-  border-color: rgba(20, 35, 56, 0.18);
+  border-color: rgba(20, 35, 56, 0.24);
+  background: #eef3f7;
+  color: #142338;
 }
 
 .basket-option-chip-active {
   border-color: rgba(20, 35, 56, 0.18);
   background: #edf2f6;
   color: #142338;
+}
+
+.basket-option-chip:hover .basket-option-delta {
+  color: #5c6f89;
+  opacity: 1;
 }
 
 .basket-option-delta {

@@ -12,6 +12,7 @@ import {
   buildConfiguredBasketItem,
   formatPriceValue,
   getDefaultOptionSelections,
+  getInstallmentPlan,
 } from "@/lib/productOptions";
 
 const router = useRouter();
@@ -24,6 +25,17 @@ const animating = ref({});
 const showCheck = ref({});
 const notification = ref({ show: false, message: "" });
 const formatPrice = (price) => formatPriceValue(price);
+const INSTALLMENT_MONTHS = 12;
+const getProductInstallment = (product) =>
+  getInstallmentPlan(product, locale.value, INSTALLMENT_MONTHS);
+const formatInstallmentLabel = (product) => {
+  const installment = getProductInstallment(product);
+  if (!installment) {
+    return "";
+  }
+
+  return `${formatPrice(installment.monthlyPayment)} / ${installment.months} ${t("credit.months")}`;
+};
 
 onMounted(async () => {
   if (!productsStore.products.length) {
@@ -106,6 +118,12 @@ const actionLabel = () => t("add_to_cart");
           <div class="card-footer">
             <p class="product-price">
               {{ formatPrice(product[`price_${locale}`]) }}
+            </p>
+            <p
+              v-if="getProductInstallment(product)"
+              class="product-installment"
+            >
+              {{ formatInstallmentLabel(product) }}
             </p>
 
             <button
@@ -289,7 +307,19 @@ const actionLabel = () => t("add_to_cart");
   color: #142338;
   font-size: 1.02rem;
   font-weight: 800;
-  margin-bottom: 10px;
+  margin-bottom: 0.45rem;
+}
+
+.product-installment {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.28rem 0.6rem;
+  margin-bottom: 0.85rem;
+  background: rgba(24, 48, 79, 0.08);
+  color: #18304f;
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
 .add-btn {
@@ -329,6 +359,11 @@ const actionLabel = () => t("add_to_cart");
 
   .product-price {
     font-size: 0.94rem;
+  }
+
+  .product-installment {
+    font-size: 0.68rem;
+    padding: 0.24rem 0.5rem;
   }
 
   .cart-icon {

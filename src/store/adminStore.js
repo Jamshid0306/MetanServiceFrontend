@@ -3,11 +3,14 @@ import { useLoaderStore } from "@/store/loaderStore";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
 import { useProductsStore } from "@/store/productsStore";
 
+const isUnauthorizedError = (error) => Number(error?.response?.status) === 401;
+
 export const useAdminStore = defineStore("admin", {
   state: () => ({
     isLogged: !!localStorage.getItem("access_token"),
     accessToken: localStorage.getItem("access_token") || null,
     products: [],
+    heroSlides: [],
     lastError: "",
   }),
   actions: {
@@ -26,16 +29,27 @@ export const useAdminStore = defineStore("admin", {
         this.logout();
         return false;
       } catch (err) {
-        this.lastError = getApiErrorMessage(err, "Login bajarilmadi.");
-        this.logout();
+        this.logout(getApiErrorMessage(err, "Login bajarilmadi."));
         return false;
       }
     },
 
-    logout() {
+    handleAdminError(err, fallback) {
+      if (isUnauthorizedError(err)) {
+        this.logout("Sessiya tugadi. Qaytadan login qiling.");
+        return true;
+      }
+
+      this.lastError = getApiErrorMessage(err, fallback);
+      return false;
+    },
+
+    logout(message = "") {
       this.isLogged = false;
       this.accessToken = null;
-      this.lastError = "";
+      this.products = [];
+      this.heroSlides = [];
+      this.lastError = message;
       localStorage.removeItem("access_token");
     },
 
@@ -51,7 +65,7 @@ export const useAdminStore = defineStore("admin", {
         }
         return false;
       } catch (err) {
-        this.lastError = getApiErrorMessage(err, "Mahsulot yaratib bo'lmadi.");
+        this.handleAdminError(err, "Mahsulot yaratib bo'lmadi.");
         return false;
       }
     },
@@ -69,9 +83,11 @@ export const useAdminStore = defineStore("admin", {
         });
         const data = res.data;
         this.products = Array.isArray(data) ? data : data?.products || [];
+        return true;
       } catch (err) {
-        this.lastError = getApiErrorMessage(err, "Admin mahsulotlari yuklanmadi.");
+        this.handleAdminError(err, "Admin mahsulotlari yuklanmadi.");
         this.products = [];
+        return false;
       } finally {
         loaderStore.loader = false;
       }
@@ -92,7 +108,7 @@ export const useAdminStore = defineStore("admin", {
           return false;
         }
       } catch (err) {
-        this.lastError = getApiErrorMessage(err, "Mahsulotni yangilab bo'lmadi.");
+        this.handleAdminError(err, "Mahsulotni yangilab bo'lmadi.");
         return false;
       }
     },
@@ -106,7 +122,69 @@ export const useAdminStore = defineStore("admin", {
         await this.getProducts();
         return true;
       } catch (err) {
-        this.lastError = getApiErrorMessage(err, "Mahsulotni o'chirib bo'lmadi.");
+        this.handleAdminError(err, "Mahsulotni o'chirib bo'lmadi.");
+        return false;
+      }
+    },
+
+    async getHeroSlides() {
+      if (!this.accessToken) return false;
+      this.lastError = "";
+      try {
+        const res = await apiClient.get("/hero-slides/admin");
+        this.heroSlides = Array.isArray(res.data?.slides) ? res.data.slides : [];
+        return true;
+      } catch (err) {
+        this.handleAdminError(err, "Hero bannerlar yuklanmadi.");
+        this.heroSlides = [];
+        return false;
+      }
+    },
+
+    async createHeroSlide(formData) {
+      if (!this.accessToken) return false;
+      this.lastError = "";
+      try {
+        const res = await apiClient.post("/hero-slides", formData);
+        if (res.data?.success) {
+          await this.getHeroSlides();
+          return true;
+        }
+        return false;
+      } catch (err) {
+        this.handleAdminError(err, "Hero banner qo'shib bo'lmadi.");
+        return false;
+      }
+    },
+
+    async updateHeroSlide(slideId, formData) {
+      if (!this.accessToken) return false;
+      this.lastError = "";
+      try {
+        const res = await apiClient.put(`/hero-slides/${slideId}`, formData);
+        if (res.data?.success) {
+          await this.getHeroSlides();
+          return true;
+        }
+        return false;
+      } catch (err) {
+        this.handleAdminError(err, "Hero bannerni yangilab bo'lmadi.");
+        return false;
+      }
+    },
+
+    async deleteHeroSlide(slideId) {
+      if (!this.accessToken) return false;
+      this.lastError = "";
+      try {
+        const res = await apiClient.delete(`/hero-slides/${slideId}`);
+        if (res.data?.success) {
+          this.heroSlides = this.heroSlides.filter((slide) => slide.id !== slideId);
+          return true;
+        }
+        return false;
+      } catch (err) {
+        this.handleAdminError(err, "Hero bannerni o'chirib bo'lmadi.");
         return false;
       }
     },

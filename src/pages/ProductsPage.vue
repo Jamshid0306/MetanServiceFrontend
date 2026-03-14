@@ -14,6 +14,7 @@ import {
   buildConfiguredBasketItem,
   formatPriceValue,
   getDefaultOptionSelections,
+  getInstallmentPlan,
 } from "@/lib/productOptions";
 
 const route = useRoute();
@@ -161,6 +162,17 @@ const goToDetail = (id) => {
 };
 
 const formatPrice = (price) => formatPriceValue(price);
+const INSTALLMENT_MONTHS = 12;
+const getProductInstallment = (product) =>
+  getInstallmentPlan(product, locale.value, INSTALLMENT_MONTHS);
+const formatInstallmentLabel = (product) => {
+  const installment = getProductInstallment(product);
+  if (!installment) {
+    return "";
+  }
+
+  return `${formatPrice(installment.monthlyPayment)} / ${installment.months} ${t("credit.months")}`;
+};
 const actionLabel = () => t("add_to_cart");
 
 watch(locale, () => {
@@ -248,6 +260,12 @@ onMounted(async () => {
             <div class="catalog-footer">
               <p class="catalog-price">
                 {{ formatPrice(product[`price_${locale}`]) }}
+              </p>
+              <p
+                v-if="getProductInstallment(product)"
+                class="catalog-installment"
+              >
+                {{ formatInstallmentLabel(product) }}
               </p>
               <button
                 @click="handleClick(product)"
@@ -401,8 +419,20 @@ onMounted(async () => {
   color: #142338;
   font-size: 1rem;
   font-weight: 800;
-  margin-bottom: 10px;
+  margin-bottom: 0.45rem;
   text-align: left;
+}
+
+.catalog-installment {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.28rem 0.6rem;
+  margin-bottom: 0.85rem;
+  background: rgba(24, 48, 79, 0.08);
+  color: #18304f;
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .cart-btn {
@@ -431,6 +461,11 @@ onMounted(async () => {
 
   .catalog-price {
     font-size: 0.88rem;
+  }
+
+  .catalog-installment {
+    font-size: 0.68rem;
+    padding: 0.24rem 0.5rem;
   }
 
   .catalog-cart-icon {

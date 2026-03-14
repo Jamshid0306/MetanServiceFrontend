@@ -94,6 +94,7 @@ const createInitialProduct = () => ({
   name: { uz: "", ru: "", en: "" },
   description: { uz: "", ru: "", en: "" },
   characteristic: { uz: "", ru: "", en: "" },
+  default_price: "",
   images: [],
   oldImages: [],
   options: createEmptyProductOptions(),
@@ -139,6 +140,15 @@ const formatOptionPriceInput = (value) =>
   value === null || value === undefined || value === ""
     ? ""
     : formatNumericInput(value);
+const formatCountInput = (value) => {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (!digits) {
+    return "";
+  }
+
+  const numeric = Number(digits);
+  return Number.isFinite(numeric) && numeric > 0 ? String(numeric) : "";
+};
 
 const getMinimumOptionPrice = (rawOptions) => {
   const fuelTypes = Array.isArray(rawOptions?.fuel_types) ? rawOptions.fuel_types : [];
@@ -270,6 +280,7 @@ const mapCylinderVolumesForForm = (volumes = []) =>
     id: volume.id,
     label: volume.label,
     hidden: Boolean(volume.hidden),
+    count: formatCountInput(volume.count) || "1",
     price_delta: formatOptionPriceInput(volume.price_delta),
   }));
 
@@ -338,6 +349,7 @@ const openUpdateModal = (product) => {
       ru: product.characteristic_ru || "",
       en: product.characteristic_en || "",
     },
+    default_price: formatOptionPriceInput(product.default_price),
     images: [],
     oldImages: oldImages,
     options: mapOptionsForForm(product, product.config_options),
@@ -430,8 +442,19 @@ const onCylinderPriceInput = (event, option) => {
   }
 };
 
+const onCylinderCountInput = (event, option) => {
+  option.count = formatCountInput(event.target.value);
+  if (option?.label?.trim()) {
+    option.hidden = false;
+  }
+};
+
 const onCreditPercentInput = (event) => {
   return formatNumericInput(event.target.value);
+};
+
+const onDefaultPriceInput = (event) => {
+  newProduct.value.default_price = formatNumericInput(event.target.value);
 };
 
 const getNextCreditMonths = () => {
@@ -537,6 +560,7 @@ const addOrUpdateProduct = async () => {
     "characteristic_en",
     newProduct.value.characteristic?.en || ""
   );
+  formData.append("default_price", newProduct.value.default_price || "");
 
   if (minimumOptionPrice === null) {
     formData.append("price_uz", "Narxni so’rang");
@@ -804,11 +828,17 @@ const hasCreditBadge = (product) =>
               </span>
             </div>
           </div>
-          <div class="product-price-box">
-            <span class="product-price-label">Базовая цена</span>
+            <div class="product-price-box">
+            <span class="product-price-label">Минимальная цена</span>
             <div class="product-price-value">
               {{ formatPrice(product.price_ru) }}
             </div>
+            <span
+              v-if="product.default_price"
+              class="product-price-note"
+            >
+              Без выбора: {{ formatPrice(product.default_price) }}
+            </span>
           </div>
         </Motion>
       </AnimatePresence>
@@ -971,7 +1001,7 @@ const hasCreditBadge = (product) =>
                   </h3>
                   <p class="editor-section-copy">
                     Сначала добавьте тип топлива, затем КПП, поколения ГБО и
-                    только потом конкретные баллоны с ценой.
+                    только потом конкретные баллоны с ценой и количеством.
                   </p>
                 </div>
               </div>
@@ -1197,8 +1227,9 @@ const hasCreditBadge = (product) =>
                               <div>
                                 <h4 class="editor-option-title">Размеры баллона</h4>
                                 <p class="editor-option-copy">
-                                  Для каждого размера в этой ветке укажите цену баллона.
-                                  Именно эта цена будет влиять на итоговую стоимость.
+                                  Для каждого размера в этой ветке укажите цену и
+                                  количество баллонов. Цена влияет на итоговую стоимость,
+                                  а количество сохраняется в конфигурации товара.
                                 </p>
                               </div>
                               <button
@@ -1226,7 +1257,7 @@ const hasCreditBadge = (product) =>
                             <div
                               v-for="(volume, volumeIndex) in generation.cylinder_volumes"
                               :key="volume.id"
-                              class="editor-option-row"
+                              class="editor-option-row editor-option-row-volume"
                             >
                               <select
                                 v-model="volume.label"
@@ -1255,6 +1286,14 @@ const hasCreditBadge = (product) =>
                                 :value="volume.price_delta"
                                 @input="onCylinderPriceInput($event, volume)"
                                 placeholder="0 UZS"
+                                class="editor-field"
+                              />
+                              <input
+                                :value="volume.count"
+                                @input="onCylinderCountInput($event, volume)"
+                                type="text"
+                                inputmode="numeric"
+                                placeholder="Кол-во"
                                 class="editor-field"
                               />
                               <button
@@ -1329,6 +1368,25 @@ const hasCreditBadge = (product) =>
                 :placeholder="`Характеристика (${currentLang.toUpperCase()})`"
                 class="editor-field editor-textarea editor-textarea-tall"
               ></textarea>
+            </div>
+
+            <div class="editor-section space-y-3">
+              <div class="editor-section-head">
+                <div>
+                  <h3 class="editor-section-title">Цена без выбора</h3>
+                  <p class="editor-section-copy">
+                    Эта цена показывается на странице товара, пока пользователь ещё ничего не выбрал.
+                  </p>
+                </div>
+              </div>
+
+              <input
+                :value="newProduct.default_price"
+                @input="onDefaultPriceInput"
+                placeholder="Цена по умолчанию"
+                inputmode="numeric"
+                class="editor-field"
+              />
             </div>
 
             <div class="editor-section space-y-3">
@@ -1651,6 +1709,13 @@ const hasCreditBadge = (product) =>
   font-weight: 800;
 }
 
+.product-price-note {
+  margin-top: 0.45rem;
+  color: #5f7595;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
 .product-pagination {
   display: flex;
   justify-content: center;
@@ -1870,6 +1935,10 @@ const hasCreditBadge = (product) =>
   gap: 0.7rem;
   align-items: center;
   margin-top: 0.75rem;
+}
+
+.editor-option-row-volume {
+  grid-template-columns: minmax(0, 1fr) 170px 120px 44px;
 }
 
 .editor-option-row-single {
@@ -2147,6 +2216,10 @@ const hasCreditBadge = (product) =>
   }
 
   .editor-option-row {
+    grid-template-columns: 1fr;
+  }
+
+  .editor-option-row-volume {
     grid-template-columns: 1fr;
   }
 

@@ -1,26 +1,61 @@
 <script setup>
+import { computed, onMounted, ref } from "vue";
+
 import { Autoplay, Pagination } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/vue";
+
+import { apiClient, resolveAssetUrl } from "@/lib/api";
+
 import heroProducts from "@/assets/images/hero-products.jpg";
 import heroService from "@/assets/images/hero-service.jpg";
 import heroSupport from "@/assets/images/hero-support.jpg";
 import "swiper/css";
 import "swiper/css/pagination";
 
-const heroSlides = [
+const fallbackSlides = [
   {
+    id: "fallback-products",
     src: heroProducts,
     alt: "Metan uskunalari va jihozlari",
   },
   {
+    id: "fallback-service",
     src: heroService,
     alt: "Urganch Metan Service servis ishlari",
   },
   {
+    id: "fallback-support",
     src: heroSupport,
     alt: "Metan tizimlari bo‘yicha texnik qo‘llab-quvvatlash",
   },
 ];
+
+const heroSlides = ref([]);
+const hasFetchedSlides = ref(false);
+const loadFailed = ref(false);
+
+const displaySlides = computed(() => {
+  if (!hasFetchedSlides.value || loadFailed.value) {
+    return fallbackSlides;
+  }
+
+  return heroSlides.value;
+});
+
+onMounted(async () => {
+  try {
+    const res = await apiClient.get("/hero-slides");
+    const slides = Array.isArray(res.data?.slides) ? res.data.slides : [];
+    heroSlides.value = slides.map((slide) => ({
+      id: slide.id,
+      src: resolveAssetUrl(slide.image_path),
+      alt: `Urganch Metan Service hero banner ${slide.id}`,
+    }));
+    hasFetchedSlides.value = true;
+  } catch {
+    loadFailed.value = true;
+  }
+});
 </script>
 
 <template>
@@ -30,21 +65,25 @@ const heroSlides = [
   >
     <section class="hero-shell">
       <Swiper
+        v-if="displaySlides.length"
         :modules="[Autoplay, Pagination]"
-        :loop="true"
+        :loop="displaySlides.length > 1"
         :speed="850"
         :autoplay="{ delay: 3200, disableOnInteraction: false }"
         :pagination="{ clickable: true }"
         class="hero-swiper reveal-up"
       >
         <SwiperSlide
-          v-for="slide in heroSlides"
-          :key="slide.src"
+          v-for="slide in displaySlides"
+          :key="slide.id || slide.src"
           class="hero-slide"
         >
           <img :src="slide.src" :alt="slide.alt" class="hero-image" />
         </SwiperSlide>
       </Swiper>
+      <div v-else class="hero-empty reveal-up">
+        <p>Hero banner hali qo‘shilmagan</p>
+      </div>
     </section>
   </div>
 </template>
@@ -95,6 +134,20 @@ const heroSlides = [
   transform: scale(1.01);
 }
 
+.hero-empty {
+  display: grid;
+  place-items: center;
+  min-height: 280px;
+  border-radius: 22px;
+  border: 1px dashed rgba(20, 35, 56, 0.16);
+  background:
+    radial-gradient(circle at top right, rgba(37, 87, 164, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(243, 247, 251, 0.96), rgba(231, 237, 245, 0.9));
+  color: #29415f;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
 .reveal-up {
   animation: riseIn 0.6s ease-out both;
 }
@@ -128,6 +181,10 @@ const heroSlides = [
 
   .hero-slide {
     min-height: 170px;
+  }
+
+  .hero-empty {
+    min-height: 190px;
   }
 }
 

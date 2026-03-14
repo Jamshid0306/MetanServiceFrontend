@@ -1,5 +1,6 @@
 <script setup>
 import Login from "../components/Login.vue";
+import HeroSlidesView from "../views/AdminPage/HeroSlidesView.vue";
 import ProductsView from "../views/AdminPage/ProductsView.vue";
 import { useAdminStore } from "../store/adminStore";
 
@@ -19,6 +20,7 @@ const store = useAdminStore();
         </header>
 
         <div class="admin-content p-4 sm:p-6">
+          <HeroSlidesView />
           <ProductsView />
         </div>
       </main>
