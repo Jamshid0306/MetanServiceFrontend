@@ -54,6 +54,14 @@ const normalizePositiveInteger = (value, fallback = null) => {
   return numeric;
 };
 const normalizeCylinderCount = (value) => normalizePositiveInteger(value, 1);
+export const getCylinderOptionTotalPrice = (option) => {
+  const unitPrice = parseNumericPrice(option?.price_delta);
+  if (unitPrice === null) {
+    return null;
+  }
+
+  return unitPrice * normalizeCylinderCount(option?.count);
+};
 
 const normalizeCylinderVolumeItem = (option = {}, index = 0, prefix = "cylinder-volume") => {
   const label = String(option?.label || "").trim();
@@ -628,7 +636,7 @@ export const getSelectedProductOptions = (product, selections = {}, pathConfig =
 
 export const calculateConfiguredPrice = (product, locale, selections = {}, pathConfig = {}) => {
   const { cylinderVolume } = resolveSelectedPath(product, selections, pathConfig);
-  const configuredPrice = parseNumericPrice(cylinderVolume?.price_delta);
+  const configuredPrice = getCylinderOptionTotalPrice(cylinderVolume);
   if (configuredPrice !== null) {
     return configuredPrice;
   }
