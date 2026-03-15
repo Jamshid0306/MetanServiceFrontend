@@ -1,33 +1,21 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { useBasketStore } from "../store/basketStore";
 import { ShoppingCart, Trash2 } from "lucide-vue-next";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import Notification from "@/components/Notification.vue";
 import LeftArrow from "@/components/icons/LeftArrow.vue";
-import { apiClient, getApiErrorMessage, resolveAssetUrl, resolveAssetUrls } from "@/lib/api";
+import { resolveAssetUrl, resolveAssetUrls } from "@/lib/api";
 import {
-  buildConfiguredBasketItem,
   formatCylinderCountLabel,
   formatCylinderOptionLabel,
   formatPriceValue,
   getBasketPrice,
-  getProductOptionGroups,
-  hasConfigurableOptions,
-  parseNumericPrice,
 } from "@/lib/productOptions";
 
 const { t, locale } = useI18n();
 const basketStore = useBasketStore();
 const router = useRouter();
-const checkoutForm = ref({
-  name: "",
-  phone: "",
-});
-const checkoutLoading = ref(false);
-const checkoutError = ref("");
-const notification = ref({ show: false, message: "" });
 
 basketStore.normalizeBasket();
 
@@ -47,55 +35,6 @@ const extractNumericOrText = (price) => {
 };
 
 const getItemKey = (item) => item.basket_key || `${item.id}:base`;
-const getItemSelectionMap = (item) =>
-  Array.isArray(item.selected_options)
-    ? item.selected_options.reduce((acc, option) => {
-        if (option?.group_key && option?.id) {
-          acc[option.group_key] = option.id;
-        }
-        return acc;
-      }, {})
-    : {};
-const OPTION_FLOW = ["fuel_type", "transmission", "generation", "cylinder_volume"];
-const buildNextSelections = (currentSelections, groupKey, optionId) => {
-  const groupIndex = OPTION_FLOW.indexOf(groupKey);
-  if (groupIndex === -1) {
-    return {
-      ...(currentSelections || {}),
-      [groupKey]: optionId,
-    };
-  }
-
-  return OPTION_FLOW.reduce((nextSelections, key, index) => {
-    if (index < groupIndex && currentSelections?.[key]) {
-      nextSelections[key] = currentSelections[key];
-    }
-    if (index === groupIndex) {
-      nextSelections[key] = optionId;
-    }
-    return nextSelections;
-  }, {});
-};
-
-const getItemOptionGroups = (item) =>
-  getProductOptionGroups(item, getItemSelectionMap(item), {
-    useFallbackPath: false,
-  });
-
-const updateItemOption = (item, groupKey, optionId) => {
-  const nextSelections = buildNextSelections(
-    getItemSelectionMap(item),
-    groupKey,
-    optionId
-  );
-
-  basketStore.replaceBasketItem(
-    getItemKey(item),
-    buildConfiguredBasketItem(item, nextSelections, 1, {
-      useFallbackPath: false,
-    })
-  );
-};
 
 const totalPrice = computed(() => {
   let sum = 0;
@@ -116,26 +55,7 @@ const totalPrice = computed(() => {
   return sum;
 });
 
-const numericTotal = computed(() =>
-  basketStore.basket.reduce((sum, item) => {
-    const price = parseNumericPrice(getBasketPrice(item, locale.value));
-    if (price === null) {
-      return sum;
-    }
-    return sum + price;
-  }, 0)
-);
-
 const formatPrice = (price) => formatPriceValue(price);
-const formatCylinderOptionMeta = (option) => {
-  const parts = [];
-
-  if (option?.price_delta) {
-    parts.push(formatPrice(option.price_delta));
-  }
-
-  return parts.join(" · ");
-};
 const formatSelectedOptionLabel = (option) => {
   const label = String(option?.label || "").trim();
   if (!label) {
@@ -153,56 +73,10 @@ const formatSelectedOptionLabel = (option) => {
 const removeItem = (item) => basketStore.removeFromBasket(getItemKey(item));
 const goToProduct = (id) =>
   router.push({ name: "ProductDetail", params: { id } });
-
-const submitOrder = async () => {
-  const name = checkoutForm.value.name.trim();
-  const phone = checkoutForm.value.phone.trim();
-  const phoneDigits = phone.replace(/\D/g, "");
-
-  if (!name || !phone || phoneDigits.length < 9 || !basketStore.basket.length) {
-    checkoutError.value = t("please_fill_all_fields");
-    return;
-  }
-
-  checkoutLoading.value = true;
-  checkoutError.value = "";
-
-  try {
-    await apiClient.post("/products/order", {
-      name,
-      phone,
-      locale: locale.value,
-      total: numericTotal.value,
-      products: basketStore.basket.map((item) => ({
-        id: item.id,
-        name: item[`name_${locale.value}`],
-        quantity: 1,
-        price: getBasketPrice(item, locale.value),
-        selected_options: item.selected_options || [],
-      })),
-    });
-
-    basketStore.clearBasket();
-    checkoutForm.value = { name: "", phone: "" };
-    notification.value = {
-      show: true,
-      message: t("success"),
-    };
-  } catch (error) {
-    checkoutError.value = getApiErrorMessage(error, t("send"));
-  } finally {
-    checkoutLoading.value = false;
-  }
-};
 </script>
 
 <template>
   <div class="basket-page max-w-6xl mx-auto py-12 px-4 mt-[30px]">
-    <Notification
-      :message="notification.message"
-      :show="notification.show"
-      @close="notification.show = false"
-    />
     <div class="basket-header flex my-4 items-center gap-12">
       <RouterLink class="basket-back hover:scale-105" to="/">
         <LeftArrow :size="30" />
@@ -225,12 +99,12 @@ const submitOrder = async () => {
           class="basket-card group flex flex-col items-center overflow-hidden rounded-2xl border bg-white transition-all duration-500 sm:flex-row sm:items-stretch"
         >
           <div
-            class="basket-media flex-shrink-0 w-full sm:w-40 h-40 flex items-center justify-center cursor-pointer"
+            class="basket-media flex-shrink-0 w-full h-52 sm:w-40 sm:h-40 flex items-center justify-center cursor-pointer"
             @click="goToProduct(item.id)"
           >
             <img
               :src="normalizeImages(item.images)[0]"
-              class="h-28 w-28 object-contain transition-transform duration-300 group-hover:scale-105"
+              class="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
             />
           </div>
           <hr class="basket-divider h-full w-[1px] bg-gray-300" />
@@ -250,53 +124,6 @@ const submitOrder = async () => {
               >
                 {{ t(option.title_key) }}: {{ formatSelectedOptionLabel(option) }}
               </span>
-            </div>
-
-            <div
-              v-if="hasConfigurableOptions(item) && getItemOptionGroups(item).length"
-              class="basket-configurator mt-4"
-              @click.stop
-            >
-              <p class="basket-configurator-title">
-                {{ t("basket_options_title") }}
-              </p>
-
-              <div
-                v-for="group in getItemOptionGroups(item)"
-                :key="`${getItemKey(item)}-${group.key}`"
-                class="basket-option-group"
-              >
-                <p class="basket-option-group-title">
-                  {{ t(group.titleKey) }}
-                </p>
-                <div class="basket-option-list">
-                  <button
-                    v-for="option in group.options"
-                    :key="option.id"
-                    type="button"
-                    class="basket-option-chip"
-                    :class="{
-                      'basket-option-chip-active':
-                        getItemSelectionMap(item)[group.key] === option.id,
-                    }"
-                    @click.stop="updateItemOption(item, group.key, option.id)"
-                  >
-                    <span>
-                      {{
-                        group.key === "cylinder_volume"
-                          ? formatCylinderOptionLabel(option)
-                          : option.label
-                      }}
-                    </span>
-                    <span
-                      v-if="group.key === 'cylinder_volume' && formatCylinderOptionMeta(option)"
-                      class="basket-option-delta"
-                    >
-                      {{ formatCylinderOptionMeta(option) }}
-                    </span>
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
           <div
@@ -338,43 +165,15 @@ const submitOrder = async () => {
           <p class="basket-total text-2xl font-bold">
             {{ t("allBasket") }}: {{ formatPrice(totalPrice) }}
           </p>
-          <button
-            @click="basketStore.clearBasket()"
-            class="basket-clear rounded-xl px-6 py-3 text-white transition-all duration-300"
-          >
-            {{ t("clear") }}
-          </button>
         </div>
 
         <div class="basket-checkout-card">
-          <div class="basket-checkout-copy">
-            <h2 class="basket-checkout-title">{{ t("checkout") }}</h2>
-            <p class="basket-checkout-subtitle">{{ t("checkout_subtitle") }}</p>
-          </div>
-
-          <div class="basket-checkout-form">
-            <input
-              v-model="checkoutForm.name"
-              type="text"
-              :placeholder="t('name')"
-              class="basket-field"
-            />
-            <input
-              v-model="checkoutForm.phone"
-              type="tel"
-              placeholder="+998"
-              class="basket-field"
-            />
-          </div>
-
-          <p v-if="checkoutError" class="basket-error">{{ checkoutError }}</p>
-
           <button
-            @click="submitOrder"
-            :disabled="checkoutLoading"
+            type="button"
+            disabled
             class="basket-submit-btn"
           >
-            {{ checkoutLoading ? t("sending") : t("checkout") }}
+            {{ t("checkout") }}
           </button>
         </div>
       </div>
@@ -420,79 +219,6 @@ const submitOrder = async () => {
 
 .basket-name {
   color: #1b2d44;
-}
-
-.basket-configurator {
-  padding: 1rem;
-  border-radius: 18px;
-  border: 1px solid rgba(20, 35, 56, 0.08);
-  background: #f6f7f9;
-}
-
-.basket-configurator-title {
-  color: #142338;
-  font-size: 0.9rem;
-  font-weight: 800;
-}
-
-.basket-option-group + .basket-option-group {
-  margin-top: 0.9rem;
-}
-
-.basket-option-group-title {
-  margin-top: 0.7rem;
-  margin-bottom: 0.45rem;
-  color: #64748b;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.basket-option-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-}
-
-.basket-option-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  min-height: 38px;
-  padding: 0.45rem 0.8rem;
-  border-radius: 999px;
-  border: 1px solid rgba(20, 35, 56, 0.1);
-  background: #ffffff;
-  color: #41536f;
-  font-size: 0.78rem;
-  font-weight: 700;
-  transition:
-    border-color 0.2s ease,
-    background 0.2s ease,
-    color 0.2s ease,
-    transform 0.2s ease;
-}
-
-.basket-option-chip:hover {
-  transform: translateY(-1px);
-  border-color: rgba(20, 35, 56, 0.24);
-  background: #eef3f7;
-  color: #142338;
-}
-
-.basket-option-chip-active {
-  border-color: rgba(20, 35, 56, 0.18);
-  background: #edf2f6;
-  color: #142338;
-}
-
-.basket-option-chip:hover .basket-option-delta {
-  color: #5c6f89;
-  opacity: 1;
-}
-
-.basket-option-delta {
-  font-size: 0.72rem;
-  opacity: 0.9;
 }
 
 .basket-controls {
@@ -541,58 +267,13 @@ const submitOrder = async () => {
 }
 
 .basket-checkout-card {
-  padding: 1.2rem;
-  border-radius: 20px;
-  border: 1px solid rgba(20, 35, 56, 0.1);
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(8px);
-}
-
-.basket-checkout-title {
-  color: #142338;
-  font-size: 1.2rem;
-  font-weight: 800;
-}
-
-.basket-checkout-subtitle {
-  margin-top: 0.3rem;
-  color: #64748b;
-}
-
-.basket-checkout-form {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-
-.basket-field {
-  width: 100%;
-  min-height: 48px;
-  padding: 0.75rem 0.95rem;
-  border-radius: 14px;
-  border: 1px solid rgba(20, 35, 56, 0.12);
-  background: #ffffff;
-  color: #22334b;
-  outline: none;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.basket-field:focus {
-  border-color: rgba(20, 35, 56, 0.2);
-  box-shadow: 0 0 0 4px rgba(20, 35, 56, 0.06);
-}
-
-.basket-error {
-  margin-top: 0.8rem;
-  color: #c53e3e;
-  font-weight: 600;
+  padding: 0;
+  border: none;
+  background: transparent;
+  backdrop-filter: none;
 }
 
 .basket-submit-btn {
-  margin-top: 1rem;
   min-height: 50px;
   width: 100%;
   border-radius: 14px;
@@ -605,14 +286,9 @@ const submitOrder = async () => {
     opacity 0.2s ease;
 }
 
-.basket-submit-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  background: #142338;
-}
-
 .basket-submit-btn:disabled {
-  opacity: 0.7;
-  cursor: wait;
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .list-enter-active,
@@ -662,10 +338,6 @@ const submitOrder = async () => {
   .basket-total-row {
     flex-direction: column;
     align-items: stretch;
-  }
-
-  .basket-checkout-form {
-    grid-template-columns: 1fr;
   }
 }
 </style>

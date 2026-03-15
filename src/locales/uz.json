@@ -8,13 +8,13 @@
     "about": "Biz haqimizda",
     "contacts": "Kontaktlar",
     "contact": "Bizning manzil",
-    "address": "Toshkent, Yunusobod tumani, 11-kvartal, 33",
-    "rights": "ACLOGIC ALLIANCE. Barcha huquqlar himoyalangan."
+    "address": "Urganch shahri, Ashxobod MFY, Xiva ko'chasi 106/2, Korpus-F",
+    "rights": "MCHJ \"URANCH METAN SERVIS\""
   },
   "about": {
     "companyName": "\"ACLOGIC ALLIANCE\" MCHJ",
     "addressTitle": "Manzil",
-    "address": "Toshkent, Yunusobod tumani 11-kvartal, 33",
+    "address": "Urganch shahri, Ashxobod MFY, Xiva ko'chasi 106/2, Korpus-F",
     "phoneTitle": "Telefon",
     "bankTitle": "Bank rekvizitlari",
     "account": "Hisob raqam",
@@ -79,6 +79,7 @@
   "credit": {
     "title": "Kredit hisoblash",
     "subtitle": "Muddatni tanlang va taxminiy to'lovni ko'ring",
+    "term": "Muddat",
     "sixMonthRate": "6 oy stavkasi",
     "months": "oy",
     "total": "Jami to'lov",

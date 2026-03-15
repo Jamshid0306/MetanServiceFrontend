@@ -316,8 +316,9 @@ const actionLabel = () => t("add_to_cart");
   border-radius: 999px;
   padding: 0.28rem 0.6rem;
   margin-bottom: 0.85rem;
-  background: rgba(24, 48, 79, 0.08);
-  color: #18304f;
+  background: #facc15;
+  color: #111111;
+  border: 1px solid #eab308;
   font-size: 0.76rem;
   font-weight: 700;
 }

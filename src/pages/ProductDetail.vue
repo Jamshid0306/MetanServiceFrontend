@@ -20,8 +20,8 @@ import {
   formatPriceValue,
   getDefaultOptionSelections,
   getCreditPlans,
-  getProductOptionGroups,
   hasCreditPricing,
+  normalizeProductOptions,
   parseNumericPrice,
 } from "@/lib/productOptions";
 
@@ -103,7 +103,19 @@ const formatSelectedOptionLabel = (option) => {
 
   return label;
 };
-const getCylinderSelectPlaceholder = () => {
+const getOptionSelectPlaceholder = (groupKey) => {
+  if (groupKey === "generation") {
+    if (locale.value === "ru") {
+      return "Выберите поколение";
+    }
+
+    if (locale.value === "en") {
+      return "Select generation";
+    }
+
+    return "Avlodni tanlang";
+  }
+
   if (locale.value === "ru") {
     return "Выберите размер баллона";
   }
@@ -114,20 +126,272 @@ const getCylinderSelectPlaceholder = () => {
 
   return "Balon razmerini tanlang";
 };
-const formatCylinderSelectOption = (option) => {
-  const optionLabel = formatCylinderOptionLabel(option);
-  const optionMeta = formatCylinderOptionMeta(option);
-  return optionMeta ? `${optionLabel} - ${optionMeta}` : optionLabel;
+const formatSelectOptionLabel = (groupKey, option) => {
+  if (groupKey === "cylinder_volume") {
+    const optionLabel = formatCylinderOptionLabel(option);
+    const optionMeta = formatCylinderOptionMeta(option);
+
+    return optionMeta ? `${optionLabel} - ${optionMeta}` : optionLabel;
+  }
+
+  return option?.label || "";
+};
+const toVisibleOptions = (options = []) =>
+  (Array.isArray(options) ? options : []).filter((option) => !option?.hidden);
+const dedupeOptionsById = (options = []) => {
+  const seen = new Set();
+
+  return (Array.isArray(options) ? options : []).filter((option) => {
+    const optionId = String(option?.id || "").trim();
+    if (!optionId || seen.has(optionId)) {
+      return false;
+    }
+
+    seen.add(optionId);
+    return true;
+  });
+};
+const buildOptionPaths = (config = {}) => {
+  const fuelTypes = Array.isArray(config?.fuel_types) ? config.fuel_types : [];
+
+  return fuelTypes.flatMap((fuelType) => {
+    const transmissions = Array.isArray(fuelType?.transmissions)
+      ? fuelType.transmissions
+      : [];
+
+    if (!transmissions.length) {
+      return [{ fuel_type: fuelType }];
+    }
+
+    return transmissions.flatMap((transmission) => {
+      const generations = Array.isArray(transmission?.generations)
+        ? transmission.generations
+        : [];
+
+      if (!generations.length) {
+        return [{ fuel_type: fuelType, transmission }];
+      }
+
+      return generations.flatMap((generation) => {
+        const cylinderVolumes = Array.isArray(generation?.cylinder_volumes)
+          ? generation.cylinder_volumes
+          : [];
+
+        if (!cylinderVolumes.length) {
+          return [{ fuel_type: fuelType, transmission, generation }];
+        }
+
+        return cylinderVolumes.map((cylinderVolume) => ({
+          fuel_type: fuelType,
+          transmission,
+          generation,
+          cylinder_volume: cylinderVolume,
+        }));
+      });
+    });
+  });
+};
+const findPathByOptionId = (paths = [], groupKey, optionId) =>
+  paths.find((path) => path?.[groupKey]?.id === optionId) || null;
+const getDeepestSelectedGroup = (selections = {}) =>
+  [...OPTION_FLOW].reverse().find((key) => Boolean(selections?.[key])) || null;
+const prunePathToGroup = (path = {}, groupKey) => {
+  const nextPath = {};
+
+  for (const key of OPTION_FLOW) {
+    if (!path?.[key]) {
+      break;
+    }
+
+    nextPath[key] = path[key];
+
+    if (key === groupKey) {
+      break;
+    }
+  }
+
+  return nextPath;
+};
+const mapPathToSelections = (path = null) =>
+  OPTION_FLOW.reduce((nextSelections, key) => {
+    if (path?.[key]?.id) {
+      nextSelections[key] = path[key].id;
+    }
+
+    return nextSelections;
+  }, {});
+const mapOptionForDisplay = (option) => ({
+  id: option.id,
+  label: option.label,
+  count: option.count,
+  price_delta: option.price_delta || 0,
+});
+const collectVisibleTransmissions = (config = {}) =>
+  dedupeOptionsById(
+    (Array.isArray(config?.fuel_types) ? config.fuel_types : []).flatMap((fuelType) =>
+      toVisibleOptions(fuelType?.transmissions || [])
+    )
+  );
+const collectVisibleGenerations = (config = {}, fuelType = null, transmission = null) => {
+  if (transmission) {
+    return dedupeOptionsById(toVisibleOptions(transmission.generations || []));
+  }
+
+  if (fuelType) {
+    return dedupeOptionsById(
+      (Array.isArray(fuelType?.transmissions) ? fuelType.transmissions : []).flatMap(
+        (transmissionOption) => toVisibleOptions(transmissionOption.generations || [])
+      )
+    );
+  }
+
+  return dedupeOptionsById(
+    (Array.isArray(config?.fuel_types) ? config.fuel_types : []).flatMap((fuelTypeOption) =>
+      (Array.isArray(fuelTypeOption?.transmissions) ? fuelTypeOption.transmissions : []).flatMap(
+        (transmissionOption) => toVisibleOptions(transmissionOption.generations || [])
+      )
+    )
+  );
+};
+const collectCylinderVolumes = (config = {}, fuelType = null, transmission = null, generation = null) => {
+  if (generation) {
+    return dedupeOptionsById(generation.cylinder_volumes || []);
+  }
+
+  if (transmission) {
+    return dedupeOptionsById(
+      (Array.isArray(transmission?.generations) ? transmission.generations : []).flatMap(
+        (generationOption) => generationOption.cylinder_volumes || []
+      )
+    );
+  }
+
+  if (fuelType) {
+    return dedupeOptionsById(
+      (Array.isArray(fuelType?.transmissions) ? fuelType.transmissions : []).flatMap(
+        (transmissionOption) =>
+          (Array.isArray(transmissionOption?.generations)
+            ? transmissionOption.generations
+            : []
+          ).flatMap((generationOption) => generationOption.cylinder_volumes || [])
+      )
+    );
+  }
+
+  return dedupeOptionsById(
+    (Array.isArray(config?.fuel_types) ? config.fuel_types : []).flatMap((fuelTypeOption) =>
+      (Array.isArray(fuelTypeOption?.transmissions) ? fuelTypeOption.transmissions : []).flatMap(
+        (transmissionOption) =>
+          (Array.isArray(transmissionOption?.generations)
+            ? transmissionOption.generations
+            : []
+          ).flatMap((generationOption) => generationOption.cylinder_volumes || [])
+      )
+    )
+  );
 };
 
 const images = computed(() => normalizeImages(store.product?.images || []));
-const optionGroups = computed(() =>
-  getProductOptionGroups(store.product, selectedOptions.value, {
-    useFallbackPath: false,
-  })
+const optionConfig = computed(() => normalizeProductOptions(store.product?.config_options));
+const optionPaths = computed(() => buildOptionPaths(optionConfig.value));
+const explicitSelectionPath = computed(() => {
+  const deepestGroup = getDeepestSelectedGroup(selectedOptions.value);
+  if (!deepestGroup) {
+    return null;
+  }
+
+  const matchedPath = findPathByOptionId(
+    optionPaths.value,
+    deepestGroup,
+    selectedOptions.value[deepestGroup]
+  );
+
+  return matchedPath ? prunePathToGroup(matchedPath, deepestGroup) : null;
+});
+const effectiveSelectionPath = computed(() => {
+  const deepestGroup = getDeepestSelectedGroup(selectedOptions.value);
+
+  if (!optionPaths.value.length) {
+    return null;
+  }
+
+  if (!deepestGroup) {
+    return optionPaths.value[0];
+  }
+
+  return (
+    findPathByOptionId(optionPaths.value, deepestGroup, selectedOptions.value[deepestGroup]) ||
+    optionPaths.value[0]
+  );
+});
+const effectiveSelectedOptions = computed(() =>
+  mapPathToSelections(effectiveSelectionPath.value)
 );
+const optionGroups = computed(() => {
+  const groups = [];
+  const visibleFuelTypes = toVisibleOptions(optionConfig.value?.fuel_types || []);
+  const visibleTransmissions = explicitSelectionPath.value?.fuel_type
+    ? toVisibleOptions(explicitSelectionPath.value.fuel_type.transmissions || [])
+    : collectVisibleTransmissions(optionConfig.value);
+  const visibleGenerations = collectVisibleGenerations(
+    optionConfig.value,
+    explicitSelectionPath.value?.fuel_type || null,
+    explicitSelectionPath.value?.transmission || null
+  );
+  const visibleCylinderVolumes = collectCylinderVolumes(
+    optionConfig.value,
+    explicitSelectionPath.value?.fuel_type || null,
+    explicitSelectionPath.value?.transmission || null,
+    explicitSelectionPath.value?.generation || null
+  );
+
+  if (visibleFuelTypes.length) {
+    groups.push({
+      key: "fuel_type",
+      titleKey: "productOptions.fuelType",
+      options: visibleFuelTypes.map(mapOptionForDisplay),
+    });
+  }
+
+  if (visibleTransmissions.length > 1) {
+    groups.push({
+      key: "transmission",
+      titleKey: "productOptions.transmission",
+      options: visibleTransmissions.map(mapOptionForDisplay),
+    });
+  }
+
+  if (visibleGenerations.length) {
+    groups.push({
+      key: "generation",
+      titleKey: "productOptions.generation",
+      options: visibleGenerations.map(mapOptionForDisplay),
+    });
+  }
+
+  if (visibleCylinderVolumes.length) {
+    groups.push({
+      key: "cylinder_volume",
+      titleKey: "productOptions.cylinderVolume",
+      options: visibleCylinderVolumes.map(mapOptionForDisplay),
+    });
+  }
+
+  return groups;
+});
+const orderedOptionGroups = computed(() => {
+  const groups = [...optionGroups.value];
+  const transmissionIndex = groups.findIndex((group) => group.key === "transmission");
+
+  if (transmissionIndex > 0) {
+    const [transmissionGroup] = groups.splice(transmissionIndex, 1);
+    groups.unshift(transmissionGroup);
+  }
+
+  return groups;
+});
 const selectedPrice = computed(() =>
-  calculateConfiguredPrice(store.product, locale.value, selectedOptions.value, {
+  calculateConfiguredPrice(store.product, locale.value, effectiveSelectedOptions.value, {
     useFallbackPath: false,
   })
 );
@@ -151,7 +415,7 @@ const selectedCreditPlan = computed(() => {
 });
 const configuredBasketItem = computed(() =>
   store.product
-    ? buildConfiguredBasketItem(store.product, selectedOptions.value, 1, {
+    ? buildConfiguredBasketItem(store.product, effectiveSelectedOptions.value, 1, {
         useFallbackPath: false,
       })
     : null
@@ -246,13 +510,31 @@ const buildNextSelections = (currentSelections, groupKey, optionId) => {
     };
   }
 
+  if (!optionId || currentSelections?.[groupKey] === optionId) {
+    return OPTION_FLOW.reduce((nextSelections, key, index) => {
+      if (index < groupIndex && currentSelections?.[key]) {
+        nextSelections[key] = currentSelections[key];
+      }
+
+      return nextSelections;
+    }, {});
+  }
+
+  const matchedPath = findPathByOptionId(optionPaths.value, groupKey, optionId);
+
   return OPTION_FLOW.reduce((nextSelections, key, index) => {
-    if (index < groupIndex && currentSelections?.[key]) {
-      nextSelections[key] = currentSelections[key];
+    if (index < groupIndex) {
+      const currentValue = currentSelections?.[key];
+
+      if (currentValue && matchedPath?.[key]?.id === currentValue) {
+        nextSelections[key] = currentValue;
+      }
     }
+
     if (index === groupIndex) {
       nextSelections[key] = optionId;
     }
+
     return nextSelections;
   }, {});
 };
@@ -655,6 +937,42 @@ onBeforeUnmount(() => {
             <span class="detail-price text-3xl font-semibold">
               {{ formatPrice(selectedPrice) }}
             </span>
+
+            <div
+              v-if="selectedCreditPlan && selectedCreditConfig"
+              class="detail-credit-inline"
+            >
+              <div
+                v-if="creditPlans.length"
+                class="detail-credit-inline-block"
+              >
+                <div class="credit-plan-switcher detail-credit-plan-switcher">
+                  <button
+                    v-for="plan in creditPlans"
+                    :key="`${plan.months}-${plan.percent}`"
+                    type="button"
+                    class="credit-plan-btn"
+                    :class="
+                      selectedCreditConfig?.months === plan.months
+                        ? 'credit-plan-btn-active'
+                        : ''
+                    "
+                    @click="selectedCreditMonths = plan.months"
+                  >
+                    <span>
+                      {{ plan.months }} {{ t("credit.months") }}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="detail-credit-payment">
+                <strong class="detail-credit-inline-value">
+                  {{ formatPrice(selectedCreditPlan.monthlyPayment) }} x
+                  {{ selectedCreditConfig.months }} {{ t("credit.months") }}
+                </strong>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -669,7 +987,7 @@ onBeforeUnmount(() => {
               </p>
             </div>
             <div
-              v-for="group in optionGroups"
+              v-for="group in orderedOptionGroups"
               :key="group.key"
               class="detail-option-group"
             >
@@ -679,7 +997,7 @@ onBeforeUnmount(() => {
                 </h3>
               </div>
               <div
-                v-if="group.key === 'cylinder_volume'"
+                v-if="group.key === 'generation' && group.options.length > 1"
                 class="detail-select-shell"
               >
                 <div
@@ -693,18 +1011,28 @@ onBeforeUnmount(() => {
                     class="detail-select-input"
                     @change="selectOption(group.key, $event.target.value)"
                   >
-                    <option value="" disabled>
-                      {{ getCylinderSelectPlaceholder() }}
+                    <option value="">
+                      {{ getOptionSelectPlaceholder(group.key) }}
                     </option>
                     <option
                       v-for="option in group.options"
                       :key="option.id"
                       :value="option.id"
                     >
-                      {{ formatCylinderSelectOption(option) }}
+                      {{ formatSelectOptionLabel(group.key, option) }}
                     </option>
                   </select>
                   <span class="detail-select-icon" aria-hidden="true">⌄</span>
+                </div>
+              </div>
+              <div
+                v-else-if="group.key === 'generation'"
+                class="detail-select-shell"
+              >
+                <div class="detail-select-wrap detail-select-wrap-active">
+                  <div class="detail-static-value">
+                    {{ formatSelectOptionLabel(group.key, group.options[0]) }}
+                  </div>
                 </div>
               </div>
               <div
@@ -737,49 +1065,6 @@ onBeforeUnmount(() => {
                     {{ formatCylinderOptionMeta(option) }}
                   </span>
                 </button>
-              </div>
-            </div>
-          </div>
-
-          <div
-            v-if="selectedCreditPlan && selectedCreditConfig"
-            class="credit-card detail-section"
-          >
-            <div class="credit-card-head">
-              <div>
-                <p class="credit-kicker">{{ t("credit.title") }}</p>
-                <h3 class="credit-heading">{{ t("credit.subtitle") }}</h3>
-              </div>
-            </div>
-
-            <div
-              v-if="creditPlans.length"
-              class="credit-plan-switcher"
-            >
-              <button
-                v-for="plan in creditPlans"
-                :key="`${plan.months}-${plan.percent}`"
-                type="button"
-                class="credit-plan-btn"
-                :class="
-                  selectedCreditConfig?.months === plan.months
-                    ? 'credit-plan-btn-active'
-                    : ''
-                "
-                @click="selectedCreditMonths = plan.months"
-              >
-                <span>
-                  {{ plan.months }} {{ t("credit.months") }}
-                </span>
-              </button>
-            </div>
-
-            <div v-if="selectedCreditPlan" class="credit-summary">
-              <div class="credit-metric">
-                <span class="credit-metric-label">{{ t("credit.monthlyPayment") }}</span>
-                <strong class="credit-metric-value">
-                  {{ formatPrice(selectedCreditPlan.monthlyPayment) }}
-                </strong>
               </div>
             </div>
           </div>
@@ -1385,6 +1670,74 @@ onBeforeUnmount(() => {
   color: var(--detail-subtle);
 }
 
+.detail-credit-inline {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 0.2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--detail-border);
+}
+
+.detail-credit-inline-block {
+  display: grid;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.detail-credit-inline-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #688171;
+}
+
+.detail-credit-plan-switcher {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.45rem;
+  overflow-x: auto;
+  padding-bottom: 0.1rem;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.detail-credit-plan-switcher::-webkit-scrollbar {
+  display: none;
+}
+
+.detail-credit-plan-switcher .credit-plan-btn {
+  flex: 0 0 auto;
+  min-width: 76px;
+  padding: 0.55rem 0.72rem;
+  border-radius: 14px;
+  scroll-snap-align: start;
+}
+
+.detail-credit-payment {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 16px;
+  border: 1px solid rgba(234, 179, 8, 0.34);
+  background: linear-gradient(180deg, #fff8cc 0%, #fff1a6 100%);
+}
+
+.detail-credit-inline-value {
+  font-size: clamp(0.95rem, 1.8vw, 1.15rem);
+  line-height: 1.1;
+  font-weight: 800;
+  color: #111111;
+}
+
+.detail-credit-inline-note {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: rgba(17, 17, 17, 0.72);
+}
+
 .detail-price-sticky {
   position: fixed;
   top: 88px;
@@ -1437,50 +1790,26 @@ onBeforeUnmount(() => {
   gap: 1rem;
 }
 
-.credit-card {
-  border-color: rgba(31, 58, 49, 0.12);
-  background: var(--detail-credit);
-}
-
-.credit-card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 1rem;
-}
-
-.credit-kicker {
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #688171;
-}
-
-.credit-heading {
-  margin-top: 0.24rem;
-  font-size: 1.05rem;
-  font-weight: 800;
-  color: #1f3a31;
-}
-
 .credit-plan-switcher {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.7rem;
 }
 
 .credit-plan-btn {
   border: 1px solid rgba(24, 71, 55, 0.12);
-  border-radius: 18px;
-  background: transparent;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
   color: #315646;
-  padding: 0.8rem 0.95rem;
-  min-width: 124px;
+  padding: 0.55rem 0.72rem;
+  min-width: 88px;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  font-weight: 700;
   transition:
     border-color 0.2s ease,
     background 0.2s ease,
@@ -1488,46 +1817,21 @@ onBeforeUnmount(() => {
 }
 
 .credit-plan-btn:not(.credit-plan-btn-active):hover {
-  border-color: rgba(24, 71, 55, 0.2);
-  background: rgba(255, 255, 255, 0.74);
+  border-color: rgba(24, 71, 55, 0.22);
+  background: #ffffff;
 }
 
 .credit-plan-btn-active {
-  background: #1f3a31;
-  color: #ffffff;
-  border-color: #1f3a31;
+  background: #facc15;
+  color: #111111;
+  border-color: #eab308;
+  box-shadow: 0 10px 24px rgba(234, 179, 8, 0.22);
 }
 
 .credit-plan-btn-active:hover {
-  background: #1f3a31;
-  color: #ffffff;
-  border-color: #1f3a31;
-}
-
-.credit-summary {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.7rem;
-}
-
-.credit-metric {
-  padding: 0.95rem 1rem;
-  border-radius: 20px;
-  background: #ffffff;
-  border: 1px solid rgba(24, 71, 55, 0.08);
-}
-
-.credit-metric-label {
-  display: block;
-  font-size: 0.8rem;
-  color: #6a7d71;
-}
-
-.credit-metric-value {
-  display: block;
-  margin-top: 0.35rem;
-  font-size: 1.25rem;
-  color: #1f3a31;
+  background: #facc15;
+  color: #111111;
+  border-color: #eab308;
 }
 
 .detail-options {
@@ -1608,6 +1912,16 @@ onBeforeUnmount(() => {
   font-weight: 700;
   padding: 0.95rem 3rem 0.95rem 1rem;
   outline: none;
+}
+
+.detail-static-value {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  color: var(--detail-ink);
+  font-size: 0.97rem;
+  font-weight: 700;
+  padding: 0.95rem 1rem;
 }
 
 .detail-select-icon {
@@ -2213,7 +2527,11 @@ onBeforeUnmount(() => {
     gap: 1rem;
   }
 
-  .detail-gallery-stage,
+  .detail-gallery-stage {
+    border-radius: 22px;
+    padding: 0;
+  }
+
   .detail-section {
     border-radius: 22px;
     padding: 0.9rem;
@@ -2233,21 +2551,15 @@ onBeforeUnmount(() => {
     font-size: 1.04rem;
   }
 
-  .credit-card-head {
-    flex-direction: column;
-    align-items: stretch;
+  .detail-credit-inline {
+    gap: 0.75rem;
   }
 
-  .credit-rate-pill {
-    width: fit-content;
-  }
-
+  .detail-credit-plan-switcher .credit-plan-btn,
   .credit-plan-btn {
-    width: 100%;
-  }
-
-  .credit-summary {
-    grid-template-columns: 1fr;
+    min-width: 72px;
+    width: auto;
+    font-size: 0.76rem;
   }
 
   .detail-option {

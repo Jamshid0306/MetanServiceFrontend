@@ -6,9 +6,15 @@ import Nav from "./components/Nav.vue";
 import Loader from "./components/Loader.vue";
 import { useLoaderStore } from "./store/loaderStore";
 import { useBasketStore } from "./store/basketStore";
-import FaceBookIcon from "./components/icons/FaceBookIcon.vue";
 import InstagramIcon from "./components/icons/InstagramIcon.vue";
 import Footer from "./components/Footer.vue";
+import {
+  CONTACT_INSTAGRAM_HANDLE,
+  CONTACT_INSTAGRAM_URL,
+  CONTACT_MAP_URL,
+  CONTACT_PHONE_DISPLAY,
+  CONTACT_PHONE_HREF,
+} from "./constants/contact";
 
 const route = useRoute();
 const router = useRouter();
@@ -116,22 +122,25 @@ watch(
           <p class="contact-panel-subtitle">Support xizmati</p>
 
           <a
-            href="https://t.me/metanservice"
-            target="_blank"
-            rel="noopener noreferrer"
+            :href="CONTACT_PHONE_HREF"
             class="contact-link"
           >
-            <span class="contact-link-icon contact-link-icon-tg">
-              <FaceBookIcon />
+            <span class="contact-link-icon contact-link-icon-phone">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">
+                <path
+                  fill="currentColor"
+                  d="M19.95 21q-3.125 0-6.175-1.35t-5.475-3.775t-3.775-5.475T3.175 4.225q0-.45.3-.75t.75-.3H8.1q.375 0 .688.25t.387.625l.6 2.725q.075.4-.025.675t-.35.525L7.05 10.3q.575 1.025 1.313 1.95T10 14q.825.825 1.75 1.563t1.95 1.312l2.325-2.35q.25-.25.55-.338t.625-.012l2.7.55q.4.075.65.388t.25.687v3.875q0 .45-.3.75t-.75.3"
+                />
+              </svg>
             </span>
             <span class="contact-link-text">
-              <strong>Telegram</strong>
-              <small>Official channel</small>
+              <strong>{{ t("phone") }}</strong>
+              <small>{{ CONTACT_PHONE_DISPLAY }}</small>
             </span>
           </a>
 
           <a
-            href="https://www.instagram.com/metanservice/"
+            :href="CONTACT_INSTAGRAM_URL"
             target="_blank"
             rel="noopener noreferrer"
             class="contact-link"
@@ -141,17 +150,17 @@ watch(
             </span>
             <span class="contact-link-text">
               <strong>Instagram</strong>
-              <small>Official page</small>
+              <small>{{ CONTACT_INSTAGRAM_HANDLE }}</small>
             </span>
           </a>
 
           <a
-            href="https://www.facebook.com/profile.php?id=61579837593638"
+            :href="CONTACT_MAP_URL"
             target="_blank"
             rel="noopener noreferrer"
             class="contact-link"
           >
-            <span class="contact-link-icon contact-link-icon-fb">
+            <span class="contact-link-icon contact-link-icon-map">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="18"
@@ -160,13 +169,13 @@ watch(
               >
                 <path
                   fill="currentColor"
-                  d="M9.198 21.5h4v-8.01h3.604l.396-3.98h-4V7.5a1 1 0 0 1 1-1h3v-4h-3a5 5 0 0 0-5 5v2.01h-2l-.396 3.98h2.396z"
+                  d="M12 22q-.425 0-.712-.288T11 21q0-.125.075-.425t.2-.7t.287-.85t.338-.925q-2.5-.225-4.2-2.062T6 11.8q0-2.5 1.75-4.15T12 6q2.5 0 4.25 1.65T18 11.8q0 1.875-.9 3.438T14.725 17.7q.15.35.3.725t.275.725t.2.65T15.6 20q0 .425-.288.713T14.6 21q-.25 0-.463-.137t-.337-.363q-.625-1.35-.987-2.175t-.813-1.825q-.45 1-.813 1.825t-.987 2.175q-.125.225-.338.363T9.4 21q-.425 0-.712-.287T8.4 20q0-.1.1-.412t.25-.738t.325-.85t.325-.725q-1.5-.75-2.45-2.137T6 11.8Q6 9.3 7.75 7.65T12 6q2.5 0 4.25 1.65T18 11.8q0 2.238-1.387 3.987T13 18.1q.175.45.338.925t.287.85t.2.7t.075.425q0 .425-.287.713T13 22z"
                 />
               </svg>
             </span>
             <span class="contact-link-text">
-              <strong>Facebook</strong>
-              <small>Official page</small>
+              <strong>{{ t("footer.contact") }}</strong>
+              <small>{{ t("footer.address") }}</small>
             </span>
           </a>
         </div>
@@ -397,7 +406,7 @@ watch(
   flex-shrink: 0;
 }
 
-.contact-link-icon-tg {
+.contact-link-icon-phone {
   background: #eef2f6;
 }
 
@@ -405,7 +414,7 @@ watch(
   background: #eef2f6;
 }
 
-.contact-link-icon-fb {
+.contact-link-icon-map {
   background: #eef2f6;
 }
 

@@ -13,8 +13,10 @@
           </p>
 
           <div class="footer-chip-row">
-            <a href="tel:+998777031345" class="footer-chip">+998 77 703 13 45</a>
-            <a href="mailto:info@urganchmetanservice.uz" class="footer-chip">info@urganchmetanservice.uz</a>
+            <a :href="CONTACT_PHONE_HREF" class="footer-chip">{{ CONTACT_PHONE_DISPLAY }}</a>
+            <a :href="CONTACT_INSTAGRAM_URL" target="_blank" rel="noopener noreferrer" class="footer-chip">
+              {{ CONTACT_INSTAGRAM_HANDLE }}
+            </a>
           </div>
         </div>
 
@@ -47,7 +49,7 @@
           <ul class="space-y-3">
             <li>
               <a
-                href="https://yandex.uz/map-widget/v1/-/CLUinOK8"
+                :href="CONTACT_MAP_URL"
                 target="_blank"
                 class="footer-contact"
               >
@@ -55,13 +57,13 @@
               </a>
             </li>
             <li>
-              <a href="tel:+998777031345" class="footer-contact">
-                +998 77 703 13 45
+              <a :href="CONTACT_PHONE_HREF" class="footer-contact">
+                {{ CONTACT_PHONE_DISPLAY }}
               </a>
             </li>
             <li>
-              <a href="mailto:info@urganchmetanservice.uz" class="footer-contact">
-                info@urganchmetanservice.uz
+              <a :href="CONTACT_INSTAGRAM_URL" target="_blank" rel="noopener noreferrer" class="footer-contact">
+                {{ CONTACT_INSTAGRAM_HANDLE }}
               </a>
             </li>
           </ul>
@@ -88,6 +90,13 @@
 
 <script setup>
 import { useI18n } from "vue-i18n";
+import {
+  CONTACT_INSTAGRAM_HANDLE,
+  CONTACT_INSTAGRAM_URL,
+  CONTACT_MAP_URL,
+  CONTACT_PHONE_DISPLAY,
+  CONTACT_PHONE_HREF,
+} from "@/constants/contact";
 const { t } = useI18n();
 </script>
 

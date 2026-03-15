@@ -1,12 +1,16 @@
 <script setup>
 import { useI18n } from "vue-i18n";
+import {
+  CONTACT_INSTAGRAM_HANDLE,
+  CONTACT_INSTAGRAM_URL,
+  CONTACT_MAP_EMBED_URL,
+  CONTACT_MAP_LABEL,
+  CONTACT_MAP_URL,
+  CONTACT_PHONE_DISPLAY,
+  CONTACT_PHONE_HREF,
+} from "@/constants/contact";
 
 const { t } = useI18n();
-
-const phone = "+998 77 703 13 45";
-const email = "info@urganchmetanservice.uz";
-const mapUrl = "https://yandex.uz/map-widget/v1/-/CLUinOK8";
-const telegramUrl = "https://t.me/metanservice";
 </script>
 
 <template>
@@ -19,31 +23,31 @@ const telegramUrl = "https://t.me/metanservice";
           <p class="contact-address">{{ t("footer.address") }}</p>
 
           <div class="contact-cards">
-            <a :href="`tel:${phone.replace(/\\s+/g, '')}`" class="contact-card">
+            <a :href="CONTACT_PHONE_HREF" class="contact-card">
               <span class="contact-label">{{ t("phone") }}</span>
-              <span class="contact-value">{{ phone }}</span>
+              <span class="contact-value">{{ CONTACT_PHONE_DISPLAY }}</span>
             </a>
 
-            <a :href="`mailto:${email}`" class="contact-card">
-              <span class="contact-label">Email</span>
-              <span class="contact-value">{{ email }}</span>
+            <a :href="CONTACT_INSTAGRAM_URL" target="_blank" rel="noopener noreferrer" class="contact-card">
+              <span class="contact-label">Instagram</span>
+              <span class="contact-value">{{ CONTACT_INSTAGRAM_HANDLE }}</span>
             </a>
 
-            <a :href="mapUrl" target="_blank" rel="noopener noreferrer" class="contact-card">
+            <a :href="CONTACT_MAP_URL" target="_blank" rel="noopener noreferrer" class="contact-card">
               <span class="contact-label">{{ t("footer.contact") }}</span>
               <span class="contact-value">{{ t("footer.address") }}</span>
             </a>
 
-            <a :href="telegramUrl" target="_blank" rel="noopener noreferrer" class="contact-card">
-              <span class="contact-label">Telegram</span>
-              <span class="contact-value">{{ t("nav.contact_admin") }}</span>
+            <a :href="CONTACT_MAP_URL" target="_blank" rel="noopener noreferrer" class="contact-card">
+              <span class="contact-label">Google Maps</span>
+              <span class="contact-value">{{ CONTACT_MAP_LABEL }}</span>
             </a>
           </div>
         </div>
 
         <div class="map-wrap reveal-right">
           <iframe
-            :src="mapUrl"
+            :src="CONTACT_MAP_EMBED_URL"
             class="map-frame"
             loading="lazy"
             referrerpolicy="no-referrer-when-downgrade"

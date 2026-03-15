@@ -8,13 +8,13 @@
     "about": "About Us",
     "contacts": "Contacts",
     "contact": "Address",
-    "address": "33, Block 11, Yunusabad district, Tashkent",
-    "rights": "ACLOGIC ALLIANCE. All rights reserved."
+    "address": "Urganch city, Ashxobod MFY, Khiva street 106/2, Building F",
+    "rights": "MCHJ \"URANCH METAN SERVIS\""
   },
   "about": {
     "companyName": "\"ACLOGIC ALLIANCE\" LLC",
     "addressTitle": "Address",
-    "address": "33, Block 11, Yunusabad district, Tashkent",
+    "address": "Urganch city, Ashxobod MFY, Khiva street 106/2, Building F",
     "phoneTitle": "Phone",
     "bankTitle": "Bank details",
     "account": "Account number",
@@ -91,6 +91,7 @@
   "credit": {
     "title": "Installment pricing",
     "subtitle": "Choose a term to see the estimated payment",
+    "term": "Term",
     "sixMonthRate": "6-month rate",
     "months": "mo.",
     "total": "Total price",

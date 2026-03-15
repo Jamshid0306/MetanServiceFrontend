@@ -6,6 +6,7 @@ import { useProductsStore } from "../store/productsStore";
 import { useBasketStore } from "../store/basketStore";
 import { useLoaderStore } from "@/store/loaderStore";
 import { resolveAssetUrl } from "@/lib/api";
+import { CONTACT_PHONE_HREF } from "@/constants/contact";
 import Basket from "./icons/Basket.vue";
 import uzFlag from "@/assets/images/uz.png";
 import ruFlag from "@/assets/images/ru.png";
@@ -134,54 +135,86 @@ watch(
             />
           </RouterLink>
 
-          <div class="mobile-search-inline relative z-40 flex-1 lg:hidden">
-            <input
-              v-model="searchQuery"
-              type="search"
-              :placeholder="t('nav.search_products') + '...'"
-              class="search-input mobile-search-input w-full pl-10 pr-3 py-2 text-sm"
-            />
-            <svg
-              class="absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-500"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          <div class="mobile-actions lg:hidden">
+            <div class="mobile-search-inline relative z-40">
+              <input
+                v-model="searchQuery"
+                type="search"
+                :placeholder="t('nav.search_products') + '...'"
+                class="search-input mobile-search-input w-full pl-10 pr-3 py-2 text-sm"
               />
-            </svg>
-
-            <div
-              v-if="filteredProducts.length"
-              class="absolute top-full left-0 mt-2 w-full search-dropdown max-h-80 overflow-y-auto"
-            >
-              <div
-                v-for="product in filteredProducts"
-                :key="product.id"
-                @click="selectProduct(product)"
-                class="search-row flex items-center gap-3 p-3 cursor-pointer"
+              <svg
+                class="absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                <img
-                  :src="getProductImage(product)"
-                  alt="Product"
-                  class="w-12 h-12 object-cover rounded-xl border border-gray-200"
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                 />
-                <div class="min-w-0">
-                  <p class="text-sm font-semibold text-slate-800 truncate">{{ product[`name_${locale}`] }}</p>
-                  <p class="text-xs font-bold text-slate-700">{{ product[`price_${locale}`] || product.price_uz }} so'm</p>
+              </svg>
+
+              <div
+                v-if="filteredProducts.length"
+                class="absolute top-full left-0 mt-2 w-full search-dropdown max-h-80 overflow-y-auto"
+              >
+                <div
+                  v-for="product in filteredProducts"
+                  :key="product.id"
+                  @click="selectProduct(product)"
+                  class="search-row flex items-center gap-3 p-3 cursor-pointer"
+                >
+                  <img
+                    :src="getProductImage(product)"
+                    alt="Product"
+                    class="w-12 h-12 object-cover rounded-xl border border-gray-200"
+                  />
+                  <div class="min-w-0">
+                    <p class="text-sm font-semibold text-slate-800 truncate">{{ product[`name_${locale}`] }}</p>
+                    <p class="text-xs font-bold text-slate-700">{{ product[`price_${locale}`] || product.price_uz }} so'm</p>
+                  </div>
                 </div>
+              </div>
+
+              <div
+                v-else-if="searchQuery.length > 1"
+                class="absolute top-full left-0 mt-2 w-full search-dropdown p-4 text-center text-sm text-slate-500"
+              >
+                {{ t("nav.no_results") }}
               </div>
             </div>
 
-            <div
-              v-else-if="searchQuery.length > 1"
-              class="absolute top-full left-0 mt-2 w-full search-dropdown p-4 text-center text-sm text-slate-500"
-            >
-              {{ t("nav.no_results") }}
+            <div class="mobile-lang-wrap relative z-40">
+              <button
+                @click="toggleLang"
+                class="lang-button mobile-lang-button flex items-center justify-center rounded-full text-sm font-semibold text-slate-700"
+                aria-label="Change language"
+              >
+                <img
+                  :src="activeLanguage.flag"
+                  class="h-5 w-5 rounded-sm ring-1 ring-slate-200"
+                  alt="Lang"
+                />
+              </button>
+
+              <div
+                v-if="langOpen"
+                class="lang-dropdown mobile-lang-dropdown absolute right-0 top-[calc(100%+6px)] w-36 rounded-2xl overflow-hidden"
+              >
+                <button
+                  v-for="lang in languages"
+                  :key="lang.code"
+                  @click="changeLanguage(lang.code)"
+                  class="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-slate-100"
+                  :class="locale === lang.code ? 'font-bold text-slate-900' : 'text-slate-700'"
+                >
+                  <img :src="lang.flag" class="w-4 h-4 rounded-sm" alt="Lang" />
+                  {{ lang.label }}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -243,7 +276,7 @@ watch(
           </div>
 
           <div class="hidden lg:flex items-center gap-2 sm:gap-3 relative">
-            <a href="https://t.me/metanservice" target="_blank" rel="noopener noreferrer" class="hidden sm:flex contact-chip">
+            <a :href="CONTACT_PHONE_HREF" class="hidden sm:flex contact-chip">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="currentColor"
@@ -329,7 +362,7 @@ watch(
         </div>
 
         <div class="mobile-card flex items-center gap-3 justify-between">
-          <a href="https://t.me/metanservice" target="_blank" rel="noopener noreferrer" class="mobile-chip">
+          <a :href="CONTACT_PHONE_HREF" class="mobile-chip">
             {{ t("nav.contact_admin") || "Admin" }}
           </a>
           <button @click="closeMenuAndGo({ name: 'Basket' })" class="mobile-chip mobile-basket relative">
@@ -537,11 +570,32 @@ watch(
 }
 
 .mobile-search-inline {
+  flex: 1;
+  min-width: 0;
   max-width: min(52vw, 320px);
 }
 
 .mobile-search-input {
   min-height: 42px;
+}
+
+.mobile-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.mobile-lang-wrap {
+  flex-shrink: 0;
+}
+
+.mobile-lang-button {
+  width: 42px;
+  height: 42px;
+  padding: 0;
 }
 
 @media (max-width: 639px) {
@@ -550,7 +604,7 @@ watch(
   }
 
   .mobile-search-inline {
-    max-width: min(48vw, 220px);
+    max-width: min(44vw, 220px);
   }
 }
 
