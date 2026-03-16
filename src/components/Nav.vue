@@ -537,6 +537,14 @@ watch(
 }
 
 @media (min-width: 1024px) {
+  .mobile-actions,
+  .mobile-search-inline,
+  .mobile-lang-wrap,
+  .mobile-lang-button,
+  .mobile-lang-dropdown {
+    display: none !important;
+  }
+
   .nav-shell {
     min-height: 4rem;
     padding-top: 0;
