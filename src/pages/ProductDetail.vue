@@ -12,6 +12,11 @@ import { useLoaderStore } from "@/store/loaderStore";
 import Notification from "@/components/Notification.vue";
 import { apiClient, getApiErrorMessage, resolveAssetUrls } from "@/lib/api";
 import {
+  formatCustomerPhone,
+  getStoredCustomerSession,
+  normalizeCustomerPhone,
+} from "@/lib/customerSession";
+import {
   calculateCreditPlan,
   buildConfiguredBasketItem,
   calculateConfiguredPrice,
@@ -80,6 +85,8 @@ const getTodayIsoDate = () => {
   return timezoneAdjusted.toISOString().slice(0, 10);
 };
 
+const customerProfile = ref(getStoredCustomerSession());
+
 const normalizeImages = (images) => resolveAssetUrls(images);
 const formatPrice = (price) => formatPriceValue(price);
 const getProductDisplayPrice = (product) =>
@@ -91,6 +98,25 @@ const fuelGuideSections = computed(() => {
 const isAnyModalOpen = computed(
   () => orderModalOpen.value || fuelGuideModalOpen.value
 );
+
+const getCustomerOrderFields = (profile = customerProfile.value) => {
+  return {
+    name: String(profile?.name || "").trim(),
+    phone: profile ? formatCustomerPhone(profile.phone) : "",
+    phones: profile?.phone || "",
+  };
+};
+
+const applyCustomerProfileToOrderForm = (profile = customerProfile.value) => {
+  const customerFields = getCustomerOrderFields(profile);
+
+  orderForm.value.name = customerFields.name;
+  orderForm.value.phone = customerFields.phone;
+
+  if (!orderForm.value.phones) {
+    orderForm.value.phones = customerFields.phones;
+  }
+};
 const formatCylinderOptionMeta = (option) => {
   const parts = [];
 
@@ -607,6 +633,7 @@ const buildNextSelections = (currentSelections, groupKey, optionId) => {
 const resetOrderForm = (orderType = canUseCreditOrder.value ? "credit" : "standard") => {
   orderForm.value = {
     ...createEmptyOrderForm(orderType),
+    ...getCustomerOrderFields(),
     amount: currentOrderTotal.value > 0 ? String(currentOrderTotal.value) : "",
     period: selectedCreditConfig.value?.months
       ? String(selectedCreditConfig.value.months)
@@ -617,6 +644,7 @@ const resetOrderForm = (orderType = canUseCreditOrder.value ? "credit" : "standa
 
 const openOrderModal = () => {
   if (!store.product) return;
+  customerProfile.value = getStoredCustomerSession();
   resetOrderForm(canUseCreditOrder.value ? "credit" : "standard");
   orderError.value = "";
   orderModalOpen.value = true;
@@ -651,10 +679,12 @@ const handleAddToBasket = () => {
 };
 
 const buildCreditPhoneList = () =>
-  orderForm.value.phones
-    .split(",")
-    .map((phone) => phone.trim())
-    .filter(Boolean);
+  [...new Set(
+    orderForm.value.phones
+      .split(",")
+      .map((phone) => normalizeCustomerPhone(phone))
+      .filter((phone) => phone.length === 12)
+  )];
 
 const buildCreditCustomerName = () =>
   [
@@ -688,10 +718,9 @@ const submitProductOrder = async () => {
 
   if (resolvedOrderType === "standard") {
     const name = orderForm.value.name.trim();
-    const phone = orderForm.value.phone.trim();
-    const phoneDigits = phone.replace(/\D/g, "");
+    const phone = normalizeCustomerPhone(orderForm.value.phone);
 
-    if (!name || !phone || phoneDigits.length < 9) {
+    if (!name || !phone || phone.length !== 12) {
       orderError.value = t("please_fill_all_fields");
       return;
     }
@@ -905,7 +934,10 @@ watch(
       if (!orderForm.value.startDate) {
         orderForm.value.startDate = getTodayIsoDate();
       }
+    } else if (customerProfile.value) {
+      applyCustomerProfileToOrderForm();
     }
+
     orderError.value = "";
   }
 );

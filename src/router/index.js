@@ -36,6 +36,24 @@ const routes = [
     },
   },
   {
+    path: "/login",
+    name: "Login",
+    component: () => import("@/pages/LoginPage.vue"),
+    meta: {
+      title: "Urganch Metan Service - Login",
+      robots: "noindex,nofollow",
+    },
+  },
+  {
+    path: "/register",
+    name: "Register",
+    component: () => import("@/pages/RegisterPage.vue"),
+    meta: {
+      title: "Urganch Metan Service - Register",
+      robots: "noindex,nofollow",
+    },
+  },
+  {
     path: "/products",
     name: "Products",
     component: () => import("@/pages/ProductsPage.vue"),

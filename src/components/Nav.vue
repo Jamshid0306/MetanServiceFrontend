@@ -105,6 +105,10 @@ watch(
           </RouterLink>
 
           <div class="mobile-actions lg:hidden">
+            <RouterLink to="/login" class="mobile-login-chip">
+              {{ t("nav.login") }}
+            </RouterLink>
+
             <div class="mobile-search-inline relative z-40">
               <input
                 v-model="searchQuery"
@@ -245,6 +249,10 @@ watch(
           </div>
 
           <div class="hidden lg:flex items-center gap-2 sm:gap-3 relative">
+            <RouterLink to="/login" class="login-chip">
+              {{ t("nav.login") }}
+            </RouterLink>
+
             <a :href="CONTACT_PHONE_HREF" class="hidden xl:flex contact-chip">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -465,6 +473,39 @@ watch(
   background: rgba(255, 255, 255, 1);
   border-color: rgba(20, 35, 56, 0.2);
   transform: translateY(-1px);
+}
+
+.login-chip,
+.mobile-login-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(20, 35, 56, 0.12);
+  background: #18304f;
+  color: #ffffff;
+  font-weight: 700;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.login-chip {
+  padding: 8px 15px;
+}
+
+.mobile-login-chip {
+  padding: 9px 12px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.login-chip:hover,
+.mobile-login-chip:hover {
+  transform: translateY(-1px);
+  border-color: #18304f;
+  background: #142338;
 }
 
 .lang-button {
