@@ -441,12 +441,12 @@ export const serializeProductOptions = (rawOptions = {}) => {
         id: transmission.id || createOptionId(),
         label: transmission.label,
         hidden: Boolean(transmission.hidden),
-        price_delta: 0,
+        price_delta: transmission.price_delta || 0,
         generations: transmission.generations.map((generation) => ({
           id: generation.id || createOptionId(),
           label: generation.label,
           hidden: Boolean(generation.hidden),
-          price_delta: 0,
+          price_delta: generation.price_delta || 0,
           cylinder_volumes: generation.cylinder_volumes.map((volume) => ({
             id: volume.id || createOptionId(),
             label: volume.label,
@@ -598,7 +598,7 @@ export const getSelectedProductOptions = (product, selections = {}, pathConfig =
       title_key: "productOptions.transmission",
       id: transmission.id,
       label: transmission.label,
-      price_delta: 0,
+      price_delta: transmission.price_delta || 0,
     });
   }
 
@@ -608,7 +608,7 @@ export const getSelectedProductOptions = (product, selections = {}, pathConfig =
       title_key: "productOptions.generation",
       id: generation.id,
       label: generation.label,
-      price_delta: 0,
+      price_delta: generation.price_delta || 0,
     });
   }
 
@@ -627,8 +627,16 @@ export const getSelectedProductOptions = (product, selections = {}, pathConfig =
 };
 
 export const calculateConfiguredPrice = (product, locale, selections = {}, pathConfig = {}) => {
-  const { cylinderVolume } = resolveSelectedPath(product, selections, pathConfig);
-  const configuredPrice = parseNumericPrice(cylinderVolume?.price_delta);
+  const { transmission, generation, cylinderVolume } = resolveSelectedPath(
+    product,
+    selections,
+    pathConfig
+  );
+  const configuredPrice =
+    parseNumericPrice(cylinderVolume?.price_delta) ??
+    parseNumericPrice(generation?.price_delta) ??
+    parseNumericPrice(transmission?.price_delta);
+
   if (configuredPrice !== null) {
     return configuredPrice;
   }
@@ -788,7 +796,7 @@ export const getInstallmentPlan = (product, locale = "uz", months = 12) => {
     return null;
   }
 
-  const basePrice = parseNumericPrice(product?.[`price_${locale}`]);
+  const basePrice = parseNumericPrice(getProductDefaultPrice(product, locale));
   if (basePrice === null) {
     return null;
   }

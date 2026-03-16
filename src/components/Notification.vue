@@ -8,6 +8,10 @@ const {t} = useI18n()
 const props = defineProps({
   message: String,
   show: Boolean,
+  showBasketAction: {
+    type: Boolean,
+    default: true,
+  },
   duration: {
     type: Number,
     default: 3000,
@@ -68,6 +72,7 @@ onBeforeUnmount(() => {
           {{ message }}
         </p>
         <button
+          v-if="showBasketAction"
           @click="goToBasket"
           class="mt-2 text-sm font-medium text-slate-700 transition-colors hover:text-slate-950"
         >

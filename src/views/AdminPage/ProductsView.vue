@@ -153,6 +153,19 @@ const formatCountInput = (value) => {
 const getMinimumOptionPrice = (rawOptions) => {
   const fuelTypes = Array.isArray(rawOptions?.fuel_types) ? rawOptions.fuel_types : [];
   let minimumPrice = null;
+  const getNumericPrice = (value) => {
+    const numericPrice = Number(String(value || "").replace(/[^\d]/g, ""));
+    return Number.isFinite(numericPrice) && numericPrice > 0 ? numericPrice : null;
+  };
+  const registerMinimumPrice = (value) => {
+    const numericPrice = getNumericPrice(value);
+    if (numericPrice === null) {
+      return;
+    }
+
+    minimumPrice =
+      minimumPrice === null ? numericPrice : Math.min(minimumPrice, numericPrice);
+  };
 
   fuelTypes.forEach((fuelType) => {
     const transmissions = Array.isArray(fuelType?.transmissions)
@@ -160,23 +173,29 @@ const getMinimumOptionPrice = (rawOptions) => {
       : [];
 
     transmissions.forEach((transmission) => {
+      const transmissionPrice = getNumericPrice(transmission?.price_delta);
       const generations = Array.isArray(transmission?.generations)
         ? transmission.generations
         : [];
 
+      if (!generations.length) {
+        registerMinimumPrice(transmissionPrice);
+        return;
+      }
+
       generations.forEach((generation) => {
+        const generationPrice = getNumericPrice(generation?.price_delta) ?? transmissionPrice;
         const cylinderVolumes = Array.isArray(generation?.cylinder_volumes)
           ? generation.cylinder_volumes
           : [];
 
-        cylinderVolumes.forEach((volume) => {
-          const numericPrice = Number(String(volume?.price_delta || "").replace(/[^\d]/g, ""));
-          if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
-            return;
-          }
+        if (!cylinderVolumes.length) {
+          registerMinimumPrice(generationPrice);
+          return;
+        }
 
-          minimumPrice =
-            minimumPrice === null ? numericPrice : Math.min(minimumPrice, numericPrice);
+        cylinderVolumes.forEach((volume) => {
+          registerMinimumPrice(getNumericPrice(volume?.price_delta) ?? generationPrice);
         });
       });
     });
@@ -289,6 +308,7 @@ const mapGenerationsForForm = (generations = []) =>
     id: generation.id,
     label: generation.label,
     hidden: Boolean(generation.hidden),
+    price_delta: formatOptionPriceInput(generation.price_delta),
     cylinder_volumes: mapCylinderVolumesForForm(generation.cylinder_volumes),
   }));
 
@@ -297,6 +317,7 @@ const mapTransmissionsForForm = (transmissions = []) =>
     id: transmission.id,
     label: transmission.label,
     hidden: Boolean(transmission.hidden),
+    price_delta: formatOptionPriceInput(transmission.price_delta),
     generations: mapGenerationsForForm(transmission.generations),
   }));
 
@@ -436,6 +457,13 @@ const onOptionLabelChange = (option) => {
 };
 
 const onCylinderPriceInput = (event, option) => {
+  option.price_delta = formatNumericInput(event.target.value);
+  if (option?.label?.trim()) {
+    option.hidden = false;
+  }
+};
+
+const onTransmissionPriceInput = (event, option) => {
   option.price_delta = formatNumericInput(event.target.value);
   if (option?.label?.trim()) {
     option.hidden = false;
@@ -740,7 +768,12 @@ const hasCreditBadge = (product) =>
 </script>
 <template>
   <div class="products-admin p-4 sm:p-6 space-y-6">
-    <Notification :message="notifMessage" :show="notifShow" type="success" />
+    <Notification
+      :message="notifMessage"
+      :show="notifShow"
+      :show-basket-action="false"
+      @close="notifShow = false"
+    />
     <div class="products-toolbar">
       <div class="products-toolbar-copy">
         <div>
@@ -1120,7 +1153,7 @@ const hasCreditBadge = (product) =>
                         </button>
                       </div>
 
-                      <div class="editor-option-row editor-option-row-single">
+                      <div class="editor-option-row editor-option-row-price">
                         <select
                           v-model="transmission.label"
                           class="editor-field editor-select"
@@ -1142,6 +1175,12 @@ const hasCreditBadge = (product) =>
                             {{ choice }}
                           </option>
                         </select>
+                        <input
+                          :value="transmission.price_delta"
+                          @input="onTransmissionPriceInput($event, transmission)"
+                          placeholder="0 UZS"
+                          class="editor-field"
+                        />
                       </div>
 
                       <div class="space-y-4">
@@ -1939,6 +1978,10 @@ const hasCreditBadge = (product) =>
 
 .editor-option-row-volume {
   grid-template-columns: minmax(0, 1fr) 170px 120px 44px;
+}
+
+.editor-option-row-price {
+  grid-template-columns: minmax(0, 1fr) 170px;
 }
 
 .editor-option-row-single {

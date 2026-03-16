@@ -20,6 +20,13 @@
 
       <!-- Form -->
       <form class="space-y-6" @submit.prevent="handleLogin">
+        <p
+          v-if="adminStore.lastError"
+          class="rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100"
+        >
+          {{ adminStore.lastError }}
+        </p>
+
         <!-- Username -->
         <div>
           <label for="username" class="block text-sm font-medium text-blue-100 mb-1">Username</label>
@@ -95,6 +102,7 @@ const showPassword = ref(false);
 
 const handleLogin = async () => {
   loading.value = true;
+  adminStore.lastError = "";
   const success = await adminStore.login(username.value, password.value);
   
   loading.value = false;

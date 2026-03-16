@@ -4,11 +4,34 @@ const trimTrailingSlash = (value = "") => value.replace(/\/+$/, "");
 const REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 15000);
 const MAX_GET_RETRIES = Number(import.meta.env.VITE_API_RETRY_COUNT || 2);
 const RETRYABLE_METHODS = new Set(["get", "head", "options"]);
+const ACCESS_TOKEN_STORAGE_KEY = "access_token";
+const REFRESH_TOKEN_STORAGE_KEY = "refresh_token";
+const TOKEN_EXPIRY_SKEW_MS = 30 * 1000;
 
 const wait = (ms) =>
   new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+const getStorage = () =>
+  typeof window === "undefined" ? null : window.localStorage;
+const decodeJwtPayload = (token) => {
+  if (!token || typeof window === "undefined") {
+    return null;
+  }
+
+  const tokenParts = String(token).split(".");
+  if (tokenParts.length < 2) {
+    return null;
+  }
+
+  try {
+    const normalized = tokenParts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    return JSON.parse(window.atob(padded));
+  } catch {
+    return null;
+  }
+};
 
 const shouldSendNgrokHeader = (baseUrl) => {
   try {
@@ -51,16 +74,108 @@ export const apiClient = axios.create({
       },
 });
 
+let refreshSessionPromise = null;
+
+export const getStoredAccessToken = () =>
+  getStorage()?.getItem(ACCESS_TOKEN_STORAGE_KEY) || null;
+
+export const getStoredRefreshToken = () =>
+  getStorage()?.getItem(REFRESH_TOKEN_STORAGE_KEY) || null;
+
+export const storeAdminTokens = ({ accessToken = null, refreshToken = null } = {}) => {
+  const storage = getStorage();
+  if (!storage) {
+    return;
+  }
+
+  if (accessToken) {
+    storage.setItem(ACCESS_TOKEN_STORAGE_KEY, accessToken);
+  } else {
+    storage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+  }
+
+  if (refreshToken) {
+    storage.setItem(REFRESH_TOKEN_STORAGE_KEY, refreshToken);
+  } else {
+    storage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
+  }
+};
+
+export const clearAdminTokens = () => {
+  storeAdminTokens({ accessToken: null, refreshToken: null });
+};
+
+export const isTokenExpired = (token) => {
+  const exp = Number(decodeJwtPayload(token)?.exp || 0);
+
+  if (!exp) {
+    return false;
+  }
+
+  return exp * 1000 <= Date.now() + TOKEN_EXPIRY_SKEW_MS;
+};
+
+export const refreshAdminSession = async () => {
+  if (refreshSessionPromise) {
+    return refreshSessionPromise;
+  }
+
+  const refreshToken = getStoredRefreshToken();
+  if (!refreshToken) {
+    return null;
+  }
+
+  refreshSessionPromise = apiClient
+    .post(
+      "/admin/refresh",
+      { refresh_token: refreshToken },
+      {
+        skipAuth: true,
+        skipAuthRefresh: true,
+      }
+    )
+    .then((response) => {
+      const nextAccessToken = response.data?.access_token || null;
+      const nextRefreshToken = response.data?.refresh_token || null;
+
+      if (!nextAccessToken) {
+        clearAdminTokens();
+        return null;
+      }
+
+      storeAdminTokens({
+        accessToken: nextAccessToken,
+        refreshToken: nextRefreshToken,
+      });
+
+      return {
+        accessToken: nextAccessToken,
+        refreshToken: nextRefreshToken,
+      };
+    })
+    .catch((error) => {
+      clearAdminTokens();
+      throw error;
+    })
+    .finally(() => {
+      refreshSessionPromise = null;
+    });
+
+  return refreshSessionPromise;
+};
+
 apiClient.interceptors.request.use((config) => {
   config.metadata = {
     retryCount: config.metadata?.retryCount || 0,
   };
 
-  if (typeof window !== "undefined") {
-    const token = window.localStorage.getItem("access_token");
-    if (token && !config.headers?.Authorization) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+  if (config.skipAuth) {
+    return config;
+  }
+
+  const token = getStoredAccessToken();
+  if (token && !config.headers?.Authorization) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
 
   return config;
@@ -84,6 +199,33 @@ const shouldRetryRequest = (error) => {
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
+    const originalRequest = error?.config;
+    const requestUrl = String(originalRequest?.url || "");
+    const isUnauthorized = Number(error?.response?.status) === 401;
+    const shouldTryRefresh =
+      isUnauthorized &&
+      originalRequest &&
+      !originalRequest._retriedWithRefresh &&
+      !originalRequest.skipAuthRefresh &&
+      !requestUrl.includes("/admin/login") &&
+      !requestUrl.includes("/admin/refresh") &&
+      Boolean(getStoredRefreshToken());
+
+    if (shouldTryRefresh) {
+      originalRequest._retriedWithRefresh = true;
+
+      try {
+        const authData = await refreshAdminSession();
+        if (authData?.accessToken) {
+          originalRequest.headers = originalRequest.headers || {};
+          originalRequest.headers.Authorization = `Bearer ${authData.accessToken}`;
+          return apiClient(originalRequest);
+        }
+      } catch (refreshError) {
+        return Promise.reject(refreshError);
+      }
+    }
+
     if (shouldRetryRequest(error)) {
       error.config.metadata.retryCount += 1;
       await wait(300 * error.config.metadata.retryCount);

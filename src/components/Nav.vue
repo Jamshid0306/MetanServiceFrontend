@@ -19,7 +19,6 @@ const productsStore = useProductsStore();
 const basketStore = useBasketStore();
 const loaderStore = useLoaderStore();
 
-const menuOpen = ref(false);
 const langOpen = ref(false);
 const isSticky = ref(false);
 const searchQuery = ref("");
@@ -45,27 +44,10 @@ const selectProduct = (product) => {
   loaderStore.loader = true;
   searchQuery.value = product[`name_${locale.value}`];
   router.push({ name: "ProductDetail", params: { id: product.id } });
-  menuOpen.value = false;
 };
 
 const getProductImage = (product) =>
   resolveAssetUrl(product?.images?.[0]) || "/placeholder.png";
-
-const shouldLockBodyScroll = () =>
-  typeof window !== "undefined" &&
-  window.innerWidth >= 1024 &&
-  window.innerWidth < 1280;
-
-const syncBodyOverflow = () => {
-  if (typeof document === "undefined") return;
-  document.body.style.overflow =
-    menuOpen.value && shouldLockBodyScroll() ? "hidden" : "auto";
-};
-
-const toggleMenu = () => {
-  menuOpen.value = !menuOpen.value;
-  syncBodyOverflow();
-};
 
 const toggleLang = () => {
   langOpen.value = !langOpen.value;
@@ -81,12 +63,6 @@ const handleScroll = () => {
   isSticky.value = window.scrollY > 20;
 };
 
-const closeMenuAndGo = (to) => {
-  menuOpen.value = false;
-  syncBodyOverflow();
-  router.push(to);
-};
-
 onMounted(async () => {
   const savedLang = localStorage.getItem("lang");
   if (savedLang) locale.value = savedLang;
@@ -96,13 +72,10 @@ onMounted(async () => {
   }
 
   window.addEventListener("scroll", handleScroll);
-  window.addEventListener("resize", syncBodyOverflow);
 });
 
 onUnmounted(() => {
   window.removeEventListener("scroll", handleScroll);
-  window.removeEventListener("resize", syncBodyOverflow);
-  document.body.style.overflow = "auto";
 });
 
 watch(
@@ -110,10 +83,6 @@ watch(
   () => {
     searchQuery.value = "";
     langOpen.value = false;
-    if (menuOpen.value) {
-      menuOpen.value = false;
-      syncBodyOverflow();
-    }
   }
 );
 </script>
@@ -218,13 +187,13 @@ watch(
             </div>
           </div>
 
-          <div class="hidden xl:flex items-center gap-6 text-[15px] font-semibold text-slate-700">
+          <div class="hidden lg:flex flex-shrink-0 items-center gap-4 xl:gap-6 text-[14px] xl:text-[15px] font-semibold text-slate-700">
             <RouterLink to="/" class="nav-link">{{ t("nav.main") }}</RouterLink>
             <RouterLink :to="{ path: '/', hash: '#contact' }" class="nav-link">{{ t("nav.contact") }}</RouterLink>
             <RouterLink to="/products" class="products-pill">{{ t("products.allProducts") }}</RouterLink>
           </div>
 
-          <div class="hidden lg:flex items-center flex-1 max-w-md relative z-40">
+          <div class="hidden lg:flex items-center flex-1 max-w-[260px] xl:max-w-md relative z-40">
             <input
               v-model="searchQuery"
               type="search"
@@ -276,7 +245,7 @@ watch(
           </div>
 
           <div class="hidden lg:flex items-center gap-2 sm:gap-3 relative">
-            <a :href="CONTACT_PHONE_HREF" class="hidden sm:flex contact-chip">
+            <a :href="CONTACT_PHONE_HREF" class="hidden xl:flex contact-chip">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="currentColor"
@@ -332,46 +301,11 @@ watch(
               </div>
               <Basket :size="22" />
             </RouterLink>
-
-            <button
-              @click="toggleMenu"
-              class="menu-toggle hidden lg:inline-flex p-2 text-slate-700 hover:text-slate-950 xl:hidden"
-              aria-label="Toggle menu"
-            >
-              <div class="space-y-1.5">
-                <span class="block h-0.5 w-6 bg-current transition-transform" :class="{ 'rotate-45 translate-y-2': menuOpen }"></span>
-                <span class="block h-0.5 w-6 bg-current transition-opacity" :class="{ 'opacity-0': menuOpen }"></span>
-                <span class="block h-0.5 w-6 bg-current transition-transform" :class="{ '-rotate-45 -translate-y-2': menuOpen }"></span>
-              </div>
-            </button>
           </div>
         </div>
 
       </div>
     </nav>
-
-    <div
-      v-if="menuOpen"
-      class="hidden lg:block xl:hidden fixed inset-0 pt-16 menu-overlay z-[998] overflow-y-auto"
-    >
-      <div class="container mx-auto px-4 py-6 space-y-6">
-        <div class="mobile-card grid gap-2 text-base font-semibold text-slate-700">
-          <button class="mobile-link" @click="closeMenuAndGo({ name: 'Home' })">{{ t("nav.main") }}</button>
-          <button class="mobile-link" @click="closeMenuAndGo({ path: '/', hash: '#contact' })">{{ t("nav.contact") }}</button>
-          <button class="mobile-link" @click="closeMenuAndGo({ name: 'Products' })">{{ t("products.allProducts") }}</button>
-        </div>
-
-        <div class="mobile-card flex items-center gap-3 justify-between">
-          <a :href="CONTACT_PHONE_HREF" class="mobile-chip">
-            {{ t("nav.contact_admin") || "Admin" }}
-          </a>
-          <button @click="closeMenuAndGo({ name: 'Basket' })" class="mobile-chip mobile-basket relative">
-            <span v-if="basketStore.basket.length" class="mobile-basket-count">{{ basketStore.basket.length }}</span>
-            {{ t("basket") }}
-          </button>
-        </div>
-      </div>
-    </div>
   </header>
 </template>
 
@@ -563,12 +497,6 @@ watch(
   background: rgba(255, 255, 255, 1);
 }
 
-.menu-toggle {
-  border-radius: 12px;
-  border: 1px solid rgba(20, 35, 56, 0.12);
-  background: rgba(255, 255, 255, 0.86);
-}
-
 .mobile-search-inline {
   flex: 1;
   min-width: 0;
@@ -606,68 +534,6 @@ watch(
   .mobile-search-inline {
     max-width: min(44vw, 220px);
   }
-}
-
-.menu-overlay {
-  background: rgba(245, 247, 250, 0.94);
-  backdrop-filter: blur(12px);
-}
-
-.mobile-card {
-  border-radius: 16px;
-  border: 1px solid rgba(20, 35, 56, 0.1);
-  background: rgba(255, 255, 255, 0.95);
-  padding: 12px;
-}
-
-.mobile-link {
-  text-align: left;
-  border: 1px solid rgba(20, 35, 56, 0.1);
-  border-radius: 12px;
-  padding: 10px 12px;
-  transition:
-    color 0.2s,
-    background-color 0.2s,
-    transform 0.2s;
-}
-
-.mobile-link:hover {
-  background: rgba(20, 35, 56, 0.04);
-  color: #18304f;
-  transform: translateX(2px);
-}
-
-.mobile-chip {
-  cursor: pointer;
-  border-radius: 999px;
-  padding: 8px 12px;
-  border: 1px solid rgba(20, 35, 56, 0.12);
-  font-weight: 600;
-  color: #18304f;
-  background: #ffffff;
-}
-
-.mobile-basket {
-  background: #18304f;
-  color: #fff;
-  border-color: transparent;
-  padding-right: 28px;
-}
-
-.mobile-basket-count {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  font-weight: 700;
 }
 
 @media (min-width: 1024px) {

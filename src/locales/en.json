@@ -83,10 +83,48 @@
     "included": "Included",
     "selectionHelp": "Choose the right option",
     "fuelType": "Fuel type",
-    "transmission": "Transmission",
+    "transmission": "Program type",
     "generation": "LPG generation",
     "cylinderVolume": "Cylinder volume",
-    "cylinderPosition": "Cylinder position"
+    "cylinderPosition": "Cylinder position",
+    "fuelGuide": {
+      "open": "About the program",
+      "title": "Quick guide for methane and propane",
+      "intro": "The notes below are general guidance. The right setup still depends on the engine, luggage space, and how much you drive.",
+      "note": "Before making a final choice, review engine condition, expected mileage, and trunk space with the installers.",
+      "sections": [
+        {
+          "title": "Methane (CNG)",
+          "automaticTitle": "For Automatic program",
+          "automaticItems": [
+            "Cuts fuel costs significantly for vehicles with high mileage.",
+            "With proper tuning, smooth and stable driving can be preserved on the Automatic program.",
+            "Works well for daily commuting and longer routes where efficiency matters."
+          ],
+          "manualTitle": "For Manual program",
+          "manualItems": [
+            "Gas adaptation and control are usually simpler on the Manual program.",
+            "Fuel savings stay noticeable even under load.",
+            "Service and diagnostics are often easier to manage."
+          ]
+        },
+        {
+          "title": "Propane (LPG)",
+          "automaticTitle": "For Automatic program",
+          "automaticItems": [
+            "The system and cylinder are often lighter, which helps with packaging.",
+            "Feels smooth and comfortable in city driving on the Automatic program.",
+            "A practical option for shorter everyday routes."
+          ],
+          "manualTitle": "For Manual program",
+          "manualItems": [
+            "Often gives a good balance between installation cost and daily usability.",
+            "Practical for short and mixed driving routes.",
+            "Maintenance costs remain manageable on many vehicles."
+          ]
+        }
+      ]
+    }
   },
   "credit": {
     "title": "Installment pricing",

@@ -23,6 +23,16 @@ const createCacheEntry = (data, ttlMs) => ({
 });
 
 const isFreshCacheEntry = (entry) => entry && entry.expiresAt > Date.now();
+const hasFullProductDetails = (product) =>
+  product &&
+  [
+    "description_uz",
+    "description_ru",
+    "description_en",
+    "characteristic_uz",
+    "characteristic_ru",
+    "characteristic_en",
+  ].some((key) => Object.prototype.hasOwnProperty.call(product, key));
 
 export const useProductsStore = defineStore("productsStore", {
   state: () => ({
@@ -34,6 +44,14 @@ export const useProductsStore = defineStore("productsStore", {
   actions: {
     cacheProduct(product) {
       if (!product?.id) return;
+      const existingEntry = detailCache.get(product.id);
+      const existingProduct = existingEntry?.data;
+
+      // Do not overwrite a full detail cache entry with a summary product from list endpoints.
+      if (hasFullProductDetails(existingProduct) && !hasFullProductDetails(product)) {
+        return;
+      }
+
       detailCache.set(product.id, createCacheEntry(product, PRODUCT_DETAIL_TTL_MS));
     },
 
@@ -142,7 +160,7 @@ export const useProductsStore = defineStore("productsStore", {
       const force = Boolean(options.force);
       const cachedEntry = detailCache.get(id);
 
-      if (!force && isFreshCacheEntry(cachedEntry)) {
+      if (!force && isFreshCacheEntry(cachedEntry) && hasFullProductDetails(cachedEntry.data)) {
         this.product = cachedEntry.data;
         this.lastError = "";
         return true;
@@ -156,7 +174,7 @@ export const useProductsStore = defineStore("productsStore", {
           return true;
         } catch (err) {
           this.lastError = getApiErrorMessage(err, "Mahsulot tafsilotini yuklab bo'lmadi.");
-          if (cachedEntry?.data) {
+          if (cachedEntry?.data && hasFullProductDetails(cachedEntry.data)) {
             this.product = cachedEntry.data;
             return true;
           }

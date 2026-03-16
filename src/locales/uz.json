@@ -71,10 +71,48 @@
     "included": "Narx ichida",
     "selectionHelp": "Mos variantni tanlang",
     "fuelType": "Yoqilg'i turi",
-    "transmission": "Uzatma qutisi",
+    "transmission": "Dastur turi",
     "generation": "Gaz avlodi",
     "cylinderVolume": "Gaz balon hajmi",
-    "cylinderPosition": "Gaz balon pozitsiyasi"
+    "cylinderPosition": "Gaz balon pozitsiyasi",
+    "fuelGuide": {
+      "open": "Dastur haqida",
+      "title": "Metan va propan bo'yicha qisqa tavsiya",
+      "intro": "Quyidagi ma'lumotlar umumiy tushuntirish uchun berilgan. Aniq yechim avtomobil dvigateli, bagaj joyi va yurish masofasiga qarab tanlanadi.",
+      "note": "Yakuni qarordan oldin ustalar bilan dvigatel holati, yurish hajmi va bagajdagi bo'sh joyni tekshirib oling.",
+      "sections": [
+        {
+          "title": "Metan (CNG)",
+          "automaticTitle": "Avtomat dastur uchun",
+          "automaticItems": [
+            "Ko'p yuradigan avtomobillarda yoqilg'i xarajatini sezilarli kamaytiradi.",
+            "To'g'ri sozlamada avtomat dastur bilan silliq yurish va barqaror ishlash saqlanadi.",
+            "Uzoq masofa va kundalik qatnov uchun tejamkor variant bo'ladi."
+          ],
+          "manualTitle": "Mexanika dastur uchun",
+          "manualItems": [
+            "Mexanika dasturida gazga moslash va nazorat qilish odatda sodda bo'ladi.",
+            "Yuklama ostida ham iqtisodiylik yaxshi seziladi.",
+            "Servis va diagnostika ishlari nisbatan tushunarli va qulay bo'ladi."
+          ]
+        },
+        {
+          "title": "Propan (LPG)",
+          "automaticTitle": "Avtomat dastur uchun",
+          "automaticItems": [
+            "Uskuna va ballon odatda yengilroq bo'lib, bagaj joylashuvi qulayroq bo'ladi.",
+            "Shahar rejimida avtomat dastur bilan yumshoq va qulay ishlaydi.",
+            "Qisqaroq masofalarda tez moslashadigan variant hisoblanadi."
+          ],
+          "manualTitle": "Mexanika dastur uchun",
+          "manualItems": [
+            "O'rnatish va kundalik foydalanishda narx va qulaylik balansi ko'p hollarda yaxshi bo'ladi.",
+            "Qisqa va aralash marshrutlarda amaliy yechim beradi.",
+            "Texnik xizmat xarajatlari ko'p mashinalarda boshqariladigan darajada bo'ladi."
+          ]
+        }
+      ]
+    }
   },
   "credit": {
     "title": "Kredit hisoblash",

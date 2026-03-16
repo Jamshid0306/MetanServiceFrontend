@@ -11,7 +11,7 @@ import { resolveAssetUrls } from "@/lib/api";
 import {
   buildConfiguredBasketItem,
   formatPriceValue,
-  getDefaultOptionSelections,
+  getProductDefaultPrice,
   getInstallmentPlan,
 } from "@/lib/productOptions";
 
@@ -25,6 +25,8 @@ const animating = ref({});
 const showCheck = ref({});
 const notification = ref({ show: false, message: "" });
 const formatPrice = (price) => formatPriceValue(price);
+const getProductDisplayPrice = (product) =>
+  getProductDefaultPrice(product, locale.value);
 const INSTALLMENT_MONTHS = 12;
 const getProductInstallment = (product) =>
   getInstallmentPlan(product, locale.value, INSTALLMENT_MONTHS);
@@ -34,7 +36,7 @@ const formatInstallmentLabel = (product) => {
     return "";
   }
 
-  return `${formatPrice(installment.monthlyPayment)} / ${installment.months} ${t("credit.months")}`;
+  return `${installment.months} ${t("credit.months")} • ${formatPrice(installment.monthlyPayment)}`;
 };
 
 onMounted(async () => {
@@ -71,7 +73,7 @@ const handleClick = (product) => {
     animating.value = { ...animating.value, [id]: false };
   }, 1800);
   basketStore.addToBasket(
-    buildConfiguredBasketItem(product, getDefaultOptionSelections(product))
+    buildConfiguredBasketItem(product, {}, 1, { useFallbackPath: false })
   );
   notification.value = {
     show: true,
@@ -117,7 +119,7 @@ const actionLabel = () => t("add_to_cart");
           </div>
           <div class="card-footer">
             <p class="product-price">
-              {{ formatPrice(product[`price_${locale}`]) }}
+              {{ formatPrice(getProductDisplayPrice(product)) }}
             </p>
             <p
               v-if="getProductInstallment(product)"
@@ -313,14 +315,21 @@ const actionLabel = () => t("add_to_cart");
 .product-installment {
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
-  padding: 0.28rem 0.6rem;
+  justify-content: center;
+  width: 100%;
+  border-radius: 14px;
+  padding: 0.42rem 0.72rem;
   margin-bottom: 0.85rem;
-  background: #facc15;
-  color: #111111;
-  border: 1px solid #eab308;
-  font-size: 0.76rem;
-  font-weight: 700;
+  background: linear-gradient(135deg, #eff8f1 0%, #dcefe3 100%);
+  color: #184b33;
+  border: 1px solid rgba(72, 122, 93, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  font-size: 0.74rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .add-btn {
@@ -363,8 +372,8 @@ const actionLabel = () => t("add_to_cart");
   }
 
   .product-installment {
-    font-size: 0.68rem;
-    padding: 0.24rem 0.5rem;
+    font-size: 0.64rem;
+    padding: 0.34rem 0.5rem;
   }
 
   .cart-icon {

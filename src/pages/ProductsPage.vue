@@ -13,7 +13,7 @@ import { resolveAssetUrl, resolveAssetUrls } from "@/lib/api";
 import {
   buildConfiguredBasketItem,
   formatPriceValue,
-  getDefaultOptionSelections,
+  getProductDefaultPrice,
   getInstallmentPlan,
 } from "@/lib/productOptions";
 
@@ -56,17 +56,19 @@ const parsePrice = (rawPrice) => {
   const numeric = Number(cleaned);
   return Number.isNaN(numeric) ? null : numeric;
 };
+const getProductDisplayPrice = (product) =>
+  getProductDefaultPrice(product, locale.value);
 
 const maxPrice = computed(() => {
   const prices = filterStore.products
-    .map((p) => parsePrice(p[`price_${locale.value}`]))
+    .map((p) => parsePrice(getProductDisplayPrice(p)))
     .filter((p) => p !== null);
   return prices.length ? Math.max(...prices) : 0;
 });
 
 const syncPriceBounds = () => {
   const prices = filterStore.products
-    .map((p) => parsePrice(p[`price_${locale.value}`]))
+    .map((p) => parsePrice(getProductDisplayPrice(p)))
     .filter((p) => p !== null);
 
   if (!prices.length) {
@@ -115,7 +117,7 @@ const handleClick = (product) => {
   }, 1800);
 
   basketStore.addToBasket(
-    buildConfiguredBasketItem(product, getDefaultOptionSelections(product))
+    buildConfiguredBasketItem(product, {}, 1, { useFallbackPath: false })
   );
   notification.value = {
     show: true,
@@ -128,7 +130,7 @@ const filteredProducts = computed(() => {
   const withoutPrice = [];
 
   for (const p of filterStore.products) {
-    const numericPrice = parsePrice(p[`price_${locale.value}`]);
+    const numericPrice = parsePrice(getProductDisplayPrice(p));
     if (numericPrice === null) {
       withoutPrice.push(p);
       continue;
@@ -259,7 +261,7 @@ onMounted(async () => {
 
             <div class="catalog-footer">
               <p class="catalog-price">
-                {{ formatPrice(product[`price_${locale}`]) }}
+                {{ formatPrice(getProductDisplayPrice(product)) }}
               </p>
               <p
                 v-if="getProductInstallment(product)"
