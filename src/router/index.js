@@ -54,6 +54,15 @@ const routes = [
     },
   },
   {
+    path: "/forgot-password",
+    name: "ForgotPassword",
+    component: () => import("@/pages/ForgotPasswordPage.vue"),
+    meta: {
+      title: "Urganch Metan Service - Parolni tiklash",
+      robots: "noindex,nofollow",
+    },
+  },
+  {
     path: "/products",
     name: "Products",
     component: () => import("@/pages/ProductsPage.vue"),

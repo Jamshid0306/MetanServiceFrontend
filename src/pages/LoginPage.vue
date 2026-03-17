@@ -18,7 +18,9 @@ const submitting = ref(false);
 const errorMessage = ref("");
 
 const canSubmit = computed(
-  () => phone.value.trim().length > 0 && password.value.trim().length > 0
+  () =>
+    phone.value.trim().length > 0 &&
+    password.value.trim().length >= 8
 );
 
 const submitTelegramLogin = async (telegramUser) => {
@@ -27,8 +29,21 @@ const submitTelegramLogin = async (telegramUser) => {
 
   try {
     const response = await apiClient.post("/customers/telegram", telegramUser);
-    storeCustomerSession(response.data?.customer || null);
-    router.push("/");
+
+    const customer = response.data?.customer || null;
+    const accessToken = response.data?.access_token || null;
+
+    if (typeof window !== "undefined" && accessToken) {
+      window.localStorage.setItem("customer_access_token", accessToken);
+    }
+
+    storeCustomerSession(customer);
+
+    if (customer?.has_password === false) {
+      router.push({ path: "/forgot-password", query: { mode: "set-password" } });
+    } else {
+      router.push("/");
+    }
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error, t("auth.telegramFailed"));
   } finally {
@@ -38,7 +53,11 @@ const submitTelegramLogin = async (telegramUser) => {
 
 const submitLogin = async () => {
   if (!canSubmit.value) {
-    errorMessage.value = t("auth.fillRequired");
+    if (!phone.value.trim() || !password.value.trim()) {
+      errorMessage.value = t("auth.fillRequired");
+    } else if (password.value.trim().length < 8) {
+      errorMessage.value = t("auth.passwordTooShort");
+    }
     return;
   }
 
@@ -101,6 +120,16 @@ const submitLogin = async () => {
               class="auth-input"
             />
           </label>
+
+          <p class="auth-forgot">
+            <button
+              type="button"
+              class="auth-forgot-link"
+              @click="router.push('/forgot-password')"
+            >
+              {{ t("auth.forgotPassword") }}
+            </button>
+          </p>
 
           <p v-if="errorMessage" class="auth-error">{{ errorMessage }}</p>
 
@@ -270,6 +299,25 @@ const submitLogin = async () => {
 .auth-submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.auth-forgot {
+  margin-top: 0.1rem;
+  text-align: right;
+}
+
+.auth-forgot-link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #18304f;
+  cursor: pointer;
+}
+
+.auth-forgot-link:hover {
+  text-decoration: underline;
 }
 
 .auth-switch {

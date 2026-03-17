@@ -79,7 +79,20 @@
     "telegramUnavailable": "Telegram login hozircha sozlanmagan.",
     "fillRequired": "Iltimos, barcha maydonlarni to'ldiring.",
     "loginFailed": "Login amalga oshmadi.",
-    "registerFailed": "Ro'yxatdan o'tish amalga oshmadi."
+    "registerFailed": "Ro'yxatdan o'tish amalga oshmadi.",
+    "passwordTooShort": "Parol uzunligi kamida 8 ta belgi bo'lishi kerak.",
+    "forgotPassword": "Parolni unutdingizmi?",
+    "resetTitle": "Parolni tiklash",
+    "resetSubtitle": "Telegram orqali raqamingizni tasdiqlang va yangi parol o'rnating.",
+    "resetTelegramHint": "Telegram orqali tizimga kirib, shu raqam bilan bog'langan profilni tasdiqlang.",
+    "newPassword": "Yangi parol",
+    "newPasswordPlaceholder": "Yangi parolni kiriting",
+    "confirmPassword": "Parolni tasdiqlang",
+    "confirmPasswordPlaceholder": "Yangi parolni qayta kiriting",
+    "passwordsDontMatch": "Parollar bir-biriga mos kelmadi.",
+    "resetNoPhone": "Telegram hisobiga bog'langan telefon raqami topilmadi.",
+    "resetSuccess": "Parol muvaffaqiyatli o'zgartirildi. Endi login qilishingiz mumkin.",
+    "resetSubmit": "Parolni yangilash"
   },
   "creat": "EDev tomonidan yaratilgan",
   "products": {

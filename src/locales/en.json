@@ -79,7 +79,20 @@
     "telegramUnavailable": "Telegram login is not configured yet.",
     "fillRequired": "Please fill in all required fields.",
     "loginFailed": "Login failed.",
-    "registerFailed": "Registration failed."
+    "registerFailed": "Registration failed.",
+    "passwordTooShort": "Password must be at least 8 characters long.",
+    "forgotPassword": "Forgot password?",
+    "resetTitle": "Reset password",
+    "resetSubtitle": "Verify your phone number via Telegram and set a new password.",
+    "resetTelegramHint": "Log in with Telegram to confirm the profile linked to this phone number.",
+    "newPassword": "New password",
+    "newPasswordPlaceholder": "Enter new password",
+    "confirmPassword": "Confirm password",
+    "confirmPasswordPlaceholder": "Re-enter new password",
+    "passwordsDontMatch": "Passwords do not match.",
+    "resetNoPhone": "Could not determine a phone number linked to this Telegram account.",
+    "resetSuccess": "Password changed successfully. You can now log in.",
+    "resetSubmit": "Update password"
   },
   "products": {
     "title": "Products",

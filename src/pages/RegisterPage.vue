@@ -22,7 +22,7 @@ const canSubmit = computed(
   () =>
     name.value.trim().length > 0 &&
     phone.value.trim().length > 0 &&
-    password.value.trim().length > 0
+    password.value.trim().length >= 8
 );
 
 const submitTelegramLogin = async (telegramUser) => {
@@ -31,8 +31,21 @@ const submitTelegramLogin = async (telegramUser) => {
 
   try {
     const response = await apiClient.post("/customers/telegram", telegramUser);
-    storeCustomerSession(response.data?.customer || null);
-    router.push("/");
+
+    const customer = response.data?.customer || null;
+    const accessToken = response.data?.access_token || null;
+
+    if (typeof window !== "undefined" && accessToken) {
+      window.localStorage.setItem("customer_access_token", accessToken);
+    }
+
+    storeCustomerSession(customer);
+
+    if (customer?.has_password === false) {
+      router.push({ path: "/forgot-password", query: { mode: "set-password" } });
+    } else {
+      router.push("/");
+    }
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error, t("auth.telegramFailed"));
   } finally {
@@ -42,7 +55,11 @@ const submitTelegramLogin = async (telegramUser) => {
 
 const submitRegister = async () => {
   if (!canSubmit.value) {
-    errorMessage.value = t("auth.fillRequired");
+    if (!name.value.trim() || !phone.value.trim() || !password.value.trim()) {
+      errorMessage.value = t("auth.fillRequired");
+    } else if (password.value.trim().length < 8) {
+      errorMessage.value = t("auth.passwordTooShort");
+    }
     return;
   }
 
