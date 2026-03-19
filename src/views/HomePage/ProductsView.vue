@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, nextTick } from "vue";
+import { computed, ref, onMounted, nextTick } from "vue";
 import Notification from "../../components/Notification.vue";
 import { useProductsStore } from "../../store/productsStore";
 import { useBasketStore } from "../../store/basketStore";
@@ -85,6 +85,27 @@ const goToDetail = (id) => {
   productsStore.fetchProductDetail(id);
 };
 const actionLabel = () => t("add_to_cart");
+
+const getProductOrder = (product) => {
+  const raw =
+    product?.order ?? product?.display_order ?? product?.sort_order ?? product?.position ?? 0;
+  const num = Number(raw);
+  return Number.isFinite(num) ? num : 999999;
+};
+
+const sortedProducts = computed(() => {
+  const list = Array.isArray(productsStore.products)
+    ? [...productsStore.products]
+    : [];
+
+  list.sort(
+    (a, b) =>
+      getProductOrder(a) - getProductOrder(b) ||
+      Number(a?.id ?? 0) - Number(b?.id ?? 0)
+  );
+
+  return list;
+});
 </script>
 
 <template>
@@ -97,7 +118,7 @@ const actionLabel = () => t("add_to_cart");
         class="grid grid-cols-4 max-lg:grid-cols-3 max-sm:grid-cols-2 max-sm:gap-4 gap-6"
       >
         <div
-          v-for="(product, index) in productsStore.products.slice(0, 8)"
+          v-for="(product, index) in sortedProducts.slice(0, 8)"
           :key="product.id"
           :ref="(el) => (productRefs[index] = el)"
           :style="{ 'transition-delay': `${index * 50}ms` }"

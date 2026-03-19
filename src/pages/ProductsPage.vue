@@ -30,6 +30,9 @@ const maxValue = ref(0);
 const initialMin = ref(0);
 const initialMax = ref(0);
 
+const isFilterModalOpen = ref(false);
+let filterModalAutoCloseTimer = null;
+
 const animating = ref({});
 const showCheck = ref({});
 const notification = ref({ show: false, message: "" });
@@ -56,6 +59,18 @@ const parsePrice = (rawPrice) => {
   const numeric = Number(cleaned);
   return Number.isNaN(numeric) ? null : numeric;
 };
+
+const getProductOrder = (product) => {
+  const raw =
+    product?.order ??
+    product?.display_order ??
+    product?.sort_order ??
+    product?.position ??
+    0;
+  const num = Number(raw);
+  return Number.isFinite(num) ? num : 999999;
+};
+
 const getProductDisplayPrice = (product) =>
   getProductDefaultPrice(product, locale.value);
 
@@ -103,6 +118,17 @@ const clearFilters = () => {
   minValue.value = initialMin.value;
   maxValue.value = initialMax.value;
   currentPage.value = 1;
+
+  // Close modal on mobile after resetting filters.
+  if (isFilterModalOpen.value) closeFilterModal();
+};
+
+const openFilterModal = () => {
+  isFilterModalOpen.value = true;
+};
+
+const closeFilterModal = () => {
+  isFilterModalOpen.value = false;
 };
 
 const handleClick = (product) => {
@@ -144,7 +170,16 @@ const filteredProducts = computed(() => {
     (p) => p.numericPrice >= minValue.value && p.numericPrice <= maxValue.value
   );
 
-  return [...priceFiltered, ...withoutPrice];
+  const result = [...priceFiltered, ...withoutPrice];
+
+  // Sort by admin-defined order; same order -> sequential by id.
+  result.sort(
+    (a, b) =>
+      getProductOrder(a) - getProductOrder(b) ||
+      Number(a?.id ?? 0) - Number(b?.id ?? 0)
+  );
+
+  return result;
 });
 
 const paginatedProducts = computed(() => {
@@ -190,6 +225,33 @@ watch(currentPage, (val) => {
   });
 });
 
+watch(isFilterModalOpen, (open, _prev, onInvalidate) => {
+  if (!open) return;
+
+  const onKeyDown = (e) => {
+    if (e.key === "Escape") closeFilterModal();
+  };
+
+  // Prevent background scrolling while modal is open.
+  document.body.style.overflow = "hidden";
+  window.addEventListener("keydown", onKeyDown);
+
+  onInvalidate(() => {
+    document.body.style.overflow = "";
+    window.removeEventListener("keydown", onKeyDown);
+  });
+});
+
+watch([minValue, maxValue], () => {
+  if (!isFilterModalOpen.value) return;
+
+  // Auto-close after user finishes adjusting (debounced).
+  if (filterModalAutoCloseTimer) window.clearTimeout(filterModalAutoCloseTimer);
+  filterModalAutoCloseTimer = window.setTimeout(() => {
+    closeFilterModal();
+  }, 450);
+});
+
 onMounted(async () => {
   loaderStore.loader = true;
   await fetchProducts();
@@ -203,8 +265,8 @@ onMounted(async () => {
 
 <template>
   <div class="products-page min-h-screen py-4 mt-[80px] max-sm:mt-[66px]">
-    <div class="container mx-auto px-4 flex flex-col lg:flex-row gap-8">
-      <aside class="w-full lg:w-72">
+    <div class="container mx-auto px-4 flex flex-col lg:flex-row gap-8 relative">
+      <aside class="hidden lg:block w-full lg:w-72">
         <div class="filter-panel p-6 lg:sticky lg:top-10 space-y-6 max-lg:space-y-3">
           <div class="flex items-center justify-between pb-4 border-b border-slate-200">
             <h2 class="font-bold text-xl text-slate-800 max-sm:text-[18px]">{{ t("filters") }}</h2>
@@ -292,6 +354,94 @@ onMounted(async () => {
           </div>
         </transition-group>
       </main>
+    </div>
+
+    <!-- Mobile filter button + modal -->
+    <button
+      type="button"
+      class="lg:hidden fixed right-4 bottom-24 z-60 h-12 px-4 rounded-2xl bg-slate-900 text-white shadow-lg flex items-center gap-2 transition-transform hover:scale-[1.03]"
+      v-if="!isFilterModalOpen"
+      :aria-label="t('filters')"
+      @click="openFilterModal"
+    >
+      <!-- settings / sliders icon -->
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M4 21v-7" />
+        <path d="M4 10V3" />
+        <path d="M12 21v-9" />
+        <path d="M12 8V3" />
+        <path d="M20 21v-5" />
+        <path d="M20 11V3" />
+        <path d="M1 14h6" />
+        <path d="M9 8h6" />
+        <path d="M17 16h6" />
+      </svg>
+      <span class="text-sm font-semibold">{{ t("filters") }}</span>
+    </button>
+
+    <div
+      v-if="isFilterModalOpen"
+      class="fixed inset-0 z-60 bg-slate-900/50 flex items-center justify-center p-3"
+      @click.self="closeFilterModal"
+    >
+      <div
+        class="w-full max-w-md mx-auto filter-panel p-6 space-y-6 max-h-[82vh] overflow-auto rounded-2xl"
+      >
+        <div class="flex items-center justify-between pb-4 border-b border-slate-200">
+          <h2 class="font-bold text-xl text-slate-800 max-sm:text-[18px]">{{ t("filters") }}</h2>
+          <div class="flex items-center gap-2">
+            <button
+              v-if="isAnyFilterActive"
+              @click="clearFilters"
+              class="text-sm font-semibold text-slate-700 transition-colors hover:text-slate-950"
+            >
+              {{ t("clear") }}
+            </button>
+            <button
+              type="button"
+              class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors"
+              aria-label="Close"
+              @click="closeFilterModal"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="font-semibold mb-3 text-slate-700 max-sm:mb-2">{{ t("price") }}</h3>
+          <DualRangeSlider
+            :min="initialMin"
+            :max="maxPrice"
+            :step="1000"
+            v-model:minValue="minValue"
+            v-model:maxValue="maxValue"
+          />
+        </div>
+      </div>
     </div>
 
     <div v-if="totalPages > 1" class="flex justify-center items-center mt-10 gap-2 flex-wrap">

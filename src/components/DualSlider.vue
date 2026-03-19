@@ -60,7 +60,7 @@ const rangeStyle = computed(() => {
 </script>
 
 <template>
-  <div class="w-full bg-white rounded-2xl">
+  <div class="w-full bg-white rounded-2xl p-[10px]">
     <div class="relative w-full h-10 flex items-center">
       <div class="absolute w-full h-1.5 bg-gray-200 rounded-full"></div>
 
@@ -90,11 +90,11 @@ const rangeStyle = computed(() => {
     </div>
 
     <div class="flex justify-between mt-6 max-md:mt-0">
-       <div class="">
+       <div class="dual-slider-meta">
           <label class="text-sm font-medium text-gray-500">{{ t('min') }}</label>
           <div class="mt-1 text-[16px] font-semibold text-gray-800">{{ localMinVal.toLocaleString() }} UZS</div>
        </div>
-       <div class="">
+       <div class="dual-slider-meta">
           <label class="text-sm font-medium text-gray-500">{{ t('max') }}</label>
           <div class="mt-1 text-[16px] w-full font-semibold text-gray-800">{{ localMaxVal.toLocaleString() }} UZS</div>
        </div>
@@ -103,6 +103,12 @@ const rangeStyle = computed(() => {
 </template>
 
 <style>
+.dual-slider-meta {
+  background: #ffffff;
+  padding: 10px 12px;
+  border-radius: 14px;
+}
+
 .dual-range-slider,
 .dual-range-slider::-webkit-slider-runnable-track,
 .dual-range-slider::-webkit-slider-thumb {

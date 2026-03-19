@@ -10,7 +10,6 @@ import ContactSection from "../views/HomePage/ContactSection.vue";
     </div>
   </div>
   <ProductsView />
-  <ContactSection />
 </template>
 
 <style scoped>

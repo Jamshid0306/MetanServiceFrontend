@@ -95,6 +95,9 @@ const createInitialProduct = () => ({
   description: { uz: "", ru: "", en: "" },
   characteristic: { uz: "", ru: "", en: "" },
   default_price: "",
+  // Display order for frontend listing.
+  // Same order numbers will be ordered by `id` as a tie-breaker.
+  order: 999999,
   images: [],
   oldImages: [],
   options: createEmptyProductOptions(),
@@ -355,6 +358,7 @@ const openUpdateModal = (product) => {
   newProduct.value = {
     credit_enabled: Boolean(product.credit_enabled),
     credit_plans: mapCreditPlansForForm(product),
+    order: Number(product.order ?? product.display_order ?? 999999),
     name: {
       uz: product.name_uz || "",
       ru: product.name_ru || "",
@@ -589,6 +593,8 @@ const addOrUpdateProduct = async () => {
     newProduct.value.characteristic?.en || ""
   );
   formData.append("default_price", newProduct.value.default_price || "");
+  const order = Number(newProduct.value.order);
+  formData.append("order", String(Number.isFinite(order) ? order : 999999));
 
   if (minimumOptionPrice === null) {
     formData.append("price_uz", "Narxni so’rang");
@@ -1407,6 +1413,27 @@ const hasCreditBadge = (product) =>
                 :placeholder="`Характеристика (${currentLang.toUpperCase()})`"
                 class="editor-field editor-textarea editor-textarea-tall"
               ></textarea>
+            </div>
+
+            <div class="editor-section space-y-3">
+              <div class="editor-section-head">
+                <div>
+                  <h3 class="editor-section-title">Порядок отображения</h3>
+                  <p class="editor-section-copy">
+                    Меньше число — раньше показывается. Например: 1, 2, 2, 3...
+                  </p>
+                </div>
+              </div>
+
+              <input
+                v-model.number="newProduct.order"
+                type="number"
+                min="0"
+                step="1"
+                placeholder="Например 1"
+                inputmode="numeric"
+                class="editor-field"
+              />
             </div>
 
             <div class="editor-section space-y-3">

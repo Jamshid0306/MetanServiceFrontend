@@ -2,71 +2,92 @@
   <footer id="site-footer" class="footer-shell relative overflow-hidden pt-16 pb-8">
     <div class="container mx-auto px-6 relative z-10">
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div class="lg:col-span-5 footer-card animate-fade-in-up">
-          <img
-            src="@/assets/images/logo.jpg"
-            :alt="t('footer.logoAlt')"
-            class="footer-logo"
-          />
-          <p class="footer-description">
-            {{ t("footer.description") }}
-          </p>
+        <div class="lg:col-span-12 footer-card animate-fade-in-up">
+          <h2 class="footer-title">{{ t("footer.contacts") }}</h2>
 
-          <div class="footer-chip-row">
-            <a :href="CONTACT_PHONE_HREF" class="footer-chip">{{ CONTACT_PHONE_DISPLAY }}</a>
-            <a :href="CONTACT_INSTAGRAM_URL" target="_blank" rel="noopener noreferrer" class="footer-chip">
-              {{ CONTACT_INSTAGRAM_HANDLE }}
+          <p class="footer-contact-subtitle">{{ t("contact_title") }}</p>
+
+          <div class="footer-contacts-list">
+            <a :href="CONTACT_PHONE_HREF" class="footer-contact-row">
+              <span class="footer-contact-icon footer-contact-icon-phone" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">
+                  <path
+                    fill="currentColor"
+                    d="M19.95 21q-3.125 0-6.175-1.35t-5.475-3.775t-3.775-5.475T3.175 4.225q0-.45.3-.75t.75-.3H8.1q.375 0 .688.25t.387.625l.6 2.725q.075.4-.025.675t-.35.525L7.05 10.3q.575 1.025 1.313 1.95T10 14q.825.825 1.75 1.563t1.95 1.312l2.325-2.35q.25-.25.55-.338t.625-.012l2.7.55q.4.075.65.388t.25.687v3.875q0 .45-.3.75t-.75.3"
+                  />
+                </svg>
+              </span>
+              <span class="footer-contact-meta">
+                <strong class="footer-contact-label">{{ t("phone") }}</strong>
+                <small class="footer-contact-value">{{ CONTACT_PHONE_DISPLAY }}</small>
+              </span>
+            </a>
+
+            <a
+              :href="CONTACT_INSTAGRAM_URL"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="footer-contact-row"
+            >
+              <span class="footer-contact-icon footer-contact-icon-inst" aria-hidden="true">
+                <InstagramIcon />
+              </span>
+              <span class="footer-contact-meta">
+                <strong class="footer-contact-label">Instagram</strong>
+                <small class="footer-contact-value">{{ CONTACT_INSTAGRAM_HANDLE }}</small>
+              </span>
+            </a>
+
+            <a
+              :href="CONTACT_MAP_URL"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="footer-contact-row"
+            >
+              <span class="footer-contact-icon footer-contact-icon-map" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">
+                  <path
+                    fill="currentColor"
+                    d="M12 22q-.425 0-.712-.288T11 21q0-.125.075-.425t.2-.7t.287-.85t.338-.925q-2.5-.225-4.2-2.062T6 11.8q0-2.5 1.75-4.15T12 6q2.5 0 4.25 1.65T18 11.8q0 1.875-.9 3.438T14.725 17.7q.15.35.3.725t.275.725t.2.65T15.6 20q0 .425-.288.713T14.6 21q-.25 0-.463-.137t-.337-.363q-.625-1.35-.987-2.175t-.813-1.825q-.45 1-.813 1.825t-.987 2.175q-.125.225-.338.363T9.4 21q-.425 0-.712-.287T8.4 20q0-.1.1-.412t.25-.738t.325-.85t.325-.725q-1.5-.75-2.45-2.137T6 11.8Q6 9.3 7.75 7.65T12 6q2.5 0 4.25 1.65T18 11.8q0 2.238-1.387 3.987T13 18.1q.175.45.338.925t.287.85t.2.7t.075.425q0 .425-.287.713T13 22z"
+                  />
+                </svg>
+              </span>
+              <span class="footer-contact-meta">
+                <strong class="footer-contact-label">{{ t("footer.contact") }}</strong>
+                <small class="footer-contact-value">{{ t("footer.address") }}</small>
+              </span>
+            </a>
+
+            <a
+              :href="CONTACT_MAP_URL"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="footer-contact-row"
+            >
+              <span class="footer-contact-icon footer-contact-icon-map" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">
+                  <path
+                    fill="currentColor"
+                    d="M12 22q-.425 0-.712-.288T11 21q0-.125.075-.425t.2-.7t.287-.85t.338-.925q-2.5-.225-4.2-2.062T6 11.8q0-2.5 1.75-4.15T12 6q2.5 0 4.25 1.65T18 11.8q0 1.875-.9 3.438T14.725 17.7q.15.35.3.725t.275.725t.2.65T15.6 20q0 .425-.288.713T14.6 21q-.25 0-.463-.137t-.337-.363q-.625-1.35-.987-2.175t-.813-1.825q-.45 1-.813 1.825t-.987 2.175q-.125.225-.338.363T9.4 21q-.425 0-.712-.287T8.4 20q0-.1.1-.412t.25-.738t.325-.85t.325-.725q-1.5-.75-2.45-2.137T6 11.8Q6 9.3 7.75 7.65T12 6q2.5 0 4.25 1.65T18 11.8q0 2.238-1.387 3.987T13 18.1q.175.45.338.925t.287.85t.2.7t.075.425q0 .425-.287.713T13 22z"
+                  />
+                </svg>
+              </span>
+              <span class="footer-contact-meta">
+                <strong class="footer-contact-label">Google Maps</strong>
+                <small class="footer-contact-value">{{ CONTACT_MAP_LABEL }}</small>
+              </span>
             </a>
           </div>
-        </div>
 
-        <div class="lg:col-span-3 footer-card animate-fade-in-up animation-delay-200">
-          <h2 class="footer-title">{{ t("footer.quickLinks") }}</h2>
-          <div class="space-y-2.5 flex flex-col">
-            <RouterLink
-              :to="{ path: '/', hash: '#header' }"
-              class="footer-link"
-            >
-              {{ t("nav.main") }}
-            </RouterLink>
-            <RouterLink
-              :to="{ path: '/', hash: '#contact' }"
-              class="footer-link"
-            >
-              {{ t("nav.contact") }}
-            </RouterLink>
-            <RouterLink
-              :to="{ name: 'Products' }"
-              class="footer-link"
-            >
-              {{ t("products.allProducts") }}
-            </RouterLink>
+          <div class="footer-map-wrap" aria-label="Google Maps">
+            <iframe
+              :src="CONTACT_MAP_EMBED_URL"
+              class="footer-map-frame"
+              loading="lazy"
+              referrerpolicy="no-referrer-when-downgrade"
+              allowfullscreen
+            />
           </div>
-        </div>
-
-        <div class="lg:col-span-4 footer-card animate-fade-in-up animation-delay-400">
-          <h2 class="footer-title">{{ t("footer.contact") }}</h2>
-          <ul class="space-y-3">
-            <li>
-              <a
-                :href="CONTACT_MAP_URL"
-                target="_blank"
-                class="footer-contact"
-              >
-                {{ t("footer.address") }}
-              </a>
-            </li>
-            <li>
-              <a :href="CONTACT_PHONE_HREF" class="footer-contact">
-                {{ CONTACT_PHONE_DISPLAY }}
-              </a>
-            </li>
-            <li>
-              <a :href="CONTACT_INSTAGRAM_URL" target="_blank" rel="noopener noreferrer" class="footer-contact">
-                {{ CONTACT_INSTAGRAM_HANDLE }}
-              </a>
-            </li>
-          </ul>
         </div>
       </div>
 
@@ -90,9 +111,12 @@
 
 <script setup>
 import { useI18n } from "vue-i18n";
+import InstagramIcon from "./icons/InstagramIcon.vue";
 import {
   CONTACT_INSTAGRAM_HANDLE,
   CONTACT_INSTAGRAM_URL,
+  CONTACT_MAP_LABEL,
+  CONTACT_MAP_EMBED_URL,
   CONTACT_MAP_URL,
   CONTACT_PHONE_DISPLAY,
   CONTACT_PHONE_HREF,
@@ -159,6 +183,110 @@ const { t } = useI18n();
   letter-spacing: 0.02em;
   color: #ffffff;
   margin-bottom: 16px;
+}
+
+.footer-contact-subtitle {
+  margin-top: -4px;
+  color: rgba(231, 238, 247, 0.86);
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+.footer-contacts-list {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.footer-contact-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.footer-contact-row:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.footer-contact-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e7eeff;
+  flex-shrink: 0;
+}
+
+.footer-contact-icon-phone {
+  background: rgba(79, 70, 229, 0.12);
+}
+
+.footer-contact-icon-inst {
+  background: rgba(232, 121, 249, 0.12);
+}
+
+.footer-contact-icon-map {
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.footer-contact-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.footer-contact-label {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.2;
+}
+
+.footer-contact-value {
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: rgba(231, 238, 247, 0.72);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.footer-map-wrap {
+  margin-top: 16px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  height: 320px;
+}
+
+.footer-map-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  .footer-map-wrap {
+    height: 260px;
+  }
 }
 
 .footer-link {

@@ -32,12 +32,29 @@ const activeLanguage = computed(
   () => languages.find((lang) => lang.code === locale.value) || languages[0]
 );
 
+const getProductOrder = (product) => {
+  const raw =
+    product?.order ??
+    product?.display_order ??
+    product?.sort_order ??
+    product?.position ??
+    0;
+  const num = Number(raw);
+  return Number.isFinite(num) ? num : 999999;
+};
+
 const filteredProducts = computed(() => {
   if (!searchQuery.value || searchQuery.value.length < 2) return [];
-  return (productsStore.products || []).filter((p) => {
+  return (productsStore.products || [])
+    .filter((p) => {
     const name = p[`name_${locale.value}`]?.toLowerCase() || "";
     return name.includes(searchQuery.value.toLowerCase());
-  });
+    })
+    .sort(
+      (a, b) =>
+        getProductOrder(a) - getProductOrder(b) ||
+        Number(a?.id ?? 0) - Number(b?.id ?? 0)
+    );
 });
 
 const selectProduct = (product) => {
