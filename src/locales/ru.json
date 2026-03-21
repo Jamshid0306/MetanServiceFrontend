@@ -8,6 +8,7 @@
     "about": "О нас",
     "contacts": "Контакты",
     "contact": "Наш адрес",
+    "telegram": "Telegram",
     "address": "Урганч Шахар, Ашхабод МФЙ, Хива куча 106/2 Корпус-F",
     "rights": "MCHJ \"URANCH METAN SERVIS\""
   },
@@ -54,7 +55,8 @@
     "login": "Вход",
     "no_results": "Результатов нет",
     "main": "Главная",
-    "service": "Услуги"
+    "service": "Услуги",
+    "back": "Назад"
   },
   "auth": {
     "userAccess": "Аккаунт пользователя",
@@ -63,7 +65,7 @@
     "registerTitle": "Регистрация",
     "registerSubtitle": "Создайте нового пользователя по имени, номеру телефона и паролю.",
     "namePlaceholder": "Введите имя",
-    "phonePlaceholder": "+998901234567",
+    "phonePlaceholder": "+998 XX XXX XX XX",
     "password": "Пароль",
     "passwordPlaceholder": "Введите пароль",
     "loginSubmit": "Войти",
@@ -112,6 +114,7 @@
     "totalPrice": "Цена по выбору",
     "included": "Входит в цену",
     "selectionHelp": "Выберите подходящий вариант",
+    "selectAllRequired": "Перед добавлением в корзину или оформлением заказа выберите все варианты",
     "fuelType": "Тип топлива",
     "transmission": "Тип программы",
     "generation": "Поколение ГБО",

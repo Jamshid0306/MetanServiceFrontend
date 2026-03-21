@@ -8,6 +8,7 @@
     "about": "About Us",
     "contacts": "Contacts",
     "contact": "Address",
+    "telegram": "Telegram",
     "address": "Urganch city, Ashxobod MFY, Khiva street 106/2, Building F",
     "rights": "MCHJ \"URANCH METAN SERVIS\""
   },
@@ -54,7 +55,8 @@
     "contact": "Contacts",
     "login": "Login",
     "main": "Home",
-    "service": "Services"
+    "service": "Services",
+    "back": "Back"
   },
   "auth": {
     "userAccess": "User account",
@@ -63,7 +65,7 @@
     "registerTitle": "Register",
     "registerSubtitle": "Create a new user with your name, phone number and password.",
     "namePlaceholder": "Enter your name",
-    "phonePlaceholder": "+998901234567",
+    "phonePlaceholder": "+998 XX XXX XX XX",
     "password": "Password",
     "passwordPlaceholder": "Enter your password",
     "loginSubmit": "Login",
@@ -121,6 +123,7 @@
     "totalPrice": "Configured price",
     "included": "Included",
     "selectionHelp": "Choose the right option",
+    "selectAllRequired": "Select all options before adding to cart or placing an order",
     "fuelType": "Fuel type",
     "transmission": "Program type",
     "generation": "LPG generation",

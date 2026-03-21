@@ -39,6 +39,7 @@ const notifMessage = ref("");
 const searchQuery = ref("");
 const currentPage = ref(1);
 const itemsPerPage = 6;
+const togglingActiveId = ref(null);
 
 const FUEL_TYPE_CHOICES = ["Metan", "Propan"];
 const TRANSMISSION_CHOICES = ["Avtomat", "Mexanika"];
@@ -98,6 +99,7 @@ const createInitialProduct = () => ({
   // Display order for frontend listing.
   // Same order numbers will be ordered by `id` as a tie-breaker.
   order: 999999,
+  is_active: true,
   images: [],
   oldImages: [],
   options: createEmptyProductOptions(),
@@ -359,6 +361,7 @@ const openUpdateModal = (product) => {
     credit_enabled: Boolean(product.credit_enabled),
     credit_plans: mapCreditPlansForForm(product),
     order: Number(product.order ?? product.display_order ?? 999999),
+    is_active: isProductActive(product),
     name: {
       uz: product.name_uz || "",
       ru: product.name_ru || "",
@@ -595,6 +598,7 @@ const addOrUpdateProduct = async () => {
   formData.append("default_price", newProduct.value.default_price || "");
   const order = Number(newProduct.value.order);
   formData.append("order", String(Number.isFinite(order) ? order : 999999));
+  formData.append("is_active", String(Boolean(newProduct.value.is_active)));
 
   if (minimumOptionPrice === null) {
     formData.append("price_uz", "Narxni so’rang");
@@ -771,6 +775,25 @@ const getProductOptionBadges = (product) => {
 const hasCreditBadge = (product) =>
   Boolean(product.credit_enabled) &&
   getProductCreditPlans(product).length > 0;
+
+const isProductActive = (product) =>
+  product &&
+  product.is_active !== false &&
+  product.is_active !== 0 &&
+  product.is_active !== "0";
+
+const toggleProductActive = async (product) => {
+  const next = !isProductActive(product);
+  togglingActiveId.value = product.id;
+  try {
+    const ok = await store.patchProductActive(product.id, next);
+    if (ok) {
+      product.is_active = next ? 1 : 0;
+    }
+  } finally {
+    togglingActiveId.value = null;
+  }
+};
 </script>
 <template>
   <div class="products-admin p-4 sm:p-6 space-y-6">
@@ -813,6 +836,7 @@ const hasCreditBadge = (product) =>
           v-for="(product, i) in paginatedProducts"
           :key="product.id"
           class="product-row relative group"
+          :class="{ 'product-row--inactive': !isProductActive(product) }"
           :initial="{ opacity: 0, y: 20 }"
           :animate="{ opacity: 1, y: 0 }"
           :exit="{ opacity: 0, y: -20 }"
@@ -825,6 +849,25 @@ const hasCreditBadge = (product) =>
             <Pencil :size="20" />
           </button>
           <div class="product-gallery">
+            <div class="product-active-bar">
+              <span class="product-active-hint">Сайт</span>
+              <button
+                type="button"
+                class="product-active-switch"
+                role="switch"
+                :aria-checked="isProductActive(product)"
+                :aria-label="
+                  isProductActive(product)
+                    ? 'Выключить показ на сайте'
+                    : 'Включить показ на сайте'
+                "
+                :class="{ 'product-active-switch-on': isProductActive(product) }"
+                :disabled="togglingActiveId === product.id"
+                @click.stop="toggleProductActive(product)"
+              >
+                <span class="product-active-knob" />
+              </button>
+            </div>
             <Swiper
               :modules="[Navigation, Pagination]"
               pagination
@@ -1434,6 +1477,15 @@ const hasCreditBadge = (product) =>
                 inputmode="numeric"
                 class="editor-field"
               />
+
+              <label class="editor-active-site">
+                <input
+                  v-model="newProduct.is_active"
+                  type="checkbox"
+                  class="editor-active-site-input"
+                />
+                <span>Показывать на сайте (каталог, поиск, главная)</span>
+              </label>
             </div>
 
             <div class="editor-section space-y-3">
@@ -1655,6 +1707,15 @@ const hasCreditBadge = (product) =>
   box-shadow: 0 20px 34px rgba(8, 30, 72, 0.1);
 }
 
+.product-row--inactive {
+  opacity: 0.72;
+  filter: saturate(0.85);
+}
+
+.product-row--inactive .product-title {
+  color: #5a6b86;
+}
+
 .product-edit-btn {
   position: absolute;
   top: 1rem;
@@ -1671,8 +1732,71 @@ const hasCreditBadge = (product) =>
 }
 
 .product-gallery {
+  position: relative;
   width: 184px;
   flex-shrink: 0;
+}
+
+.product-active-bar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(20, 54, 108, 0.12);
+  box-shadow: 0 6px 16px rgba(8, 30, 72, 0.1);
+}
+
+.product-active-hint {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5a6f8f;
+}
+
+.product-active-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid rgba(20, 54, 108, 0.2);
+  background: #e2e8f0;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.product-active-switch-on {
+  background: rgba(34, 197, 94, 0.35);
+  border-color: rgba(22, 163, 74, 0.45);
+}
+
+.product-active-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+  transition: transform 0.2s ease;
+}
+
+.product-active-switch-on .product-active-knob {
+  transform: translateX(20px);
+}
+
+.product-active-switch:disabled {
+  opacity: 0.55;
+  cursor: wait;
 }
 
 .product-swiper {
@@ -1945,6 +2069,30 @@ const hasCreditBadge = (product) =>
   border-color: rgba(20, 79, 149, 0.32);
   box-shadow: 0 0 0 4px rgba(26, 79, 149, 0.08);
   background: #ffffff;
+}
+
+.editor-active-site {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 14px;
+  border: 1px dashed rgba(20, 54, 108, 0.18);
+  background: rgba(248, 250, 255, 0.9);
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #3d5a80;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.editor-active-site-input {
+  margin-top: 0.2rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: #1a4f95;
+  flex-shrink: 0;
 }
 
 .editor-select {

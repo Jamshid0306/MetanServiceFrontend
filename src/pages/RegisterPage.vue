@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import TelegramLoginButton from "@/components/TelegramLoginButton.vue";
+import { useUzbekPhoneInput } from "@/composables/useUzbekPhoneInput";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
 import {
   normalizeCustomerPhone,
@@ -13,15 +14,18 @@ const router = useRouter();
 const { t } = useI18n();
 
 const name = ref("");
-const phone = ref("");
+const { phone, onPhoneFocus, onPhoneBlur, onPhoneInput } = useUzbekPhoneInput();
 const password = ref("");
 const submitting = ref(false);
 const errorMessage = ref("");
 
+const normalizedPhone = computed(() => normalizeCustomerPhone(phone.value));
+const isPhoneValid = computed(() => normalizedPhone.value.length === 12);
+
 const canSubmit = computed(
   () =>
     name.value.trim().length > 0 &&
-    phone.value.trim().length > 0 &&
+    isPhoneValid.value &&
     password.value.trim().length >= 8
 );
 
@@ -55,7 +59,7 @@ const submitTelegramLogin = async (telegramUser) => {
 
 const submitRegister = async () => {
   if (!canSubmit.value) {
-    if (!name.value.trim() || !phone.value.trim() || !password.value.trim()) {
+    if (!name.value.trim() || !isPhoneValid.value || !password.value.trim()) {
       errorMessage.value = t("auth.fillRequired");
     } else if (password.value.trim().length < 8) {
       errorMessage.value = t("auth.passwordTooShort");
@@ -69,7 +73,7 @@ const submitRegister = async () => {
   try {
     const response = await apiClient.post("/customers/register", {
       name: name.value.trim(),
-      phone: normalizeCustomerPhone(phone.value),
+      phone: normalizedPhone.value,
       password: password.value,
     });
 
@@ -117,10 +121,15 @@ const submitRegister = async () => {
           <label class="auth-field">
             <span>{{ t("phone") }}</span>
             <input
-              v-model="phone"
+              :value="phone"
               type="tel"
+              inputmode="numeric"
+              autocomplete="tel-national"
               :placeholder="t('auth.phonePlaceholder')"
               class="auth-input"
+              @focus="onPhoneFocus"
+              @blur="onPhoneBlur"
+              @input="onPhoneInput"
             />
           </label>
 

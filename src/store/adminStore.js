@@ -178,6 +178,7 @@ export const useAdminStore = defineStore("admin", {
             limit: 1000,
             offset: 0,
             include_full_details: true,
+            include_inactive: true,
           },
         });
         const data = res.data;
@@ -189,6 +190,22 @@ export const useAdminStore = defineStore("admin", {
         return false;
       } finally {
         loaderStore.loader = false;
+      }
+    },
+
+    async patchProductActive(productId, isActive) {
+      if (!(await this.ensureAccessToken())) return false;
+      this.lastError = "";
+
+      try {
+        await apiClient.patch(`/products/active/${productId}`, {
+          is_active: Boolean(isActive),
+        });
+        useProductsStore().invalidateCaches();
+        return true;
+      } catch (err) {
+        this.handleAdminError(err, "Mahsulot statusini o‘zgartirib bo‘lmadi.");
+        return false;
       }
     },
 

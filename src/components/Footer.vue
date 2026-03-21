@@ -24,6 +24,26 @@
             </a>
 
             <a
+              :href="CONTACT_TELEGRAM_URL"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="footer-contact-row"
+            >
+              <span class="footer-contact-icon footer-contact-icon-tg" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">
+                  <path
+                    fill="currentColor"
+                    d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.23-.447-1.923-.875-1.09-.718-1.7-1.165-2.75-1.866-1.21-.82-1.42-1.005-1.45-1.44-.02-.32.08-.517.45-.735 1.14-.68 7.87-4.9 8.1-5.3.05-.1.07-.2-.04-.28-.1-.1-.24-.07-.36-.04-.16.04-2.65 1.7-7.48 4.9z"
+                  />
+                </svg>
+              </span>
+              <span class="footer-contact-meta">
+                <strong class="footer-contact-label">{{ t("footer.telegram") }}</strong>
+                <small class="footer-contact-value">{{ CONTACT_TELEGRAM_HANDLE }}</small>
+              </span>
+            </a>
+
+            <a
               :href="CONTACT_INSTAGRAM_URL"
               target="_blank"
               rel="noopener noreferrer"
@@ -58,25 +78,7 @@
               </span>
             </a>
 
-            <a
-              :href="CONTACT_MAP_URL"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="footer-contact-row"
-            >
-              <span class="footer-contact-icon footer-contact-icon-map" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">
-                  <path
-                    fill="currentColor"
-                    d="M12 22q-.425 0-.712-.288T11 21q0-.125.075-.425t.2-.7t.287-.85t.338-.925q-2.5-.225-4.2-2.062T6 11.8q0-2.5 1.75-4.15T12 6q2.5 0 4.25 1.65T18 11.8q0 1.875-.9 3.438T14.725 17.7q.15.35.3.725t.275.725t.2.65T15.6 20q0 .425-.288.713T14.6 21q-.25 0-.463-.137t-.337-.363q-.625-1.35-.987-2.175t-.813-1.825q-.45 1-.813 1.825t-.987 2.175q-.125.225-.338.363T9.4 21q-.425 0-.712-.287T8.4 20q0-.1.1-.412t.25-.738t.325-.85t.325-.725q-1.5-.75-2.45-2.137T6 11.8Q6 9.3 7.75 7.65T12 6q2.5 0 4.25 1.65T18 11.8q0 2.238-1.387 3.987T13 18.1q.175.45.338.925t.287.85t.2.7t.075.425q0 .425-.287.713T13 22z"
-                  />
-                </svg>
-              </span>
-              <span class="footer-contact-meta">
-                <strong class="footer-contact-label">Google Maps</strong>
-                <small class="footer-contact-value">{{ CONTACT_MAP_LABEL }}</small>
-              </span>
-            </a>
+
           </div>
 
           <div class="footer-map-wrap" aria-label="Google Maps">
@@ -90,7 +92,6 @@
           </div>
         </div>
       </div>
-
       <div class="footer-bottom">
         <p class="text-sm text-white/90">
           &copy; {{ new Date().getFullYear() }} {{ t("footer.rights") }}
@@ -115,11 +116,12 @@ import InstagramIcon from "./icons/InstagramIcon.vue";
 import {
   CONTACT_INSTAGRAM_HANDLE,
   CONTACT_INSTAGRAM_URL,
-  CONTACT_MAP_LABEL,
   CONTACT_MAP_EMBED_URL,
   CONTACT_MAP_URL,
   CONTACT_PHONE_DISPLAY,
   CONTACT_PHONE_HREF,
+  CONTACT_TELEGRAM_HANDLE,
+  CONTACT_TELEGRAM_URL,
 } from "@/constants/contact";
 const { t } = useI18n();
 </script>
@@ -241,6 +243,11 @@ const { t } = useI18n();
 
 .footer-contact-icon-map {
   background: rgba(16, 185, 129, 0.12);
+}
+
+.footer-contact-icon-tg {
+  background: rgba(34, 158, 217, 0.14);
+  color: #7dd3fc;
 }
 
 .footer-contact-meta {

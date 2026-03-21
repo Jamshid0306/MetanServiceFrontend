@@ -289,12 +289,6 @@ const shouldShowTransmissionOptions = (options = []) => {
 
   return hasAutomatic && hasManual;
 };
-const collectVisibleTransmissions = (config = {}) =>
-  dedupeOptionsById(
-    (Array.isArray(config?.fuel_types) ? config.fuel_types : []).flatMap((fuelType) =>
-      toVisibleOptions(fuelType?.transmissions || [])
-    )
-  );
 const collectVisibleGenerations = (config = {}, fuelType = null, transmission = null) => {
   if (transmission) {
     return dedupeOptionsById(toVisibleOptions(transmission.generations || []));
@@ -421,20 +415,33 @@ const resolvedSelectedOptions = computed(() =>
 const optionGroups = computed(() => {
   const groups = [];
   const visibleFuelTypes = toVisibleOptions(optionConfig.value?.fuel_types || []);
-  const visibleTransmissions = explicitSelectionPath.value?.fuel_type
-    ? toVisibleOptions(explicitSelectionPath.value.fuel_type.transmissions || [])
-    : collectVisibleTransmissions(optionConfig.value);
-  const visibleGenerations = collectVisibleGenerations(
-    optionConfig.value,
-    explicitSelectionPath.value?.fuel_type || null,
-    explicitSelectionPath.value?.transmission || null
-  );
-  const visibleCylinderVolumes = collectCylinderVolumes(
-    optionConfig.value,
-    explicitSelectionPath.value?.fuel_type || null,
-    explicitSelectionPath.value?.transmission || null,
-    explicitSelectionPath.value?.generation || null
-  );
+  // Bir nechta yoqilg'i (masalan metan + propan) bo'lsa, foydalanuvchi yoqilg'ini
+  // tanlamaguncha pastki qatlam (transmission/avlod/balon) barcha yoqilgilardan
+  // yig'ilmasin — aks holda bir xil nomli (masalan "3-avlod") variantlar takrorlanadi.
+  const fuelScopeForSubtree =
+    explicitSelectionPath.value?.fuel_type ||
+    (visibleFuelTypes.length === 1 ? visibleFuelTypes[0] : null);
+
+  const visibleTransmissions = fuelScopeForSubtree
+    ? toVisibleOptions(fuelScopeForSubtree.transmissions || [])
+    : [];
+  const visibleGenerations =
+    fuelScopeForSubtree === null
+      ? []
+      : collectVisibleGenerations(
+          optionConfig.value,
+          fuelScopeForSubtree,
+          explicitSelectionPath.value?.transmission || null
+        );
+  const visibleCylinderVolumes =
+    fuelScopeForSubtree === null
+      ? []
+      : collectCylinderVolumes(
+          optionConfig.value,
+          fuelScopeForSubtree,
+          explicitSelectionPath.value?.transmission || null,
+          explicitSelectionPath.value?.generation || null
+        );
 
   if (visibleFuelTypes.length > 1) {
     groups.push({
@@ -470,6 +477,7 @@ const optionGroups = computed(() => {
 
   return groups;
 });
+
 const orderedOptionGroups = computed(() => {
   const groups = [...optionGroups.value];
   const transmissionIndex = groups.findIndex((group) => group.key === "transmission");
@@ -480,6 +488,18 @@ const orderedOptionGroups = computed(() => {
   }
 
   return groups;
+});
+
+/** Ko‘rinadigan barcha variant guruhlari tanlangan bo‘lsa true (yoki tanlash shart bo‘lmasa). */
+const requiredOptionGroupKeys = computed(() =>
+  orderedOptionGroups.value.map((group) => group.key)
+);
+const isProductOptionSelectionComplete = computed(() => {
+  const keys = requiredOptionGroupKeys.value;
+  if (!keys.length) {
+    return true;
+  }
+  return keys.every((key) => Boolean(selectedOptions.value[key]));
 });
 const selectedPrice = computed(() =>
   calculateConfiguredPrice(store.product, locale.value, resolvedSelectedOptions.value, {
@@ -644,6 +664,13 @@ const resetOrderForm = (orderType = canUseCreditOrder.value ? "credit" : "standa
 
 const openOrderModal = () => {
   if (!store.product) return;
+  if (!isProductOptionSelectionComplete.value) {
+    notification.value = {
+      show: true,
+      message: t("productOptions.selectAllRequired"),
+    };
+    return;
+  }
   customerProfile.value = getStoredCustomerSession();
   resetOrderForm(canUseCreditOrder.value ? "credit" : "standard");
   orderError.value = "";
@@ -664,6 +691,13 @@ const closeFuelGuideModal = () => {
 
 const handleAddToBasket = () => {
   if (detailAnimating.value || !configuredBasketItem.value) return;
+  if (!isProductOptionSelectionComplete.value) {
+    notification.value = {
+      show: true,
+      message: t("productOptions.selectAllRequired"),
+    };
+    return;
+  }
 
   basketStore.addToBasket(configuredBasketItem.value);
   notification.value = {
@@ -697,6 +731,10 @@ const buildCreditCustomerName = () =>
     .join(" ");
 
 const submitProductOrder = async () => {
+  if (!isProductOptionSelectionComplete.value) {
+    orderError.value = t("productOptions.selectAllRequired");
+    return;
+  }
   if (!orderProductsPayload.value.length) {
     orderError.value = t("please_fill_all_fields");
     return;
@@ -827,6 +865,7 @@ const fetchProductData = async (id) => {
   }
 
   selectedOptions.value = {};
+  selectedCreditMonths.value = null;
   activeTab.value = "description";
   fuelGuideModalOpen.value = false;
   closeOrderModal();
@@ -909,7 +948,9 @@ watch(
   (plans) => {
     const currentMonths = Number(selectedCreditMonths.value);
     if (!plans.some((plan) => plan.months === currentMonths)) {
-      selectedCreditMonths.value = plans[0]?.months ?? null;
+      const defaultPlan =
+        plans.find((plan) => plan.months === 12) ?? plans[0] ?? null;
+      selectedCreditMonths.value = defaultPlan?.months ?? null;
     }
   },
   { immediate: true }
@@ -974,8 +1015,10 @@ onBeforeUnmount(() => {
       class="detail-topbar mb-[20px] flex justify-center items-center relative animate-fade-in-down"
     >
       <button
+        type="button"
         @click="$router.back()"
-        class="detail-back cursor-pointer absolute left-[10px]"
+        class="detail-back cursor-pointer"
+        :aria-label="t('nav.back')"
       >
         <LeftArrow :size="40" />
       </button>
@@ -1214,10 +1257,18 @@ onBeforeUnmount(() => {
               <strong class="detail-order-total">{{ currentOrderTotalLabel }}</strong>
             </div>
 
+            <p
+              v-if="orderedOptionGroups.length && !isProductOptionSelectionComplete"
+              class="detail-options-required-hint"
+            >
+              {{ t("productOptions.selectAllRequired") }}
+            </p>
+
             <div class="detail-primary-actions">
               <button
                 @click="handleAddToBasket"
-                class="detail-add-btn relative flex flex-1 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-2xl py-4 font-medium text-white transition-all duration-300 active:scale-95"
+                :disabled="!isProductOptionSelectionComplete"
+                class="detail-add-btn relative flex flex-1 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-2xl py-4 font-medium text-white transition-all duration-300 active:scale-95 disabled:cursor-not-allowed disabled:opacity-55 disabled:active:scale-100"
               >
                 <span
                   :class="
@@ -1246,6 +1297,7 @@ onBeforeUnmount(() => {
               <button
                 type="button"
                 class="detail-order-btn"
+                :disabled="!isProductOptionSelectionComplete"
                 @click="openOrderModal"
               >
                 {{ t("order_now") }}
@@ -1738,6 +1790,10 @@ onBeforeUnmount(() => {
 }
 
 .detail-back {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1750,7 +1806,8 @@ onBeforeUnmount(() => {
   padding: 0;
   transition:
     background 0.2s ease,
-    border-color 0.2s ease;
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .detail-back:hover {
@@ -2303,6 +2360,24 @@ onBeforeUnmount(() => {
 .detail-order-btn:hover {
   border-color: var(--detail-accent);
   background: var(--detail-accent-soft);
+}
+
+.detail-order-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.detail-add-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.detail-options-required-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.35;
+  color: #b45309;
 }
 
 .order-modal-overlay {
@@ -2879,6 +2954,18 @@ onBeforeUnmount(() => {
 
   .detail-topbar {
     padding-inline: 3.2rem;
+  }
+
+  /* Orqaga: skroll qilganda ham ko‘rinadi (nav ostida, sticky narx ustida) */
+  .detail-back {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 6.25rem);
+    left: max(0.75rem, env(safe-area-inset-left, 0px));
+    transform: none;
+    z-index: 998;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(10px);
   }
 
   .detail-main {

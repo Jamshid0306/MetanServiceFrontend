@@ -8,6 +8,7 @@
     "about": "Biz haqimizda",
     "contacts": "Kontaktlar",
     "contact": "Bizning manzil",
+    "telegram": "Telegram",
     "address": "Urganch shahri, Ashxobod MFY, Xiva ko'chasi 106/2, Korpus-F",
     "rights": "MCHJ \"URANCH METAN SERVIS\""
   },
@@ -54,7 +55,8 @@
     "contact_admin": "Menejer bilan bog’laning",
     "login": "Kirish",
     "main": "Bosh sahifa",
-    "service": "Xizmatlar"
+    "service": "Xizmatlar",
+    "back": "Orqaga"
   },
   "auth": {
     "userAccess": "Foydalanuvchi hisobi",
@@ -63,7 +65,7 @@
     "registerTitle": "Register",
     "registerSubtitle": "Ism, telefon raqam va parol bilan yangi foydalanuvchi yarating.",
     "namePlaceholder": "Ismingizni kiriting",
-    "phonePlaceholder": "+998901234567",
+    "phonePlaceholder": "+998 XX XXX XX XX",
     "password": "Parol",
     "passwordPlaceholder": "Parolni kiriting",
     "loginSubmit": "Kirish",
@@ -109,6 +111,7 @@
     "totalPrice": "Tanlangan narx",
     "included": "Narx ichida",
     "selectionHelp": "Mos variantni tanlang",
+    "selectAllRequired": "Savatga qo‘shish yoki buyurtma berishdan oldin barcha variantlarni tanlang",
     "fuelType": "Yoqilg'i turi",
     "transmission": "Dastur turi",
     "generation": "Gaz avlodi",
