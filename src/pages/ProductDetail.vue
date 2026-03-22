@@ -190,11 +190,8 @@ const buildOptionPaths = (config = {}) => {
 
     return transmissions.flatMap((transmission) => {
       const cylinderVolumes = dedupeOptionsById(
-        (Array.isArray(transmission?.generations) ? transmission.generations : []).flatMap(
-          (generation) =>
-            toVisibleOptions(
-              Array.isArray(generation?.cylinder_volumes) ? generation.cylinder_volumes : []
-            )
+        toVisibleOptions(
+          Array.isArray(transmission?.cylinder_volumes) ? transmission.cylinder_volumes : []
         )
       );
 
@@ -279,12 +276,12 @@ const shouldShowTransmissionOptions = (options = []) => {
 
   return hasAutomatic && hasManual;
 };
-/** Barcha avlodlar ostidagi balon hajmlari — UI da avlod tanlanmaydi. */
+/** Balonlar transmission ostida (avlod yo‘q). */
 const collectCylinderVolumes = (config = {}, fuelType = null, transmission = null) => {
   if (transmission) {
     return dedupeOptionsById(
-      (Array.isArray(transmission?.generations) ? transmission.generations : []).flatMap(
-        (generationOption) => toVisibleOptions(generationOption.cylinder_volumes || [])
+      toVisibleOptions(
+        Array.isArray(transmission?.cylinder_volumes) ? transmission.cylinder_volumes : []
       )
     );
   }
@@ -293,11 +290,10 @@ const collectCylinderVolumes = (config = {}, fuelType = null, transmission = nul
     return dedupeOptionsById(
       (Array.isArray(fuelType?.transmissions) ? fuelType.transmissions : []).flatMap(
         (transmissionOption) =>
-          (Array.isArray(transmissionOption?.generations)
-            ? transmissionOption.generations
-            : []
-          ).flatMap((generationOption) =>
-            toVisibleOptions(generationOption.cylinder_volumes || [])
+          toVisibleOptions(
+            Array.isArray(transmissionOption?.cylinder_volumes)
+              ? transmissionOption.cylinder_volumes
+              : []
           )
       )
     );
@@ -307,11 +303,10 @@ const collectCylinderVolumes = (config = {}, fuelType = null, transmission = nul
     (Array.isArray(config?.fuel_types) ? config.fuel_types : []).flatMap((fuelTypeOption) =>
       (Array.isArray(fuelTypeOption?.transmissions) ? fuelTypeOption.transmissions : []).flatMap(
         (transmissionOption) =>
-          (Array.isArray(transmissionOption?.generations)
-            ? transmissionOption.generations
-            : []
-          ).flatMap((generationOption) =>
-            toVisibleOptions(generationOption.cylinder_volumes || [])
+          toVisibleOptions(
+            Array.isArray(transmissionOption?.cylinder_volumes)
+              ? transmissionOption.cylinder_volumes
+              : []
           )
       )
     )
@@ -363,8 +358,8 @@ const effectiveSelectionPath = computed(() => {
   }
 
   const mergedCylinderVolumes = dedupeOptionsById(
-    (transmission.generations || []).flatMap((g) =>
-      toVisibleOptions(g.cylinder_volumes || [])
+    toVisibleOptions(
+      Array.isArray(transmission.cylinder_volumes) ? transmission.cylinder_volumes : []
     )
   );
 

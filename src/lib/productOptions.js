@@ -8,10 +8,6 @@ export const PRODUCT_OPTION_GROUPS = [
     titleKey: "productOptions.transmission",
   },
   {
-    key: "generation",
-    titleKey: "productOptions.generation",
-  },
-  {
     key: "cylinder_volume",
     titleKey: "productOptions.cylinderVolume",
   },
@@ -19,10 +15,9 @@ export const PRODUCT_OPTION_GROUPS = [
 
 export const CREDIT_MONTH_OPTIONS = [3, 6, 9, 12];
 
-const CONFIG_SCHEMA_VERSION = 4;
+const CONFIG_SCHEMA_VERSION = 5;
 const DEFAULT_FUEL_TYPE_LABEL = "Standart";
 const DEFAULT_TRANSMISSION_LABEL = "Standart";
-const DEFAULT_GENERATION_LABEL = "Standart";
 const ASK_PRICE_BY_LOCALE = {
   uz: "Narxni so’rang",
   ru: "Цену уточняйте",
@@ -74,11 +69,26 @@ const normalizeCylinderVolumeList = (rawOptions = [], prefix = "cylinder-volume"
     .map((option, index) => normalizeCylinderVolumeItem(option, index, prefix))
     .filter(Boolean);
 
-const normalizeGenerationItem = (
+/** Eski JSON: balonlar avlod ostida; yangi: to‘g‘ridan-to‘g‘ri transmission ostida. */
+const collectRawCylinderVolumesFromTransmission = (option = {}, fallbackVolumes = []) => {
+  const direct = Array.isArray(option?.cylinder_volumes) ? option.cylinder_volumes : [];
+  if (direct.length) {
+    return direct;
+  }
+  const gens = Array.isArray(option?.generations) ? option.generations : [];
+  if (gens.length) {
+    return gens.flatMap((g) =>
+      Array.isArray(g?.cylinder_volumes) ? g.cylinder_volumes : []
+    );
+  }
+  return Array.isArray(fallbackVolumes) ? fallbackVolumes : [];
+};
+
+const normalizeTransmissionItem = (
   option = {},
   index = 0,
-  prefix = "generation",
-  fallbackVolumes = []
+  prefix = "transmission",
+  fallbackCylinderVolumes = []
 ) => {
   const label = String(option?.label || "").trim();
   if (!label) {
@@ -86,9 +96,7 @@ const normalizeGenerationItem = (
   }
 
   const optionId = toOptionId(option?.id, `${prefix}-${index + 1}`);
-  const rawVolumes = Array.isArray(option?.cylinder_volumes)
-    ? option.cylinder_volumes
-    : fallbackVolumes;
+  const rawVolumes = collectRawCylinderVolumesFromTransmission(option, fallbackCylinderVolumes);
 
   return {
     id: optionId,
@@ -99,50 +107,14 @@ const normalizeGenerationItem = (
   };
 };
 
-const normalizeGenerationList = (
-  rawOptions = [],
-  prefix = "generation",
-  fallbackVolumes = []
-) =>
-  (Array.isArray(rawOptions) ? rawOptions : [])
-    .map((option, index) =>
-      normalizeGenerationItem(option, index, prefix, fallbackVolumes)
-    )
-    .filter(Boolean);
-
-const normalizeTransmissionItem = (
-  option = {},
-  index = 0,
-  prefix = "transmission",
-  fallbackGenerations = []
-) => {
-  const label = String(option?.label || "").trim();
-  if (!label) {
-    return null;
-  }
-
-  const optionId = toOptionId(option?.id, `${prefix}-${index + 1}`);
-  const rawGenerations = Array.isArray(option?.generations)
-    ? option.generations
-    : fallbackGenerations;
-
-  return {
-    id: optionId,
-    label,
-    hidden: Boolean(option?.hidden),
-    price_delta: normalizePriceDelta(option?.price_delta),
-    generations: normalizeGenerationList(rawGenerations, `${optionId}-generation`),
-  };
-};
-
 const normalizeTransmissionList = (
   rawOptions = [],
   prefix = "transmission",
-  fallbackGenerations = []
+  fallbackCylinderVolumes = []
 ) =>
   (Array.isArray(rawOptions) ? rawOptions : [])
     .map((option, index) =>
-      normalizeTransmissionItem(option, index, prefix, fallbackGenerations)
+      normalizeTransmissionItem(option, index, prefix, fallbackCylinderVolumes)
     )
     .filter(Boolean);
 
@@ -181,20 +153,15 @@ const normalizeFuelTypeList = (
     )
     .filter(Boolean);
 
-const createSyntheticGeneration = (volumes = []) => ({
-  id: "generation-default",
-  label: DEFAULT_GENERATION_LABEL,
-  hidden: true,
-  price_delta: 0,
-  cylinder_volumes: normalizeCylinderVolumeList(volumes, "generation-default-volume"),
-});
-
-const createSyntheticTransmission = (generations = []) => ({
+const createSyntheticTransmission = (cylinderVolumes = []) => ({
   id: "transmission-default",
   label: DEFAULT_TRANSMISSION_LABEL,
   hidden: true,
   price_delta: 0,
-  generations: normalizeGenerationList(generations, "transmission-default-generation"),
+  cylinder_volumes: normalizeCylinderVolumeList(
+    cylinderVolumes,
+    "transmission-default-volume"
+  ),
 });
 
 const createSyntheticFuelType = (transmissions = []) => ({
@@ -206,28 +173,18 @@ const createSyntheticFuelType = (transmissions = []) => ({
 
 const normalizeLegacyConfig = (source = {}) => {
   const legacyVolumes = normalizeCylinderVolumeList(source?.cylinder_volume, "legacy-volume");
-  const legacyGenerations = normalizeGenerationList(
-    source?.cylinder_position,
-    "legacy-generation",
-    legacyVolumes
-  );
-  const fallbackGenerations = legacyGenerations.length
-    ? legacyGenerations
-    : legacyVolumes.length
-      ? [createSyntheticGeneration(legacyVolumes)]
-      : [];
   const legacyTransmissions = normalizeTransmissionList(
     source?.transmission,
     "legacy-transmission",
-    fallbackGenerations
+    legacyVolumes
   );
 
   if (legacyTransmissions.length) {
     return [createSyntheticFuelType(legacyTransmissions)];
   }
 
-  if (fallbackGenerations.length) {
-    return [createSyntheticFuelType([createSyntheticTransmission(fallbackGenerations)])];
+  if (legacyVolumes.length) {
+    return [createSyntheticFuelType([createSyntheticTransmission(legacyVolumes)])];
   }
 
   const directTransmissions = normalizeTransmissionList(source?.transmissions, "transmission");
@@ -268,7 +225,6 @@ const findOptionById = (options = [], optionId = "") =>
 
 const toVisibleOptions = (options = []) => options.filter((option) => !option.hidden);
 
-/** Barcha avlodlar ostidagi balon hajmlarini bitta ro‘yxatga (id bo‘yicha noyob). */
 const dedupeOptionsById = (options = []) => {
   const seen = new Set();
   return (Array.isArray(options) ? options : []).filter((option) => {
@@ -285,10 +241,8 @@ const mergeCylinderVolumesForTransmission = (transmission) => {
   if (!transmission) {
     return [];
   }
-  const merged = (transmission.generations || []).flatMap((gen) =>
-    toVisibleOptions(Array.isArray(gen?.cylinder_volumes) ? gen.cylinder_volumes : [])
-  );
-  return dedupeOptionsById(merged);
+  const list = Array.isArray(transmission.cylinder_volumes) ? transmission.cylinder_volumes : [];
+  return dedupeOptionsById(toVisibleOptions(list));
 };
 
 /** Barcha yoqil‘i turlaridan dasturlarni bitta ro‘yxat (UI da metan/propan tanlanmaydi). */
@@ -357,7 +311,6 @@ const resolveSelectedPath = (product, selections = {}, pathConfig = {}) => {
     config,
     fuelType,
     transmission,
-    generation: null,
     cylinderVolume,
   };
 };
@@ -369,18 +322,11 @@ export const createEmptyCylinderVolumeItem = () => ({
   price_delta: "",
 });
 
-export const createEmptyGenerationItem = () => ({
-  id: createOptionId(),
-  label: "",
-  price_delta: "",
-  cylinder_volumes: [],
-});
-
 export const createEmptyTransmissionItem = () => ({
   id: createOptionId(),
   label: "",
   price_delta: "",
-  generations: [],
+  cylinder_volumes: [],
 });
 
 export const createEmptyFuelTypeItem = () => ({
@@ -483,17 +429,11 @@ export const serializeProductOptions = (rawOptions = {}) => {
         label: transmission.label,
         hidden: Boolean(transmission.hidden),
         price_delta: transmission.price_delta || 0,
-        generations: transmission.generations.map((generation) => ({
-          id: generation.id || createOptionId(),
-          label: generation.label,
-          hidden: Boolean(generation.hidden),
-          price_delta: generation.price_delta || 0,
-          cylinder_volumes: generation.cylinder_volumes.map((volume) => ({
-            id: volume.id || createOptionId(),
-            label: volume.label,
-            count: normalizeCylinderCount(volume.count),
-            price_delta: volume.price_delta || 0,
-          })),
+        cylinder_volumes: (transmission.cylinder_volumes || []).map((volume) => ({
+          id: volume.id || createOptionId(),
+          label: volume.label,
+          count: normalizeCylinderCount(volume.count),
+          price_delta: volume.price_delta || 0,
         })),
       })),
     })),
@@ -510,12 +450,12 @@ export const hasConfigurableOptions = (product) => {
     ) ||
     config.fuel_types.some((fuelType) =>
       fuelType.transmissions.some((transmission) =>
-        transmission.generations.some((generation) => !generation.hidden)
+        (transmission.cylinder_volumes || []).some((v) => v && !v.hidden)
       )
     ) ||
     config.fuel_types.some((fuelType) =>
-      fuelType.transmissions.some((transmission) =>
-        transmission.generations.some((generation) => generation.cylinder_volumes.length > 0)
+      fuelType.transmissions.some(
+        (transmission) => (transmission.cylinder_volumes || []).length > 0
       )
     )
   );
@@ -622,12 +562,29 @@ export const calculateConfiguredPrice = (product, locale, selections = {}, pathC
     selections,
     pathConfig
   );
-  const configuredPrice =
-    parseNumericPrice(cylinderVolume?.price_delta) ??
-    parseNumericPrice(transmission?.price_delta);
+  const transmissionPrice = transmission
+    ? parseNumericPrice(transmission?.price_delta)
+    : null;
+  const cylinderPrice = cylinderVolume
+    ? parseNumericPrice(cylinderVolume?.price_delta)
+    : null;
 
-  if (configuredPrice !== null) {
-    return configuredPrice;
+  // Avtomat / mexanika narxi balon hajmi narxi ustiga qo‘shiladi
+  if (transmission && cylinderVolume) {
+    if (transmissionPrice === null && cylinderPrice === null) {
+      return getProductDefaultPrice(product, locale);
+    }
+    const tx = transmissionPrice !== null ? transmissionPrice : 0;
+    const cx = cylinderPrice !== null ? cylinderPrice : 0;
+    return tx + cx;
+  }
+
+  if (cylinderVolume && cylinderPrice !== null) {
+    return cylinderPrice;
+  }
+
+  if (transmission && transmissionPrice !== null) {
+    return transmissionPrice;
   }
 
   return getProductDefaultPrice(product, locale);
@@ -639,21 +596,13 @@ export const getProductOptionSummary = (product) => {
   const transmissions = config.fuel_types.flatMap((fuelType) =>
     toVisibleOptions(fuelType.transmissions)
   );
-  const generations = config.fuel_types.flatMap((fuelType) =>
-    fuelType.transmissions.flatMap((transmission) =>
-      toVisibleOptions(transmission.generations)
-    )
-  );
   const cylinderVolumes = config.fuel_types.flatMap((fuelType) =>
-    fuelType.transmissions.flatMap((transmission) =>
-      transmission.generations.flatMap((generation) => generation.cylinder_volumes)
-    )
+    fuelType.transmissions.flatMap((transmission) => transmission.cylinder_volumes || [])
   );
 
   return {
     fuelTypeCount: fuelTypes.length,
     transmissionCount: transmissions.length,
-    generationCount: generations.length,
     cylinderVolumeCount: cylinderVolumes.length,
   };
 };

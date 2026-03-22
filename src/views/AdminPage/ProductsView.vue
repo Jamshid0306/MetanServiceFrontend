@@ -17,7 +17,6 @@ import {
   createEmptyCreditPlan,
   createEmptyCylinderVolumeItem,
   createEmptyFuelTypeItem,
-  createEmptyGenerationItem,
   createEmptyProductOptions,
   createEmptyTransmissionItem,
   formatPriceValue,
@@ -44,7 +43,6 @@ const togglingActiveId = ref(null);
 /** Foydalanuvchi tomonda metan/propan tanlanmaydi; admin ichki struktura uchun bitta “Standart” vetka. */
 const FUEL_TYPE_CHOICES = ["Standart"];
 const TRANSMISSION_CHOICES = ["Avtomat", "Mexanika"];
-const GENERATION_CHOICES = ["2-avlod", "3-avlod", "4-avlod", "5-avlod"];
 const PROPAN_CYLINDER_VOLUME_CHOICES = [
   "25 l",
   "30 l",
@@ -180,29 +178,19 @@ const getMinimumOptionPrice = (rawOptions) => {
 
     transmissions.forEach((transmission) => {
       const transmissionPrice = getNumericPrice(transmission?.price_delta);
-      const generations = Array.isArray(transmission?.generations)
-        ? transmission.generations
+      const cylinderVolumes = Array.isArray(transmission?.cylinder_volumes)
+        ? transmission.cylinder_volumes
         : [];
 
-      if (!generations.length) {
+      if (!cylinderVolumes.length) {
         registerMinimumPrice(transmissionPrice);
         return;
       }
 
-      generations.forEach((generation) => {
-        const generationPrice = getNumericPrice(generation?.price_delta) ?? transmissionPrice;
-        const cylinderVolumes = Array.isArray(generation?.cylinder_volumes)
-          ? generation.cylinder_volumes
-          : [];
-
-        if (!cylinderVolumes.length) {
-          registerMinimumPrice(generationPrice);
-          return;
-        }
-
-        cylinderVolumes.forEach((volume) => {
-          registerMinimumPrice(getNumericPrice(volume?.price_delta) ?? generationPrice);
-        });
+      cylinderVolumes.forEach((volume) => {
+        registerMinimumPrice(
+          getNumericPrice(volume?.price_delta) ?? transmissionPrice
+        );
       });
     });
   });
@@ -269,22 +257,13 @@ const mapCylinderVolumesForForm = (volumes = []) =>
     price_delta: formatOptionPriceInput(volume.price_delta),
   }));
 
-const mapGenerationsForForm = (generations = []) =>
-  generations.map((generation) => ({
-    id: generation.id,
-    label: generation.label,
-    hidden: Boolean(generation.hidden),
-    price_delta: formatOptionPriceInput(generation.price_delta),
-    cylinder_volumes: mapCylinderVolumesForForm(generation.cylinder_volumes),
-  }));
-
 const mapTransmissionsForForm = (transmissions = []) =>
   transmissions.map((transmission) => ({
     id: transmission.id,
     label: transmission.label,
     hidden: Boolean(transmission.hidden),
     price_delta: formatOptionPriceInput(transmission.price_delta),
-    generations: mapGenerationsForForm(transmission.generations),
+    cylinder_volumes: mapCylinderVolumesForForm(transmission.cylinder_volumes),
   }));
 
 const mapOptionsForForm = (product, rawOptions) => {
@@ -383,38 +362,16 @@ const removeTransmission = (fuelTypeIndex, transmissionIndex) => {
   );
 };
 
-const addGeneration = (fuelTypeIndex, transmissionIndex) => {
+const addCylinderVolume = (fuelTypeIndex, transmissionIndex) => {
   newProduct.value.options.fuel_types[fuelTypeIndex]?.transmissions[
     transmissionIndex
-  ]?.generations.push(
-    createEmptyGenerationItem()
-  );
+  ]?.cylinder_volumes.push(createEmptyCylinderVolumeItem());
 };
 
-const removeGeneration = (fuelTypeIndex, transmissionIndex, generationIndex) => {
+const removeCylinderVolume = (fuelTypeIndex, transmissionIndex, volumeIndex) => {
   newProduct.value.options.fuel_types[fuelTypeIndex]?.transmissions[
     transmissionIndex
-  ]?.generations.splice(
-    generationIndex,
-    1
-  );
-};
-
-const addCylinderVolume = (fuelTypeIndex, transmissionIndex, generationIndex) => {
-  newProduct.value.options.fuel_types[fuelTypeIndex]?.transmissions[
-    transmissionIndex
-  ]?.generations[generationIndex]?.cylinder_volumes.push(createEmptyCylinderVolumeItem());
-};
-
-const removeCylinderVolume = (
-  fuelTypeIndex,
-  transmissionIndex,
-  generationIndex,
-  volumeIndex
-) => {
-  newProduct.value.options.fuel_types[fuelTypeIndex]?.transmissions[
-    transmissionIndex
-  ]?.generations[generationIndex]?.cylinder_volumes.splice(volumeIndex, 1);
+  ]?.cylinder_volumes.splice(volumeIndex, 1);
 };
 
 const onOptionLabelChange = (option) => {
@@ -493,9 +450,6 @@ const getFuelTypeChoices = (currentValue = "") =>
 const getTransmissionChoices = (currentValue = "") =>
   withCurrentChoice(TRANSMISSION_CHOICES, currentValue);
 
-const getGenerationChoices = (currentValue = "") =>
-  withCurrentChoice(GENERATION_CHOICES, currentValue);
-
 const getCylinderVolumeChoices = (fuelTypeLabel = "", currentValue = "") =>
   withCurrentChoice(resolveCylinderVolumeChoices(), currentValue);
 
@@ -509,23 +463,15 @@ const isTransmissionChoiceDisabled = (fuelTypeIndex, choice, currentIndex) =>
     (transmission, index) => index !== currentIndex && transmission.label === choice
   );
 
-const isGenerationChoiceDisabled = (fuelTypeIndex, transmissionIndex, choice, currentIndex) =>
-  newProduct.value.options.fuel_types[fuelTypeIndex]?.transmissions[
-    transmissionIndex
-  ]?.generations.some(
-    (generation, index) => index !== currentIndex && generation.label === choice
-  );
-
 const isCylinderVolumeChoiceDisabled = (
   fuelTypeIndex,
   transmissionIndex,
-  generationIndex,
   choice,
   currentIndex
 ) =>
   newProduct.value.options.fuel_types[fuelTypeIndex]?.transmissions[
     transmissionIndex
-  ]?.generations[generationIndex]?.cylinder_volumes.some(
+  ]?.cylinder_volumes.some(
     (volume, index) => index !== currentIndex && volume.label === choice
   );
 
@@ -702,14 +648,6 @@ const getProductOptionBadges = (product) => {
       key: "transmission",
       title: "КПП",
       count: summary.transmissionCount,
-    });
-  }
-
-  if (summary.generationCount) {
-    badges.push({
-      key: "generation",
-      title: "Поколения",
-      count: summary.generationCount,
     });
   }
 
@@ -1186,171 +1124,83 @@ const toggleProductActive = async (product) => {
                       <div class="space-y-4">
                         <div class="editor-option-head">
                           <div>
-                            <h4 class="editor-option-title">Поколения ГБО</h4>
+                            <h4 class="editor-option-title">Размеры баллона</h4>
                             <p class="editor-option-copy">
-                              Выберите доступные поколения ГБО для этой ветки КПП.
+                              Для каждого размера укажите цену и количество баллонов.
+                              Цена влияет на итоговую стоимость,
+                              а количество сохраняется в конфигурации товара.
                             </p>
                           </div>
                           <button
                             type="button"
-                            @click="addGeneration(fuelTypeIndex, transmissionIndex)"
+                            @click="addCylinderVolume(fuelTypeIndex, transmissionIndex)"
                             class="editor-secondary-btn"
                           >
-                            Добавить поколение
+                            Добавить размер
                           </button>
                         </div>
 
                         <div
-                          v-if="!transmission.generations.length"
+                          v-if="!transmission.cylinder_volumes.length"
                           class="editor-empty-state"
                         >
-                          Поколения для этой КПП ещё не добавлены.
+                          Размеры баллона ещё не добавлены.
                         </div>
 
                         <div
-                          v-for="(generation, generationIndex) in transmission.generations"
-                          :key="generation.id"
-                          class="editor-option-group space-y-4"
+                          v-for="(volume, volumeIndex) in transmission.cylinder_volumes"
+                          :key="volume.id"
+                          class="editor-option-row editor-option-row-volume"
                         >
-                          <div class="editor-option-head">
-                            <div>
-                              <h4 class="editor-option-title">
-                                Поколение {{ generationIndex + 1 }}
-                              </h4>
-                              <p class="editor-option-copy">
-                                Выберите поколение ГБО для текущей ветки.
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              @click="
-                                removeGeneration(
+                          <select
+                            v-model="volume.label"
+                            class="editor-field editor-select"
+                            @change="onOptionLabelChange(volume)"
+                          >
+                            <option value="" disabled>Выберите размер баллона</option>
+                            <option
+                              v-for="choice in getCylinderVolumeChoices(fuelType.label, volume.label)"
+                              :key="choice"
+                              :value="choice"
+                              :disabled="
+                                isCylinderVolumeChoiceDisabled(
                                   fuelTypeIndex,
                                   transmissionIndex,
-                                  generationIndex
+                                  choice,
+                                  volumeIndex
                                 )
                               "
-                              class="editor-remove-btn"
                             >
-                              ×
-                            </button>
-                          </div>
-
-                          <div class="editor-option-row editor-option-row-single">
-                            <select
-                              v-model="generation.label"
-                              class="editor-field editor-select"
-                              @change="onOptionLabelChange(generation)"
-                            >
-                              <option value="" disabled>Выберите поколение</option>
-                              <option
-                                v-for="choice in getGenerationChoices(generation.label)"
-                                :key="choice"
-                                :value="choice"
-                                :disabled="
-                                  isGenerationChoiceDisabled(
-                                    fuelTypeIndex,
-                                    transmissionIndex,
-                                    choice,
-                                    generationIndex
-                                  )
-                                "
-                              >
-                                {{ choice }}
-                              </option>
-                            </select>
-                          </div>
-
-                          <div class="space-y-4">
-                            <div class="editor-option-head">
-                              <div>
-                                <h4 class="editor-option-title">Размеры баллона</h4>
-                                <p class="editor-option-copy">
-                                  Для каждого размера в этой ветке укажите цену и
-                                  количество баллонов. Цена влияет на итоговую стоимость,
-                                  а количество сохраняется в конфигурации товара.
-                                </p>
-                              </div>
-                              <button
-                                type="button"
-                                @click="
-                                  addCylinderVolume(
-                                    fuelTypeIndex,
-                                    transmissionIndex,
-                                    generationIndex
-                                  )
-                                "
-                                class="editor-secondary-btn"
-                              >
-                                Добавить размер
-                              </button>
-                            </div>
-
-                            <div
-                              v-if="!generation.cylinder_volumes.length"
-                              class="editor-empty-state"
-                            >
-                              Размеры баллона ещё не добавлены.
-                            </div>
-
-                            <div
-                              v-for="(volume, volumeIndex) in generation.cylinder_volumes"
-                              :key="volume.id"
-                              class="editor-option-row editor-option-row-volume"
-                            >
-                              <select
-                                v-model="volume.label"
-                                class="editor-field editor-select"
-                                @change="onOptionLabelChange(volume)"
-                              >
-                                <option value="" disabled>Выберите размер баллона</option>
-                                <option
-                                  v-for="choice in getCylinderVolumeChoices(fuelType.label, volume.label)"
-                                  :key="choice"
-                                  :value="choice"
-                                  :disabled="
-                                    isCylinderVolumeChoiceDisabled(
-                                      fuelTypeIndex,
-                                      transmissionIndex,
-                                      generationIndex,
-                                      choice,
-                                      volumeIndex
-                                    )
-                                  "
-                                >
-                                  {{ choice }}
-                                </option>
-                              </select>
-                              <input
-                                :value="volume.price_delta"
-                                @input="onCylinderPriceInput($event, volume)"
-                                placeholder="0 UZS"
-                                class="editor-field"
-                              />
-                              <input
-                                :value="volume.count"
-                                @input="onCylinderCountInput($event, volume)"
-                                type="text"
-                                inputmode="numeric"
-                                placeholder="Кол-во"
-                                class="editor-field"
-                              />
-                              <button
-                                type="button"
-                                @click="
-                                  removeCylinderVolume(
-                                    fuelTypeIndex,
-                                    transmissionIndex,
-                                    generationIndex,
-                                    volumeIndex
-                                  )
-                                "
-                                class="editor-remove-btn"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          </div>
+                              {{ choice }}
+                            </option>
+                          </select>
+                          <input
+                            :value="volume.price_delta"
+                            @input="onCylinderPriceInput($event, volume)"
+                            placeholder="0 UZS"
+                            class="editor-field"
+                          />
+                          <input
+                            :value="volume.count"
+                            @input="onCylinderCountInput($event, volume)"
+                            type="text"
+                            inputmode="numeric"
+                            placeholder="Кол-во"
+                            class="editor-field"
+                          />
+                          <button
+                            type="button"
+                            @click="
+                              removeCylinderVolume(
+                                fuelTypeIndex,
+                                transmissionIndex,
+                                volumeIndex
+                              )
+                            "
+                            class="editor-remove-btn"
+                          >
+                            ×
+                          </button>
                         </div>
                       </div>
                     </div>
