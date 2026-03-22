@@ -268,6 +268,50 @@ const findOptionById = (options = [], optionId = "") =>
 
 const toVisibleOptions = (options = []) => options.filter((option) => !option.hidden);
 
+/** Barcha avlodlar ostidagi balon hajmlarini bitta ro‘yxatga (id bo‘yicha noyob). */
+const dedupeOptionsById = (options = []) => {
+  const seen = new Set();
+  return (Array.isArray(options) ? options : []).filter((option) => {
+    const oid = String(option?.id || "").trim();
+    if (!oid || seen.has(oid)) {
+      return false;
+    }
+    seen.add(oid);
+    return true;
+  });
+};
+
+const mergeCylinderVolumesForTransmission = (transmission) => {
+  if (!transmission) {
+    return [];
+  }
+  const merged = (transmission.generations || []).flatMap((gen) =>
+    toVisibleOptions(Array.isArray(gen?.cylinder_volumes) ? gen.cylinder_volumes : [])
+  );
+  return dedupeOptionsById(merged);
+};
+
+/** Barcha yoqil‘i turlaridan dasturlarni bitta ro‘yxat (UI da metan/propan tanlanmaydi). */
+const getAllTransmissionsMerged = (config) =>
+  dedupeOptionsById(
+    (config.fuel_types || []).flatMap((ft) =>
+      toVisibleOptions(ft.transmissions || [])
+    )
+  );
+
+const resolveFuelTypeContainingTransmission = (config, transmissionId) => {
+  const tid = String(transmissionId || "").trim();
+  if (!tid) {
+    return null;
+  }
+  for (const ft of config.fuel_types || []) {
+    if (findOptionById(toVisibleOptions(ft.transmissions || []), tid)) {
+      return ft;
+    }
+  }
+  return null;
+};
+
 const resolveOptionFromSelection = (options = [], optionId = "", config = {}) => {
   const selectedOption = findOptionById(options, optionId);
   if (selectedOption) {
@@ -288,26 +332,23 @@ const resolveOptionFromSelection = (options = [], optionId = "", config = {}) =>
 
 const resolveSelectedPath = (product, selections = {}, pathConfig = {}) => {
   const config = getNormalizedConfig(product?.config_options);
-  const fuelType = resolveOptionFromSelection(
+  const allTransmissions = getAllTransmissionsMerged(config);
+  const transmission = resolveOptionFromSelection(
+    allTransmissions,
+    selections.transmission,
+    pathConfig
+  );
+  let fuelType = resolveOptionFromSelection(
     config.fuel_types,
     selections.fuel_type,
     pathConfig
   );
-  const transmissions = fuelType?.transmissions || [];
-  const transmission = resolveOptionFromSelection(
-    transmissions,
-    selections.transmission,
-    pathConfig
-  );
-  const generations = transmission?.generations || [];
-  const generation = resolveOptionFromSelection(
-    generations,
-    selections.generation,
-    pathConfig
-  );
-  const cylinderVolumes = generation?.cylinder_volumes || [];
+  if (!fuelType && transmission) {
+    fuelType = resolveFuelTypeContainingTransmission(config, transmission.id);
+  }
+  const cylinderVolumesMerged = mergeCylinderVolumesForTransmission(transmission);
   const cylinderVolume = resolveOptionFromSelection(
-    cylinderVolumes,
+    cylinderVolumesMerged,
     selections.cylinder_volume,
     pathConfig
   );
@@ -316,7 +357,7 @@ const resolveSelectedPath = (product, selections = {}, pathConfig = {}) => {
     config,
     fuelType,
     transmission,
-    generation,
+    generation: null,
     cylinderVolume,
   };
 };
@@ -481,7 +522,7 @@ export const hasConfigurableOptions = (product) => {
 };
 
 export const ensureValidOptionSelections = (product, selections = {}) => {
-  const { fuelType, transmission, generation, cylinderVolume } = resolveSelectedPath(
+  const { fuelType, transmission, cylinderVolume } = resolveSelectedPath(
     product,
     selections
   );
@@ -495,10 +536,6 @@ export const ensureValidOptionSelections = (product, selections = {}) => {
     nextSelections.transmission = transmission.id;
   }
 
-  if (generation) {
-    nextSelections.generation = generation.id;
-  }
-
   if (cylinderVolume) {
     nextSelections.cylinder_volume = cylinderVolume.id;
   }
@@ -507,27 +544,13 @@ export const ensureValidOptionSelections = (product, selections = {}) => {
 };
 
 export const getProductOptionGroups = (product, selections = {}, pathConfig = {}) => {
-  const { config, fuelType, transmission, generation } = resolveSelectedPath(
+  const { config, transmission } = resolveSelectedPath(
     product,
     selections,
     pathConfig
   );
   const groups = [];
-  const visibleFuelTypes = toVisibleOptions(config.fuel_types);
-
-  if (visibleFuelTypes.length) {
-    groups.push({
-      key: "fuel_type",
-      titleKey: "productOptions.fuelType",
-      options: visibleFuelTypes.map((option) => ({
-        id: option.id,
-        label: option.label,
-        price_delta: 0,
-      })),
-    });
-  }
-
-  const visibleTransmissions = toVisibleOptions(fuelType?.transmissions || []);
+  const visibleTransmissions = getAllTransmissionsMerged(config);
 
   if (visibleTransmissions.length) {
     groups.push({
@@ -541,25 +564,12 @@ export const getProductOptionGroups = (product, selections = {}, pathConfig = {}
     });
   }
 
-  const visibleGenerations = toVisibleOptions(transmission?.generations || []);
-  if (visibleGenerations.length) {
-    groups.push({
-      key: "generation",
-      titleKey: "productOptions.generation",
-      options: visibleGenerations.map((option) => ({
-        id: option.id,
-        label: option.label,
-        price_delta: 0,
-      })),
-    });
-  }
-
-  const cylinderVolumes = generation?.cylinder_volumes || [];
-  if (cylinderVolumes.length) {
+  const cylinderVolumesMerged = toVisibleOptions(mergeCylinderVolumesForTransmission(transmission));
+  if (cylinderVolumesMerged.length) {
     groups.push({
       key: "cylinder_volume",
       titleKey: "productOptions.cylinderVolume",
-      options: cylinderVolumes.map((option) => ({
+      options: cylinderVolumesMerged.map((option) => ({
         id: option.id,
         label: option.label,
         count: normalizeCylinderCount(option.count),
@@ -575,22 +585,12 @@ export const getDefaultOptionSelections = (product) =>
   ensureValidOptionSelections(product);
 
 export const getSelectedProductOptions = (product, selections = {}, pathConfig = {}) => {
-  const { fuelType, transmission, generation, cylinderVolume } = resolveSelectedPath(
+  const { transmission, cylinderVolume } = resolveSelectedPath(
     product,
     selections,
     pathConfig
   );
   const selectedOptions = [];
-
-  if (fuelType && !fuelType.hidden) {
-    selectedOptions.push({
-      group_key: "fuel_type",
-      title_key: "productOptions.fuelType",
-      id: fuelType.id,
-      label: fuelType.label,
-      price_delta: 0,
-    });
-  }
 
   if (transmission && !transmission.hidden) {
     selectedOptions.push({
@@ -599,16 +599,6 @@ export const getSelectedProductOptions = (product, selections = {}, pathConfig =
       id: transmission.id,
       label: transmission.label,
       price_delta: transmission.price_delta || 0,
-    });
-  }
-
-  if (generation && !generation.hidden) {
-    selectedOptions.push({
-      group_key: "generation",
-      title_key: "productOptions.generation",
-      id: generation.id,
-      label: generation.label,
-      price_delta: generation.price_delta || 0,
     });
   }
 
@@ -627,14 +617,13 @@ export const getSelectedProductOptions = (product, selections = {}, pathConfig =
 };
 
 export const calculateConfiguredPrice = (product, locale, selections = {}, pathConfig = {}) => {
-  const { transmission, generation, cylinderVolume } = resolveSelectedPath(
+  const { transmission, cylinderVolume } = resolveSelectedPath(
     product,
     selections,
     pathConfig
   );
   const configuredPrice =
     parseNumericPrice(cylinderVolume?.price_delta) ??
-    parseNumericPrice(generation?.price_delta) ??
     parseNumericPrice(transmission?.price_delta);
 
   if (configuredPrice !== null) {

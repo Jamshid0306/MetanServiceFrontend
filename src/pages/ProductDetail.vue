@@ -54,7 +54,8 @@ const orderForm = ref(createEmptyOrderForm());
 const stickyPriceVisible = ref(false);
 let swiperInstance = null;
 let priceSummaryObserver = null;
-const OPTION_FLOW = ["fuel_type", "transmission", "generation", "cylinder_volume"];
+/** Metan/propan tanlanmaydi; faqat dastur (avtomat/mexanika) va balon hajmi. Yoqil‘i ichki yo‘lda saqlanadi. */
+const OPTION_FLOW = ["transmission", "cylinder_volume"];
 
 function createEmptyOrderForm(orderType = "standard") {
   return {
@@ -140,18 +141,6 @@ const formatSelectedOptionLabel = (option) => {
   return label;
 };
 const getOptionSelectPlaceholder = (groupKey) => {
-  if (groupKey === "generation") {
-    if (locale.value === "ru") {
-      return "Выберите поколение";
-    }
-
-    if (locale.value === "en") {
-      return "Select generation";
-    }
-
-    return "Avlodni tanlang";
-  }
-
   if (locale.value === "ru") {
     return "Выберите размер баллона";
   }
@@ -200,30 +189,24 @@ const buildOptionPaths = (config = {}) => {
     }
 
     return transmissions.flatMap((transmission) => {
-      const generations = Array.isArray(transmission?.generations)
-        ? transmission.generations
-        : [];
+      const cylinderVolumes = dedupeOptionsById(
+        (Array.isArray(transmission?.generations) ? transmission.generations : []).flatMap(
+          (generation) =>
+            toVisibleOptions(
+              Array.isArray(generation?.cylinder_volumes) ? generation.cylinder_volumes : []
+            )
+        )
+      );
 
-      if (!generations.length) {
+      if (!cylinderVolumes.length) {
         return [{ fuel_type: fuelType, transmission }];
       }
 
-      return generations.flatMap((generation) => {
-        const cylinderVolumes = Array.isArray(generation?.cylinder_volumes)
-          ? generation.cylinder_volumes
-          : [];
-
-        if (!cylinderVolumes.length) {
-          return [{ fuel_type: fuelType, transmission, generation }];
-        }
-
-        return cylinderVolumes.map((cylinderVolume) => ({
-          fuel_type: fuelType,
-          transmission,
-          generation,
-          cylinder_volume: cylinderVolume,
-        }));
-      });
+      return cylinderVolumes.map((cylinderVolume) => ({
+        fuel_type: fuelType,
+        transmission,
+        cylinder_volume: cylinderVolume,
+      }));
     });
   });
 };
@@ -233,6 +216,9 @@ const getDeepestSelectedGroup = (selections = {}) =>
   [...OPTION_FLOW].reverse().find((key) => Boolean(selections?.[key])) || null;
 const prunePathToGroup = (path = {}, groupKey) => {
   const nextPath = {};
+  if (path?.fuel_type) {
+    nextPath.fuel_type = path.fuel_type;
+  }
 
   for (const key of OPTION_FLOW) {
     if (!path?.[key]) {
@@ -248,14 +234,18 @@ const prunePathToGroup = (path = {}, groupKey) => {
 
   return nextPath;
 };
-const mapPathToSelections = (path = null) =>
-  OPTION_FLOW.reduce((nextSelections, key) => {
+const mapPathToSelections = (path = null) => {
+  const nextSelections = {};
+  if (path?.fuel_type?.id) {
+    nextSelections.fuel_type = path.fuel_type.id;
+  }
+  for (const key of OPTION_FLOW) {
     if (path?.[key]?.id) {
       nextSelections[key] = path[key].id;
     }
-
-    return nextSelections;
-  }, {});
+  }
+  return nextSelections;
+};
 const resolveSingleVisibleOption = (options = []) => {
   const visibleOptions = dedupeOptionsById(toVisibleOptions(options));
   return visibleOptions.length === 1 ? visibleOptions[0] : null;
@@ -289,36 +279,12 @@ const shouldShowTransmissionOptions = (options = []) => {
 
   return hasAutomatic && hasManual;
 };
-const collectVisibleGenerations = (config = {}, fuelType = null, transmission = null) => {
-  if (transmission) {
-    return dedupeOptionsById(toVisibleOptions(transmission.generations || []));
-  }
-
-  if (fuelType) {
-    return dedupeOptionsById(
-      (Array.isArray(fuelType?.transmissions) ? fuelType.transmissions : []).flatMap(
-        (transmissionOption) => toVisibleOptions(transmissionOption.generations || [])
-      )
-    );
-  }
-
-  return dedupeOptionsById(
-    (Array.isArray(config?.fuel_types) ? config.fuel_types : []).flatMap((fuelTypeOption) =>
-      (Array.isArray(fuelTypeOption?.transmissions) ? fuelTypeOption.transmissions : []).flatMap(
-        (transmissionOption) => toVisibleOptions(transmissionOption.generations || [])
-      )
-    )
-  );
-};
-const collectCylinderVolumes = (config = {}, fuelType = null, transmission = null, generation = null) => {
-  if (generation) {
-    return dedupeOptionsById(generation.cylinder_volumes || []);
-  }
-
+/** Barcha avlodlar ostidagi balon hajmlari — UI da avlod tanlanmaydi. */
+const collectCylinderVolumes = (config = {}, fuelType = null, transmission = null) => {
   if (transmission) {
     return dedupeOptionsById(
       (Array.isArray(transmission?.generations) ? transmission.generations : []).flatMap(
-        (generationOption) => generationOption.cylinder_volumes || []
+        (generationOption) => toVisibleOptions(generationOption.cylinder_volumes || [])
       )
     );
   }
@@ -330,7 +296,9 @@ const collectCylinderVolumes = (config = {}, fuelType = null, transmission = nul
           (Array.isArray(transmissionOption?.generations)
             ? transmissionOption.generations
             : []
-          ).flatMap((generationOption) => generationOption.cylinder_volumes || [])
+          ).flatMap((generationOption) =>
+            toVisibleOptions(generationOption.cylinder_volumes || [])
+          )
       )
     );
   }
@@ -342,7 +310,9 @@ const collectCylinderVolumes = (config = {}, fuelType = null, transmission = nul
           (Array.isArray(transmissionOption?.generations)
             ? transmissionOption.generations
             : []
-          ).flatMap((generationOption) => generationOption.cylinder_volumes || [])
+          ).flatMap((generationOption) =>
+            toVisibleOptions(generationOption.cylinder_volumes || [])
+          )
       )
     )
   );
@@ -367,39 +337,40 @@ const explicitSelectionPath = computed(() => {
 });
 const effectiveSelectionPath = computed(() => {
   const nextPath = explicitSelectionPath.value ? { ...explicitSelectionPath.value } : {};
-  const fuelType =
-    nextPath.fuel_type ||
-    resolveSingleVisibleOption(optionConfig.value?.fuel_types || []);
-
-  if (!fuelType) {
-    return Object.keys(nextPath).length ? nextPath : null;
-  }
-
-  nextPath.fuel_type = fuelType;
+  const allTransmissions = dedupeOptionsById(
+    (optionConfig.value?.fuel_types || []).flatMap((ft) =>
+      toVisibleOptions(ft.transmissions || [])
+    )
+  );
 
   const transmission =
     nextPath.transmission ||
-    resolveSingleVisibleOption(fuelType.transmissions || []);
+    resolveSingleVisibleOption(allTransmissions);
 
   if (!transmission) {
-    return nextPath;
+    return Object.keys(nextPath).length ? nextPath : null;
   }
 
   nextPath.transmission = transmission;
 
-  const generation =
-    nextPath.generation ||
-    resolveSingleVisibleOption(transmission.generations || []);
-
-  if (!generation) {
-    return nextPath;
+  const matched = findPathByOptionId(
+    optionPaths.value,
+    "transmission",
+    transmission.id
+  );
+  if (matched?.fuel_type) {
+    nextPath.fuel_type = matched.fuel_type;
   }
 
-  nextPath.generation = generation;
+  const mergedCylinderVolumes = dedupeOptionsById(
+    (transmission.generations || []).flatMap((g) =>
+      toVisibleOptions(g.cylinder_volumes || [])
+    )
+  );
 
   const cylinderVolume =
     nextPath.cylinder_volume ||
-    resolveSingleVisibleOption(generation.cylinder_volumes || []);
+    resolveSingleVisibleOption(mergedCylinderVolumes);
 
   if (cylinderVolume) {
     nextPath.cylinder_volume = cylinderVolume;
@@ -414,56 +385,35 @@ const resolvedSelectedOptions = computed(() =>
 );
 const optionGroups = computed(() => {
   const groups = [];
-  const visibleFuelTypes = toVisibleOptions(optionConfig.value?.fuel_types || []);
-  // Bir nechta yoqilg'i (masalan metan + propan) bo'lsa, foydalanuvchi yoqilg'ini
-  // tanlamaguncha pastki qatlam (transmission/avlod/balon) barcha yoqilgilardan
-  // yig'ilmasin — aks holda bir xil nomli (masalan "3-avlod") variantlar takrorlanadi.
-  const fuelScopeForSubtree =
-    explicitSelectionPath.value?.fuel_type ||
-    (visibleFuelTypes.length === 1 ? visibleFuelTypes[0] : null);
+  const visibleTransmissions = dedupeOptionsById(
+    (optionConfig.value?.fuel_types || []).flatMap((ft) =>
+      toVisibleOptions(ft.transmissions || [])
+    )
+  );
 
-  const visibleTransmissions = fuelScopeForSubtree
-    ? toVisibleOptions(fuelScopeForSubtree.transmissions || [])
+  const transmissionForVolumes =
+    explicitSelectionPath.value?.transmission ||
+    (selectedOptions.value.transmission
+      ? findPathByOptionId(
+          optionPaths.value,
+          "transmission",
+          selectedOptions.value.transmission
+        )?.transmission
+      : null);
+
+  const visibleCylinderVolumes = transmissionForVolumes
+    ? collectCylinderVolumes(
+        optionConfig.value,
+        null,
+        transmissionForVolumes
+      )
     : [];
-  const visibleGenerations =
-    fuelScopeForSubtree === null
-      ? []
-      : collectVisibleGenerations(
-          optionConfig.value,
-          fuelScopeForSubtree,
-          explicitSelectionPath.value?.transmission || null
-        );
-  const visibleCylinderVolumes =
-    fuelScopeForSubtree === null
-      ? []
-      : collectCylinderVolumes(
-          optionConfig.value,
-          fuelScopeForSubtree,
-          explicitSelectionPath.value?.transmission || null,
-          explicitSelectionPath.value?.generation || null
-        );
-
-  if (visibleFuelTypes.length > 1) {
-    groups.push({
-      key: "fuel_type",
-      titleKey: "productOptions.fuelType",
-      options: visibleFuelTypes.map(mapOptionForDisplay),
-    });
-  }
 
   if (shouldShowTransmissionOptions(visibleTransmissions)) {
     groups.push({
       key: "transmission",
       titleKey: "productOptions.transmission",
       options: visibleTransmissions.map(mapOptionForDisplay),
-    });
-  }
-
-  if (visibleGenerations.length > 1) {
-    groups.push({
-      key: "generation",
-      titleKey: "productOptions.generation",
-      options: visibleGenerations.map(mapOptionForDisplay),
     });
   }
 
@@ -1171,7 +1121,7 @@ onBeforeUnmount(() => {
               </div>
               <div
                 v-if="
-                  ['generation', 'cylinder_volume'].includes(group.key) &&
+                  group.key === 'cylinder_volume' &&
                   group.options.length > 1
                 "
                 class="detail-select-shell"
@@ -1202,7 +1152,7 @@ onBeforeUnmount(() => {
                 </div>
               </div>
               <div
-                v-else-if="['generation', 'cylinder_volume'].includes(group.key)"
+                v-else-if="group.key === 'cylinder_volume'"
                 class="detail-select-shell"
               >
                 <div class="detail-select-wrap detail-select-wrap-active">
@@ -1216,7 +1166,6 @@ onBeforeUnmount(() => {
                 :class="[
                   'detail-option-grid flex flex-wrap gap-2',
                   {
-                    'detail-option-grid-fuel': group.key === 'fuel_type',
                     'detail-option-grid-transmission': group.key === 'transmission',
                   },
                 ]"

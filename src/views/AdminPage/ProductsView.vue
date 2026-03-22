@@ -41,7 +41,8 @@ const currentPage = ref(1);
 const itemsPerPage = 6;
 const togglingActiveId = ref(null);
 
-const FUEL_TYPE_CHOICES = ["Metan", "Propan"];
+/** Foydalanuvchi tomonda metan/propan tanlanmaydi; admin ichki struktura uchun bitta “Standart” vetka. */
+const FUEL_TYPE_CHOICES = ["Standart"];
 const TRANSMISSION_CHOICES = ["Avtomat", "Mexanika"];
 const GENERATION_CHOICES = ["2-avlod", "3-avlod", "4-avlod", "5-avlod"];
 const PROPAN_CYLINDER_VOLUME_CHOICES = [
@@ -230,64 +231,24 @@ const getProductCreditBadge = (product) =>
     .map((plan) => `${plan.months} мес. / ${plan.percent}%`)
     .join(", ");
 
-const inferFuelTypeChoiceFromProduct = (productLike = newProduct.value) => {
-  const searchableContent = [
-    productLike?.name?.uz ?? productLike?.name_uz,
-    productLike?.name?.ru ?? productLike?.name_ru,
-    productLike?.name?.en ?? productLike?.name_en,
-    productLike?.description?.uz ?? productLike?.description_uz,
-    productLike?.description?.ru ?? productLike?.description_ru,
-    productLike?.description?.en ?? productLike?.description_en,
-    productLike?.characteristic?.uz ?? productLike?.characteristic_uz,
-    productLike?.characteristic?.ru ?? productLike?.characteristic_ru,
-    productLike?.characteristic?.en ?? productLike?.characteristic_en,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  if (
-    searchableContent.includes("propan") ||
-    searchableContent.includes("пропан") ||
-    searchableContent.includes("lpg")
-  ) {
-    return "Propan";
+const normalizeLegacyFuelLabel = (label = "") => {
+  const s = String(label || "").trim();
+  if (!s) {
+    return "";
   }
-
+  const lower = s.toLowerCase();
   if (
-    searchableContent.includes("metan") ||
-    searchableContent.includes("метан") ||
-    searchableContent.includes("methane") ||
-    searchableContent.includes("cng")
+    lower === "metan" ||
+    lower === "propan" ||
+    lower === "метан" ||
+    lower === "пропан"
   ) {
-    return "Metan";
+    return "Standart";
   }
-
-  return "";
+  return s;
 };
 
-const resolveCylinderVolumeChoices = (fuelTypeLabel = "") => {
-  const normalizedFuelType = String(fuelTypeLabel || "").trim().toLowerCase();
-
-  if (
-    normalizedFuelType.includes("propan") ||
-    normalizedFuelType.includes("пропан") ||
-    normalizedFuelType.includes("lpg")
-  ) {
-    return PROPAN_CYLINDER_VOLUME_CHOICES;
-  }
-
-  if (
-    normalizedFuelType.includes("metan") ||
-    normalizedFuelType.includes("метан") ||
-    normalizedFuelType.includes("methane") ||
-    normalizedFuelType.includes("cng")
-  ) {
-    return METAN_CYLINDER_VOLUME_CHOICES;
-  }
-
-  return CYLINDER_VOLUME_CHOICES;
-};
+const resolveCylinderVolumeChoices = () => CYLINDER_VOLUME_CHOICES;
 
 const withCurrentChoice = (choices, currentValue = "") => {
   const nextChoices = [...choices];
@@ -328,16 +289,12 @@ const mapTransmissionsForForm = (transmissions = []) =>
 
 const mapOptionsForForm = (product, rawOptions) => {
   const normalized = normalizeProductOptions(rawOptions);
-  const inferredFuelType = inferFuelTypeChoiceFromProduct(product);
 
   return {
     ...createEmptyProductOptions(),
     fuel_types: normalized.fuel_types.map((fuelType) => ({
       id: fuelType.id,
-      label:
-        fuelType.label === "Standart" && inferredFuelType
-          ? inferredFuelType
-          : fuelType.label,
+      label: normalizeLegacyFuelLabel(fuelType.label),
       hidden: false,
       transmissions: mapTransmissionsForForm(fuelType.transmissions),
     })),
@@ -396,13 +353,16 @@ const resetForm = () => {
 };
 
 const addFuelType = () => {
+  if (newProduct.value.options.fuel_types.length >= FUEL_TYPE_CHOICES.length) {
+    return;
+  }
   newProduct.value.options.fuel_types.push({
     ...createEmptyFuelTypeItem(),
     label:
       FUEL_TYPE_CHOICES.find(
         (choice) =>
           !newProduct.value.options.fuel_types.some((fuelType) => fuelType.label === choice)
-      ) || "",
+      ) || FUEL_TYPE_CHOICES[0],
   });
 };
 
@@ -537,7 +497,7 @@ const getGenerationChoices = (currentValue = "") =>
   withCurrentChoice(GENERATION_CHOICES, currentValue);
 
 const getCylinderVolumeChoices = (fuelTypeLabel = "", currentValue = "") =>
-  withCurrentChoice(resolveCylinderVolumeChoices(fuelTypeLabel), currentValue);
+  withCurrentChoice(resolveCylinderVolumeChoices(), currentValue);
 
 const isFuelTypeChoiceDisabled = (choice, currentIndex) =>
   newProduct.value.options.fuel_types.some(
@@ -736,14 +696,6 @@ const goToPage = (page) => {
 const getProductOptionBadges = (product) => {
   const summary = getProductOptionSummary(product);
   const badges = [];
-
-  if (summary.fuelTypeCount) {
-    badges.push({
-      key: "fuel_type",
-      title: "Топливо",
-      count: summary.fuelTypeCount,
-    });
-  }
 
   if (summary.transmissionCount) {
     badges.push({
@@ -1082,8 +1034,8 @@ const toggleProductActive = async (product) => {
                     Варианты установки
                   </h3>
                   <p class="editor-section-copy">
-                    Сначала добавьте тип топлива, затем КПП, поколения ГБО и
-                    только потом конкретные баллоны с ценой и количеством.
+                    Добавьте ветку конфигурации, затем КПП, поколения ГБО и
+                    конкретные баллоны с ценой и количеством.
                   </p>
                 </div>
               </div>
@@ -1091,18 +1043,18 @@ const toggleProductActive = async (product) => {
               <div class="editor-option-group space-y-4">
                 <div class="editor-option-head">
                   <div>
-                    <h4 class="editor-option-title">Тип топлива</h4>
+                    <h4 class="editor-option-title">Конфигурация</h4>
                     <p class="editor-option-copy">
-                      Сначала добавьте метан или пропан, затем внутри каждого типа
-                      настройте КПП, поколения и баллоны.
+                      Одна ветка на товар (внутри — КПП, поколения и баллоны).
                     </p>
                   </div>
                   <button
+                    v-if="newProduct.options.fuel_types.length < FUEL_TYPE_CHOICES.length"
                     type="button"
                     @click="addFuelType"
                     class="editor-secondary-btn"
                   >
-                    Добавить тип
+                    Добавить ветку
                   </button>
                 </div>
 
@@ -1110,7 +1062,7 @@ const toggleProductActive = async (product) => {
                   v-if="!newProduct.options.fuel_types.length"
                   class="editor-empty-state"
                 >
-                  Типы топлива ещё не добавлены.
+                  Конфигурация ещё не добавлена.
                 </div>
 
                 <div
@@ -1121,11 +1073,10 @@ const toggleProductActive = async (product) => {
                   <div class="editor-option-head">
                     <div>
                       <h4 class="editor-option-title">
-                        Топливо {{ fuelTypeIndex + 1 }}
+                        Ветка {{ fuelTypeIndex + 1 }}
                       </h4>
                       <p class="editor-option-copy">
-                        Выберите тип топлива для этой ветки. Один товар может
-                        содержать и метан, и пропан.
+                        Внутреннее имя ветки (по умолчанию «Standart»).
                       </p>
                     </div>
                     <button
@@ -1143,7 +1094,7 @@ const toggleProductActive = async (product) => {
                       class="editor-field editor-select"
                       @change="onOptionLabelChange(fuelType)"
                     >
-                      <option value="" disabled>Выберите тип топлива</option>
+                      <option value="" disabled>Выберите значение</option>
                       <option
                         v-for="choice in getFuelTypeChoices(fuelType.label)"
                         :key="choice"
@@ -1160,7 +1111,7 @@ const toggleProductActive = async (product) => {
                       <div>
                         <h4 class="editor-option-title">КПП</h4>
                         <p class="editor-option-copy">
-                          Например: автомат и механика для выбранного топлива.
+                          Например: автомат и механика для этой ветки.
                         </p>
                       </div>
                       <button
@@ -1176,7 +1127,7 @@ const toggleProductActive = async (product) => {
                       v-if="!fuelType.transmissions.length"
                       class="editor-empty-state"
                     >
-                      Ветки КПП для этого топлива ещё не добавлены.
+                      Ветки КПП для этой конфигурации ещё не добавлены.
                     </div>
 
                     <div
@@ -1190,7 +1141,7 @@ const toggleProductActive = async (product) => {
                             КПП {{ transmissionIndex + 1 }}
                           </h4>
                           <p class="editor-option-copy">
-                            Выберите тип КПП для топлива {{ fuelType.label || "..." }}.
+                            Выберите тип КПП для этой ветки ({{ fuelType.label || "..." }}).
                           </p>
                         </div>
                         <button
