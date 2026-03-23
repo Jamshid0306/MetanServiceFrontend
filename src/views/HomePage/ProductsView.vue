@@ -1,15 +1,12 @@
 <script setup>
 import { computed, ref, onMounted, nextTick } from "vue";
-import Notification from "../../components/Notification.vue";
 import { useProductsStore } from "../../store/productsStore";
-import { useBasketStore } from "../../store/basketStore";
-import { ShoppingCart, Check } from "lucide-vue-next";
+import { ArrowRight } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useLoaderStore } from "@/store/loaderStore";
 import { resolveAssetUrls } from "@/lib/api";
 import {
-  buildConfiguredBasketItem,
   formatPriceValue,
   getProductDefaultPrice,
   getInstallmentPlan,
@@ -18,12 +15,8 @@ import {
 const router = useRouter();
 const { t, locale } = useI18n();
 const productsStore = useProductsStore();
-const basketStore = useBasketStore();
 const productRefs = ref([]);
 const normalizeImages = (images) => resolveAssetUrls(images);
-const animating = ref({});
-const showCheck = ref({});
-const notification = ref({ show: false, message: "" });
 const formatPrice = (price) => formatPriceValue(price);
 const getProductDisplayPrice = (product) =>
   getProductDefaultPrice(product, locale.value);
@@ -62,32 +55,14 @@ onMounted(async () => {
   });
 });
 const handleClick = (product) => {
-  const id = product.id;
-  if (animating.value[id]) return;
-  animating.value = { ...animating.value, [id]: true };
-  setTimeout(() => {
-    showCheck.value = { ...showCheck.value, [id]: true };
-  }, 600);
-  setTimeout(() => {
-    showCheck.value = { ...showCheck.value, [id]: false };
-    animating.value = { ...animating.value, [id]: false };
-  }, 1800);
-  basketStore.addToBasket(
-    buildConfiguredBasketItem(product, {}, 1, { useFallbackPath: false })
-  );
-  notification.value = {
-    show: true,
-    message: `${product[`name_${locale.value}`]} ${t("add_to_cart2")}`,
-  };
-
-  // Add-to-cart button bosilganda bevosita product detail sahifaga o'tish.
-  goToDetail(id);
+  // Product card ichidagi tugma bosilganda: faqat detailga kirish.
+  goToDetail(product.id);
 };
 const goToDetail = (id) => {
   router.push({ name: "ProductDetail", params: { id } });
   productsStore.fetchProductDetail(id);
 };
-const actionLabel = () => t("add_to_cart");
+const actionLabel = () => t("header.more");
 
 const getProductOrder = (product) => {
   const raw =
@@ -121,10 +96,10 @@ const sortedProducts = computed(() => {
         class="grid grid-cols-4 max-lg:grid-cols-3 max-sm:grid-cols-2 max-sm:gap-4 gap-6"
       >
         <div
-          v-for="(product, index) in sortedProducts.slice(0, 8)"
+          v-for="(product, index) in sortedProducts"
           :key="product.id"
           :ref="(el) => (productRefs[index] = el)"
-          :style="{ 'transition-delay': `${index * 50}ms` }"
+          :style="{ 'transition-delay': `${Math.min(index, 20) * 50}ms` }"
           class="product-card group"
         >
           <div @click="goToDetail(product.id)" class="card-body cursor-pointer">
@@ -156,32 +131,10 @@ const sortedProducts = computed(() => {
               @click="handleClick(product)"
               class="add-btn relative w-full flex-1 cursor-pointer flex items-center justify-center gap-2 text-white py-2.5 rounded-xl font-medium overflow-hidden"
             >
-              <span
-                class="transition-all duration-300 max-xl:text-[15px] max-md:text-[10px]"
-                :class="
-                  animating[product.id]
-                    ? 'opacity-0 scale-0'
-                    : 'opacity-100 scale-100'
-                "
-              >
-                {{ actionLabel(product) }}
+              <span class="transition-all duration-300 max-xl:text-[15px] max-md:text-[10px]">
+                {{ actionLabel() }}
               </span>
-              <ShoppingCart
-                class="cart-icon absolute w-5 h-5 transition-all duration-500"
-                :class="
-                  animating[product.id]
-                    ? 'translate-x-32 opacity-0'
-                    : 'translate-x-0 opacity-100'
-                "
-              />
-              <Check
-                class="absolute w-6 h-6 text-white transition-all duration-500"
-                :class="
-                  showCheck[product.id]
-                    ? 'opacity-100 scale-100'
-                    : 'opacity-0 scale-0'
-                "
-              />
+              <ArrowRight class="cart-icon absolute w-5 h-5 transition-all duration-500" />
             </button>
           </div>
         </div>
@@ -195,13 +148,6 @@ const sortedProducts = computed(() => {
         </RouterLink>
       </div>
     </div>
-    <Notification
-      v-if="notification.show"
-      :message="notification.message"
-      :show="notification.show"
-      @close="notification.show = false"
-      class="z-[999999999999999]"
-    />
   </div>
 </template>
 

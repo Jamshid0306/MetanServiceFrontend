@@ -552,15 +552,79 @@ export const formatCylinderOptionLabel = (option) => {
 export const normalizeProductOptions = (rawOptions = {}) => getNormalizedConfig(rawOptions);
 
 export const getProductDefaultPrice = (product, locale = "uz") => {
+  const localizedPrice = product?.[`price_${locale}`];
+
+  // Catalog/home narxi gearbox tanlovi bo‘lmasdan (faqat balon hajmi) ko‘rsatilishi kerak,
+  // shuning uchun `price_${locale}` ni birinchi o‘rinda ishlatamiz.
+  if (
+    localizedPrice !== null &&
+    localizedPrice !== undefined &&
+    localizedPrice !== ""
+  ) {
+    const numericLocalizedPrice = parseNumericPrice(localizedPrice);
+    if (numericLocalizedPrice === null) return localizedPrice;
+
+    // Agar backend/admin noto‘g‘ri qilib gearbox addon (avtomat/mehanika) qo‘shib yuborgan bo‘lsa,
+    // config_options asosida "gearMin" ni aniqlab, bazaga qaytaramiz.
+    const cfg = product?.config_options ? normalizeProductOptions(product.config_options) : null;
+    const fuelTypes = Array.isArray(cfg?.fuel_types) ? cfg.fuel_types : [];
+
+    if (!fuelTypes.length) return numericLocalizedPrice;
+
+    const safeMin = (a, b) => (a === null ? b : Math.min(a, b));
+
+    let baseMin = null; // faqat cylinder (gearboxsiz) minimal narx
+    let withGearMin = null; // oldin saqlangan bo‘lishi mumkin: cylinder + min(automatic, manual)
+
+    for (const ft of fuelTypes) {
+      const gb = Boolean(ft?.gearbox_program_enabled);
+      const auto = parseNumericPrice(ft?.automatic_price_delta);
+      const manual = parseNumericPrice(ft?.manual_price_delta);
+
+      // admin oldin shunday qo‘shgan:
+      // - agar auto va manual bo‘lsa min(auto, manual)
+      // - aks holda mavjud bittasini olgan (yo‘q bo‘lsa 0)
+      const gearMin = gb
+        ? auto !== null && manual !== null
+          ? Math.min(auto, manual)
+          : (auto ?? manual ?? 0)
+        : 0;
+
+      const transmissions = Array.isArray(ft?.transmissions) ? ft.transmissions : [];
+      const cylinderVolumes = transmissions.flatMap((tr) =>
+        Array.isArray(tr?.cylinder_volumes) ? tr.cylinder_volumes : []
+      );
+
+      let cylinderMin = null;
+      for (const v of cylinderVolumes) {
+        const vPrice = parseNumericPrice(v?.price_delta);
+        if (vPrice === null) continue;
+        cylinderMin = safeMin(cylinderMin, vPrice);
+      }
+
+      if (cylinderMin === null) continue;
+
+      baseMin = safeMin(baseMin, cylinderMin);
+      withGearMin = safeMin(withGearMin, cylinderMin + gearMin);
+    }
+
+    // Agar price aynan (cylinderMin + gearMin) ko‘rinishida bo‘lsa, bazaga qaytaramiz.
+    if (baseMin !== null && withGearMin !== null) {
+      const tolerance = 1; // float/tozalash farqlari bo‘lishi mumkin
+      const diff = Math.abs(numericLocalizedPrice - withGearMin);
+      if (diff <= tolerance) {
+        return baseMin;
+      }
+    }
+
+    return numericLocalizedPrice;
+  }
+
+  // Fallback sifatida admin kiritgan `default_price`.
   const defaultPrice = String(product?.default_price || "").trim();
   if (defaultPrice) {
     const numericDefaultPrice = parseNumericPrice(defaultPrice);
     return numericDefaultPrice === null ? defaultPrice : numericDefaultPrice;
-  }
-
-  const localizedPrice = product?.[`price_${locale}`];
-  if (localizedPrice !== null && localizedPrice !== undefined && localizedPrice !== "") {
-    return localizedPrice;
   }
 
   return ASK_PRICE_BY_LOCALE[locale] || ASK_PRICE_BY_LOCALE.uz;

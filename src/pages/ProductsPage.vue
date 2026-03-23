@@ -1,26 +1,17 @@
 <script setup>
 import { ref, computed, watch, onMounted } from "vue";
-import { useRouter, useRoute } from "vue-router";
+import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { ShoppingCart, Check } from "lucide-vue-next";
-import Notification from "@/components/Notification.vue";
+import { ArrowRight } from "lucide-vue-next";
 import DualRangeSlider from "@/components/DualSlider.vue";
-import { useBasketStore } from "@/store/basketStore";
 import { useFilterStore } from "@/store/filterStore";
 import { useProductsStore } from "@/store/productsStore";
 import { useLoaderStore } from "@/store/loaderStore";
 import { resolveAssetUrl, resolveAssetUrls } from "@/lib/api";
-import {
-  buildConfiguredBasketItem,
-  formatPriceValue,
-  getProductDefaultPrice,
-  getInstallmentPlan,
-} from "@/lib/productOptions";
+import { formatPriceValue, getProductDefaultPrice, getInstallmentPlan } from "@/lib/productOptions";
 
-const route = useRoute();
 const router = useRouter();
 const { t, locale } = useI18n();
-const basketStore = useBasketStore();
 const filterStore = useFilterStore();
 const productsStore = useProductsStore();
 const loaderStore = useLoaderStore();
@@ -32,13 +23,6 @@ const initialMax = ref(0);
 
 const isFilterModalOpen = ref(false);
 let filterModalAutoCloseTimer = null;
-
-const animating = ref({});
-const showCheck = ref({});
-const notification = ref({ show: false, message: "" });
-
-const currentPage = ref(1);
-const itemsPerPage = 9;
 
 const normalizeImages = (images) => {
   if (!images) return [];
@@ -117,7 +101,6 @@ const isAnyFilterActive = computed(() => {
 const clearFilters = () => {
   minValue.value = initialMin.value;
   maxValue.value = initialMax.value;
-  currentPage.value = 1;
 
   // Close modal on mobile after resetting filters.
   if (isFilterModalOpen.value) closeFilterModal();
@@ -132,26 +115,8 @@ const closeFilterModal = () => {
 };
 
 const handleClick = (product) => {
-  const id = product.id;
-  if (animating.value[id]) return;
-
-  animating.value[id] = true;
-  setTimeout(() => (showCheck.value[id] = true), 600);
-  setTimeout(() => {
-    showCheck.value[id] = false;
-    animating.value[id] = false;
-  }, 1800);
-
-  basketStore.addToBasket(
-    buildConfiguredBasketItem(product, {}, 1, { useFallbackPath: false })
-  );
-  notification.value = {
-    show: true,
-    message: `${product[`name_${locale.value}`]} ${t("add_to_cart2")}`,
-  };
-
-  // Add-to-cart button bosilganda bevosita product detail sahifaga o'tish.
-  goToDetail(id);
+  // Catalogdagi tugma bosilganda: faqat detailga kirish.
+  goToDetail(product.id);
 };
 
 const filteredProducts = computed(() => {
@@ -185,16 +150,6 @@ const filteredProducts = computed(() => {
   return result;
 });
 
-const paginatedProducts = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage;
-  return filteredProducts.value.slice(start, start + itemsPerPage);
-});
-
-const totalPages = computed(() => {
-  const pages = Math.ceil(filteredProducts.value.length / itemsPerPage);
-  return pages > 0 ? pages : 1;
-});
-
 const goToDetail = (id) => {
   loaderStore.loader = true;
   productsStore.fetchProductDetail(id);
@@ -213,19 +168,10 @@ const formatInstallmentLabel = (product) => {
 
   return `${formatPrice(installment.monthlyPayment)} / ${installment.months} ${t("credit.months")}`;
 };
-const actionLabel = () => t("add_to_cart");
+const actionLabel = () => t("header.more");
 
 watch(locale, () => {
   syncPriceBounds();
-});
-
-watch(currentPage, (val) => {
-  router.replace({
-    query: {
-      ...route.query,
-      page: val,
-    },
-  });
 });
 
 watch(isFilterModalOpen, (open, _prev, onInvalidate) => {
@@ -259,10 +205,6 @@ onMounted(async () => {
   loaderStore.loader = true;
   await fetchProducts();
   loaderStore.loader = false;
-
-  if (route.query.page) {
-    currentPage.value = Number(route.query.page);
-  }
 });
 </script>
 
@@ -299,23 +241,16 @@ onMounted(async () => {
         <transition-group
           tag="div"
           name="fade-slide"
-          class="grid grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-5 md:gap-6"
+          class="flex flex-col gap-3 sm:gap-4"
         >
           <div
-            v-for="product in paginatedProducts"
+            v-for="product in filteredProducts"
             :key="product.id"
             class="catalog-card group"
           >
             <div @click="goToDetail(product.id)" class="cursor-pointer group">
               <div class="catalog-meta">
                 <span class="catalog-id">#{{ product.id }}</span>
-              </div>
-              <div class="catalog-media">
-                <img
-                  :src="normalizeImages(product.images)[0]"
-                  :alt="product.name"
-                  class="catalog-image"
-                />
               </div>
               <h3
                 class="catalog-title"
@@ -338,19 +273,11 @@ onMounted(async () => {
                 @click="handleClick(product)"
                 class="catalog-btn relative w-full flex items-center justify-center gap-1 sm:gap-2 text-white py-2 rounded-xl font-medium overflow-hidden transition-colors duration-300 cart-btn text-[13px] sm:text-sm md:text-base"
               >
-                <span
-                  class="transition-all duration-300 max-sm:text-[10px]"
-                  :class="animating[product.id] ? 'opacity-0 scale-0' : 'opacity-100 scale-100'"
-                >
-                  {{ actionLabel(product) }}
+                <span class="transition-all duration-300 max-sm:text-[10px]">
+                  {{ actionLabel() }}
                 </span>
-                <ShoppingCart
+                <ArrowRight
                   class="catalog-cart-icon absolute w-4 h-4 sm:w-5 sm:h-5 transition-all duration-500"
-                  :class="animating[product.id] ? 'translate-x-28 opacity-0' : 'translate-x-0 opacity-100'"
-                />
-                <Check
-                  class="absolute w-5 h-5 sm:w-6 sm:h-6 text-white transition-all duration-500"
-                  :class="showCheck[product.id] ? 'opacity-100 scale-100' : 'opacity-0 scale-0'"
                 />
               </button>
             </div>
@@ -447,44 +374,6 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-if="totalPages > 1" class="flex justify-center items-center mt-10 gap-2 flex-wrap">
-      <button
-        @click="currentPage > 1 && currentPage--"
-        :disabled="currentPage === 1"
-        class="w-9 h-9 flex items-center justify-center rounded-full border border-slate-300 text-slate-600 transition-all hover:bg-slate-900 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        ‹
-      </button>
-
-      <button
-        v-for="page in totalPages"
-        :key="page"
-        @click="currentPage = page"
-        class="w-9 h-9 flex items-center justify-center rounded-full font-medium transition-all"
-        :class="
-          currentPage === page
-            ? 'border border-slate-900 bg-slate-900 text-white'
-            : 'border border-slate-300 text-slate-700 hover:bg-slate-100'
-        "
-      >
-        {{ page }}
-      </button>
-
-      <button
-        @click="currentPage < totalPages && currentPage++"
-        :disabled="currentPage === totalPages"
-        class="w-9 h-9 flex items-center justify-center rounded-full border border-slate-300 text-slate-600 transition-all hover:bg-slate-900 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        ›
-      </button>
-    </div>
-
-    <Notification
-      v-if="notification.show"
-      :message="notification.message"
-      :show="notification.show"
-      @close="notification.show = false"
-    />
   </div>
 </template>
 
@@ -507,7 +396,7 @@ onMounted(async () => {
   padding: 10px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
   transition:
     transform 0.3s ease,
     border-color 0.3s ease;
@@ -520,7 +409,7 @@ onMounted(async () => {
 
 .catalog-meta {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   margin-bottom: 6px;
 }
 
@@ -561,7 +450,7 @@ onMounted(async () => {
   font-size: 0.9rem;
   font-weight: 700;
   line-height: 1.4;
-  min-height: 40px;
+  min-height: unset;
 }
 
 .catalog-footer {

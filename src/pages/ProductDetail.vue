@@ -43,7 +43,10 @@ const getOptionFlow = () => {
 const resolveDefaultBalloonProgramEnabled = () => {
   const cfg = normalizeProductOptions(store.product?.config_options);
   const ft = cfg?.fuel_types?.[0];
-  return Boolean(ft?.gearbox_program_enabled);
+  // "Program kerakmi?" tugmasida foydalanuvchi tanlaguncha narxga avtomat/mehanika
+  // qo‘shimchasini qo‘shmaslik kerak. Shuning uchun default: false.
+  void ft;
+  return false;
 };
 
 const basketStore = useBasketStore();
@@ -194,6 +197,26 @@ const dedupeOptionsById = (options = []) => {
     return true;
   });
 };
+
+/**
+ * Cylinder volumes bir xil "razmer" (label+count+price_delta) bo‘lsa ham backend turli `id` bilan yuborishi mumkin.
+ * UI’da duplikatlar ko‘rinmasligi uchun signature bo‘yicha dedupe qilamiz.
+ */
+const dedupeCylinderVolumesBySignature = (options = []) => {
+  const seen = new Set();
+
+  return (Array.isArray(options) ? options : []).filter((option) => {
+    const label = String(option?.label || "").trim();
+    const count = Number(option?.count ?? 0);
+    const priceDelta = Number(option?.price_delta ?? 0);
+
+    const signature = `${label}|${count}|${priceDelta}`;
+    if (!label || seen.has(signature)) return false;
+    seen.add(signature);
+    return true;
+  });
+};
+
 const buildOptionPaths = (config = {}) => {
   const fuelTypes = Array.isArray(config?.fuel_types) ? config.fuel_types : [];
 
@@ -313,7 +336,7 @@ const shouldShowTransmissionOptions = (options = []) => {
 /** Balonlar transmission ostida (avlod yo‘q). */
 const collectCylinderVolumes = (config = {}, fuelType = null, transmission = null) => {
   if (transmission) {
-    return dedupeOptionsById(
+    return dedupeCylinderVolumesBySignature(
       toVisibleOptions(
         Array.isArray(transmission?.cylinder_volumes) ? transmission.cylinder_volumes : []
       )
@@ -321,7 +344,7 @@ const collectCylinderVolumes = (config = {}, fuelType = null, transmission = nul
   }
 
   if (fuelType) {
-    return dedupeOptionsById(
+    return dedupeCylinderVolumesBySignature(
       (Array.isArray(fuelType?.transmissions) ? fuelType.transmissions : []).flatMap(
         (transmissionOption) =>
           toVisibleOptions(
@@ -333,7 +356,7 @@ const collectCylinderVolumes = (config = {}, fuelType = null, transmission = nul
     );
   }
 
-  return dedupeOptionsById(
+  return dedupeCylinderVolumesBySignature(
     (Array.isArray(config?.fuel_types) ? config.fuel_types : []).flatMap((fuelTypeOption) =>
       (Array.isArray(fuelTypeOption?.transmissions) ? fuelTypeOption.transmissions : []).flatMap(
         (transmissionOption) =>
@@ -404,7 +427,7 @@ const effectiveSelectionPath = computed(() => {
   }
 
   const trForVolumes = transmission || allTransmissions[0];
-  const mergedCylinderVolumes = dedupeOptionsById(
+  const mergedCylinderVolumes = dedupeCylinderVolumesBySignature(
     toVisibleOptions(
       Array.isArray(trForVolumes?.cylinder_volumes) ? trForVolumes.cylinder_volumes : []
     )
@@ -893,6 +916,57 @@ const setBalloonProgramEnabled = (enabled) => {
   // Transmission tanlovi o'chirilsa, narx transmissionPrice qo'shilmasdan faqat balon hajmi narxidan hisoblanadi.
   const next = { ...(selectedOptions.value || {}) };
   delete next.transmission;
+
+  // Cylinder volume ro‘yxati (dedupe) qo‘shimcha "gearbox" yoqilganda qayta hisoblansa,
+  // backend bir xil "razmer"ni turli `id` bilan yuborgan bo‘lishi mumkin.
+  // Bunday holatda oldin tanlangan `id` endi ro‘yxatda bo‘lmay qoladi va UI "bo‘sh" ko‘rinadi.
+  // Tanlangan cylinder volume ni label+count+price_delta bo‘yicha mos `id` ga remap qilamiz.
+  if (next.cylinder_volume) {
+    const signatureFromOption = (opt) => {
+      const label = String(opt?.label || "").trim();
+      const count = Number(opt?.count ?? 0);
+      const priceDelta = Number(opt?.price_delta ?? 0);
+      return `${label}|${count}|${priceDelta}`;
+    };
+
+    const selectedId = next.cylinder_volume;
+
+    const cfg = optionConfig.value;
+    const fuelTypes = Array.isArray(cfg?.fuel_types) ? cfg.fuel_types : [];
+
+    let selectedOpt = null;
+    for (const ft of fuelTypes) {
+      const transmissions = Array.isArray(ft?.transmissions) ? ft.transmissions : [];
+      for (const tr of transmissions) {
+        const vols = toVisibleOptions(Array.isArray(tr?.cylinder_volumes) ? tr.cylinder_volumes : []);
+        const found = vols.find((v) => String(v?.id || "").trim() === String(selectedId || "").trim());
+        if (found) {
+          selectedOpt = found;
+          break;
+        }
+      }
+      if (selectedOpt) break;
+    }
+
+    if (selectedOpt) {
+      const selectedSignature = signatureFromOption(selectedOpt);
+
+      const visibleTransmissions = dedupeOptionsById(
+        (optionConfig.value?.fuel_types || []).flatMap((ft) => toVisibleOptions(ft.transmissions || []))
+      );
+      const firstTransmission = visibleTransmissions[0];
+      if (firstTransmission) {
+        const currentCylinderOptions = collectCylinderVolumes(optionConfig.value, null, firstTransmission);
+        const matched = currentCylinderOptions.find(
+          (o) => signatureFromOption(o) === selectedSignature
+        );
+        if (matched && String(matched.id) !== String(selectedId)) {
+          next.cylinder_volume = matched.id;
+        }
+      }
+    }
+  }
+
   selectedOptions.value = next;
 };
 

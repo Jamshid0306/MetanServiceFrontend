@@ -39,50 +39,34 @@ const currentPage = ref(1);
 const itemsPerPage = 6;
 const togglingActiveId = ref(null);
 
-/** Foydalanuvchi tomonda metan/propan tanlanmaydi; admin ichki struktura uchun bitta “Standart” vetka. */
-const FUEL_TYPE_CHOICES = ["Standart"];
-const PROPAN_CYLINDER_VOLUME_CHOICES = [
-  "25 l",
-  "30 l",
-  "40 l",
-  "50 l",
-  "60 l",
-  "65 l",
-  "70 l",
-  "75 l",
-  "80 l",
-  "90 l",
-  "100 l",
-  "110 l",
-  "120 l",
-  "130 l",
-  "140 l",
-  "150 l",
-];
+/** Admin ichida metan/propan tanlanadi; ichki struktura esa faqat bitta fuel_type bilan ishlaydi. */
+const FUEL_TYPE_CHOICES = ["Propan", "Metan"];
+// Propan: 25,30,35...150 (5 qadamda)
+const PROPAN_CYLINDER_VOLUME_CHOICES = Array.from({ length: 26 }, (_, i) =>
+  String(25 + i * 5)
+);
+// Metan: 25, 30, 40, 50, 60, 65, 70, 75, 80, 90, 100, 110, 120, 130, 140, 150, 200
 const METAN_CYLINDER_VOLUME_CHOICES = [
-  "25 l",
-  "30 l",
-  "40 l",
-  "50 l",
-  "60 l",
-  "65 l",
-  "70 l",
-  "75 l",
-  "80 l",
-  "90 l",
-  "100 l",
-  "110 l",
-  "120 l",
-  "130 l",
-  "140 l",
-  "150 l",
-  "200 l",
+  "25",
+  "30",
+  "40",
+  "50",
+  "60",
+  "65",
+  "70",
+  "75",
+  "80",
+  "90",
+  "100",
+  "110",
+  "120",
+  "130",
+  "140",
+  "150",
+  "200",
 ];
 const CYLINDER_VOLUME_CHOICES = [
-  ...new Set([
-    ...PROPAN_CYLINDER_VOLUME_CHOICES,
-    ...METAN_CYLINDER_VOLUME_CHOICES,
-  ]),
+  ...new Set([...PROPAN_CYLINDER_VOLUME_CHOICES, ...METAN_CYLINDER_VOLUME_CHOICES]),
 ];
 const CREDIT_MONTH_CHOICES = [3, 6, 9, 12];
 
@@ -101,8 +85,8 @@ const createInitialProduct = () => ({
   oldImages: [],
   options: {
     ...createEmptyProductOptions(),
-    // UI faqat bitta ichki vetkani ko'rsatadi (metan/propan emas).
-    fuel_types: [{ ...createEmptyFuelTypeItem(), label: "Standart" }],
+    // UI: bitta fuel_type ko'rsatiladi, yuqorida metan/propan tanlanadi.
+    fuel_types: [{ ...createEmptyFuelTypeItem(), label: "Propan" }],
   },
 });
 const newProduct = ref(createInitialProduct());
@@ -180,12 +164,9 @@ const getMinimumOptionPrice = (rawOptions) => {
     const gb = Boolean(fuelType?.gearbox_program_enabled);
     const auto = getNumericPrice(fuelType?.automatic_price_delta);
     const manual = getNumericPrice(fuelType?.manual_price_delta);
-    const gearMin =
-      gb && auto !== null && manual !== null
-        ? Math.min(auto, manual)
-        : gb
-          ? (auto ?? manual ?? 0)
-          : 0;
+    // default_price catalog/home uchun faqat balon hajmi narxidan olinishi kerak.
+    // Avtomat/Mehanika qo‘shimchasi product detailda foydalanuvchi tanlagandan keyin qo‘shiladi.
+    const gearMin = 0;
 
     if (!cylinderVolumes.length) {
       return;
@@ -196,7 +177,7 @@ const getMinimumOptionPrice = (rawOptions) => {
       if (v === null) {
         return;
       }
-      const addon = gb ? (Number.isFinite(gearMin) ? gearMin : 0) : 0;
+      const addon = 0;
       registerMinimumPrice(v + addon);
     });
   });
@@ -233,16 +214,45 @@ const normalizeLegacyFuelLabel = (label = "") => {
   const lower = s.toLowerCase();
   if (
     lower === "metan" ||
-    lower === "propan" ||
-    lower === "метан" ||
-    lower === "пропан"
+    lower === "metan "
   ) {
-    return "Standart";
+    return "Metan";
+  }
+
+  if (
+    lower === "propan" ||
+    lower === "propan "
+  ) {
+    return "Propan";
+  }
+
+  if (
+    lower === "метан" ||
+    lower === "метан "
+  ) {
+    return "Metan";
+  }
+
+  if (
+    lower === "пропан" ||
+    lower === "пропан "
+  ) {
+    return "Propan";
   }
   return s;
 };
 
-const resolveCylinderVolumeChoices = () => CYLINDER_VOLUME_CHOICES;
+const resolveCylinderVolumeChoices = (fuelTypeLabel = "") => {
+  const label = String(fuelTypeLabel || "").toLowerCase().trim();
+  const isPropan =
+    label.includes("propan") || label.includes("пропан") || label === "p" || label === "propan";
+  const isMetan =
+    label.includes("metan") || label.includes("метан") || label === "m" || label === "metan";
+
+  if (isPropan) return PROPAN_CYLINDER_VOLUME_CHOICES;
+  if (isMetan) return METAN_CYLINDER_VOLUME_CHOICES;
+  return CYLINDER_VOLUME_CHOICES;
+};
 
 const withCurrentChoice = (choices, currentValue = "") => {
   const nextChoices = [...choices];
@@ -263,6 +273,24 @@ const mapCylinderVolumesForForm = (volumes = []) =>
     price_delta: formatOptionPriceInput(volume.price_delta),
   }));
 
+const inferFuelTypeLabelFromCylinderVolumes = (rawFuelLabel, rawCylinderVolumes) => {
+  const mapped = normalizeLegacyFuelLabel(rawFuelLabel);
+  if (mapped === "Propan" || mapped === "Metan") {
+    return mapped;
+  }
+
+  const vols = Array.isArray(rawCylinderVolumes) ? rawCylinderVolumes : [];
+  const volLabels = vols.map((v) => String(v?.label ?? "").trim());
+
+  // Metanga xos farq sifatida odatda `200` modeli bor.
+  const has200 = volLabels.some((l) => {
+    const cleaned = l.replace(/\s*l\s*$/i, "").trim();
+    return cleaned === "200";
+  });
+
+  return has200 ? "Metan" : "Propan";
+};
+
 const mapOptionsForForm = (product, rawOptions) => {
   const normalized = normalizeProductOptions(rawOptions);
 
@@ -270,7 +298,10 @@ const mapOptionsForForm = (product, rawOptions) => {
     ...createEmptyProductOptions(),
     fuel_types: normalized.fuel_types.map((fuelType) => ({
       id: fuelType.id,
-      label: normalizeLegacyFuelLabel(fuelType.label),
+      label: inferFuelTypeLabelFromCylinderVolumes(
+        fuelType.label,
+        fuelType.transmissions?.[0]?.cylinder_volumes || []
+      ),
       hidden: false,
       cylinder_volumes: mapCylinderVolumesForForm(
         fuelType.transmissions[0]?.cylinder_volumes || []
@@ -439,7 +470,10 @@ const getFuelTypeChoices = (currentValue = "") =>
   withCurrentChoice(FUEL_TYPE_CHOICES, currentValue);
 
 const getCylinderVolumeChoices = (fuelTypeLabel = "", currentValue = "") =>
-  withCurrentChoice(resolveCylinderVolumeChoices(), currentValue);
+  withCurrentChoice(
+    resolveCylinderVolumeChoices(fuelTypeLabel),
+    currentValue
+  );
 
 const isFuelTypeChoiceDisabled = (choice, currentIndex) =>
   newProduct.value.options.fuel_types.some(
@@ -447,9 +481,9 @@ const isFuelTypeChoiceDisabled = (choice, currentIndex) =>
   );
 
 const isCylinderVolumeChoiceDisabled = (fuelTypeIndex, choice, currentIndex) =>
-  newProduct.value.options.fuel_types[fuelTypeIndex]?.cylinder_volumes.some(
-    (volume, index) => index !== currentIndex && volume.label === choice
-  );
+  // Bir xil balon razmerini bir product ichida xohlagancha kiritishga ruxsat.
+  // (Oldin duplikat bo‘lsa tanlashni disable qilardi.)
+  false;
 
 const addOrUpdateProduct = async () => {
   loading.value = true;
@@ -985,6 +1019,24 @@ const toggleProductActive = async (product) => {
                       >
                         Добавить размер
                       </button>
+                    </div>
+
+                    <div class="pt-2">
+                      <label class="block text-xs text-white/70 mb-1"
+                        >Топливо</label
+                      >
+                      <select
+                        v-model="fuelType.label"
+                        class="editor-field editor-select"
+                      >
+                        <option
+                          v-for="choice in FUEL_TYPE_CHOICES"
+                          :key="choice"
+                          :value="choice"
+                        >
+                          {{ choice }}
+                        </option>
+                      </select>
                     </div>
 
                     <div
