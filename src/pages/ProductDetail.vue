@@ -32,6 +32,13 @@ import {
 
 const router = useRouter();
 const store = useProductsStore();
+const getOptionFlow = () => {
+  const cfg = normalizeProductOptions(store.product?.config_options);
+  const ft = cfg?.fuel_types?.[0];
+  return ft?.gearbox_program_enabled
+    ? ["cylinder_volume", "transmission"]
+    : ["cylinder_volume"];
+};
 const basketStore = useBasketStore();
 const { t, locale, tm } = useI18n();
 const route = useRoute();
@@ -54,8 +61,6 @@ const orderForm = ref(createEmptyOrderForm());
 const stickyPriceVisible = ref(false);
 let swiperInstance = null;
 let priceSummaryObserver = null;
-/** Metan/propan tanlanmaydi; faqat dastur (avtomat/mexanika) va balon hajmi. Yoqil‘i ichki yo‘lda saqlanadi. */
-const OPTION_FLOW = ["transmission", "cylinder_volume"];
 
 function createEmptyOrderForm(orderType = "standard") {
   return {
@@ -207,17 +212,28 @@ const buildOptionPaths = (config = {}) => {
     });
   });
 };
-const findPathByOptionId = (paths = [], groupKey, optionId) =>
-  paths.find((path) => path?.[groupKey]?.id === optionId) || null;
+const findPathByOptionId = (paths = [], groupKey, optionId, context = {}) => {
+  const tid = context.transmissionId;
+  if (groupKey === "cylinder_volume" && tid) {
+    return (
+      paths.find(
+        (path) =>
+          path?.cylinder_volume?.id === optionId &&
+          path?.transmission?.id === tid
+      ) || null
+    );
+  }
+  return paths.find((path) => path?.[groupKey]?.id === optionId) || null;
+};
 const getDeepestSelectedGroup = (selections = {}) =>
-  [...OPTION_FLOW].reverse().find((key) => Boolean(selections?.[key])) || null;
+  [...getOptionFlow()].reverse().find((key) => Boolean(selections?.[key])) || null;
 const prunePathToGroup = (path = {}, groupKey) => {
   const nextPath = {};
   if (path?.fuel_type) {
     nextPath.fuel_type = path.fuel_type;
   }
 
-  for (const key of OPTION_FLOW) {
+  for (const key of getOptionFlow()) {
     if (!path?.[key]) {
       break;
     }
@@ -236,7 +252,7 @@ const mapPathToSelections = (path = null) => {
   if (path?.fuel_type?.id) {
     nextSelections.fuel_type = path.fuel_type.id;
   }
-  for (const key of OPTION_FLOW) {
+  for (const key of getOptionFlow()) {
     if (path?.[key]?.id) {
       nextSelections[key] = path[key].id;
     }
@@ -265,6 +281,11 @@ const hasTransmissionChoice = (options = [], variants = []) =>
     return variants.some((variant) => normalizedLabel.includes(variant));
   });
 const shouldShowTransmissionOptions = (options = []) => {
+  const cfg = normalizeProductOptions(store.product?.config_options);
+  const ft = cfg?.fuel_types?.[0];
+  if (ft?.gearbox_program_enabled) {
+    return options.length >= 2;
+  }
   const hasAutomatic = hasTransmissionChoice(options, ["avtomat", "automatic", "автомат"]);
   const hasManual = hasTransmissionChoice(options, [
     "mexanika",
@@ -325,52 +346,59 @@ const explicitSelectionPath = computed(() => {
   const matchedPath = findPathByOptionId(
     optionPaths.value,
     deepestGroup,
-    selectedOptions.value[deepestGroup]
+    selectedOptions.value[deepestGroup],
+    { transmissionId: selectedOptions.value.transmission }
   );
 
   return matchedPath ? prunePathToGroup(matchedPath, deepestGroup) : null;
 });
 const effectiveSelectionPath = computed(() => {
   const nextPath = explicitSelectionPath.value ? { ...explicitSelectionPath.value } : {};
+  const ft = optionConfig.value?.fuel_types?.[0];
+  const gearboxOn = Boolean(ft?.gearbox_program_enabled);
   const allTransmissions = dedupeOptionsById(
     (optionConfig.value?.fuel_types || []).flatMap((ft) =>
       toVisibleOptions(ft.transmissions || [])
     )
   );
 
-  const transmission =
-    nextPath.transmission ||
-    resolveSingleVisibleOption(allTransmissions);
-
-  if (!transmission) {
-    return Object.keys(nextPath).length ? nextPath : null;
+  let transmission = nextPath.transmission;
+  if (!transmission && allTransmissions.length === 1) {
+    transmission = resolveSingleVisibleOption(allTransmissions);
+  }
+  if (!gearboxOn && !transmission && allTransmissions.length) {
+    transmission = allTransmissions[0];
   }
 
-  nextPath.transmission = transmission;
-
-  const matched = findPathByOptionId(
-    optionPaths.value,
-    "transmission",
-    transmission.id
-  );
-  if (matched?.fuel_type) {
-    nextPath.fuel_type = matched.fuel_type;
+  if (transmission) {
+    nextPath.transmission = transmission;
+    const matched = findPathByOptionId(
+      optionPaths.value,
+      "transmission",
+      transmission.id
+    );
+    if (matched?.fuel_type) {
+      nextPath.fuel_type = matched.fuel_type;
+    }
   }
 
+  const trForVolumes = transmission || allTransmissions[0];
   const mergedCylinderVolumes = dedupeOptionsById(
     toVisibleOptions(
-      Array.isArray(transmission.cylinder_volumes) ? transmission.cylinder_volumes : []
+      Array.isArray(trForVolumes?.cylinder_volumes) ? trForVolumes.cylinder_volumes : []
     )
   );
 
   const cylinderVolume =
-    nextPath.cylinder_volume ||
-    resolveSingleVisibleOption(mergedCylinderVolumes);
+    nextPath.cylinder_volume || resolveSingleVisibleOption(mergedCylinderVolumes);
 
   if (cylinderVolume) {
     nextPath.cylinder_volume = cylinderVolume;
   }
 
+  if (!Object.keys(nextPath).length) {
+    return null;
+  }
   return nextPath;
 });
 const resolvedSelectedOptions = computed(() =>
@@ -386,31 +414,10 @@ const optionGroups = computed(() => {
     )
   );
 
-  const transmissionForVolumes =
-    explicitSelectionPath.value?.transmission ||
-    (selectedOptions.value.transmission
-      ? findPathByOptionId(
-          optionPaths.value,
-          "transmission",
-          selectedOptions.value.transmission
-        )?.transmission
-      : null);
-
-  const visibleCylinderVolumes = transmissionForVolumes
-    ? collectCylinderVolumes(
-        optionConfig.value,
-        null,
-        transmissionForVolumes
-      )
+  const firstTransmission = visibleTransmissions[0];
+  const visibleCylinderVolumes = firstTransmission
+    ? collectCylinderVolumes(optionConfig.value, null, firstTransmission)
     : [];
-
-  if (shouldShowTransmissionOptions(visibleTransmissions)) {
-    groups.push({
-      key: "transmission",
-      titleKey: "productOptions.transmission",
-      options: visibleTransmissions.map(mapOptionForDisplay),
-    });
-  }
 
   if (visibleCylinderVolumes.length > 1) {
     groups.push({
@@ -420,20 +427,18 @@ const optionGroups = computed(() => {
     });
   }
 
-  return groups;
-});
-
-const orderedOptionGroups = computed(() => {
-  const groups = [...optionGroups.value];
-  const transmissionIndex = groups.findIndex((group) => group.key === "transmission");
-
-  if (transmissionIndex > 0) {
-    const [transmissionGroup] = groups.splice(transmissionIndex, 1);
-    groups.unshift(transmissionGroup);
+  if (shouldShowTransmissionOptions(visibleTransmissions)) {
+    groups.push({
+      key: "transmission",
+      titleKey: "productOptions.transmission",
+      options: visibleTransmissions.map(mapOptionForDisplay),
+    });
   }
 
   return groups;
 });
+
+const orderedOptionGroups = computed(() => optionGroups.value);
 
 /** Ko‘rinadigan barcha variant guruhlari tanlangan bo‘lsa true (yoki tanlash shart bo‘lmasa). */
 const requiredOptionGroupKeys = computed(() =>
@@ -558,7 +563,8 @@ const observeStickyPrice = () => {
   priceSummaryObserver.observe(summaryRef.value);
 };
 const buildNextSelections = (currentSelections, groupKey, optionId) => {
-  const groupIndex = OPTION_FLOW.indexOf(groupKey);
+  const flow = getOptionFlow();
+  const groupIndex = flow.indexOf(groupKey);
   if (groupIndex === -1) {
     return {
       ...(currentSelections || {}),
@@ -567,7 +573,7 @@ const buildNextSelections = (currentSelections, groupKey, optionId) => {
   }
 
   if (!optionId || currentSelections?.[groupKey] === optionId) {
-    return OPTION_FLOW.reduce((nextSelections, key, index) => {
+    return flow.reduce((nextSelections, key, index) => {
       if (index < groupIndex && currentSelections?.[key]) {
         nextSelections[key] = currentSelections[key];
       }
@@ -576,9 +582,11 @@ const buildNextSelections = (currentSelections, groupKey, optionId) => {
     }, {});
   }
 
-  const matchedPath = findPathByOptionId(optionPaths.value, groupKey, optionId);
+  const matchedPath = findPathByOptionId(optionPaths.value, groupKey, optionId, {
+    transmissionId: currentSelections?.transmission,
+  });
 
-  return OPTION_FLOW.reduce((nextSelections, key, index) => {
+  return flow.reduce((nextSelections, key, index) => {
     if (index < groupIndex) {
       const currentValue = currentSelections?.[key];
 

@@ -15,7 +15,7 @@ export const PRODUCT_OPTION_GROUPS = [
 
 export const CREDIT_MONTH_OPTIONS = [3, 6, 9, 12];
 
-const CONFIG_SCHEMA_VERSION = 5;
+const CONFIG_SCHEMA_VERSION = 6;
 const DEFAULT_FUEL_TYPE_LABEL = "Standart";
 const DEFAULT_TRANSMISSION_LABEL = "Standart";
 const ASK_PRICE_BY_LOCALE = {
@@ -118,6 +118,103 @@ const normalizeTransmissionList = (
     )
     .filter(Boolean);
 
+const isAutoTransmissionLabel = (label = "") => {
+  const s = String(label || "")
+    .trim()
+    .toLowerCase();
+  return (
+    s.includes("avtomat") ||
+    s.includes("автомат") ||
+    s.includes("automatic") ||
+    s.includes("auto")
+  );
+};
+
+const isManualTransmissionLabel = (label = "") => {
+  const s = String(label || "")
+    .trim()
+    .toLowerCase();
+  return (
+    s.includes("mexanika") ||
+    s.includes("mehanika") ||
+    s.includes("manual") ||
+    s.includes("механика") ||
+    s.includes("mechanic")
+  );
+};
+
+const inferGearboxFromNormalizedTransmissions = (transmissions = []) => {
+  const auto = transmissions.find((t) => isAutoTransmissionLabel(t?.label));
+  const manual = transmissions.find((t) => isManualTransmissionLabel(t?.label));
+  if (auto && manual) {
+    return {
+      enabled: true,
+      automatic_price_delta: normalizePriceDelta(auto?.price_delta),
+      manual_price_delta: normalizePriceDelta(manual?.price_delta),
+    };
+  }
+  return { enabled: false, automatic_price_delta: 0, manual_price_delta: 0 };
+};
+
+const mergeCylinderVolumesFromTransmissionsRaw = (transmissions = []) => {
+  const merged = (Array.isArray(transmissions) ? transmissions : []).flatMap((tr) =>
+    collectRawCylinderVolumesFromTransmission(tr || {}, [])
+  );
+  return dedupeOptionsById(merged);
+};
+
+const buildTransmissionsFromFuelShape = (
+  optionId,
+  volumesNormalized,
+  gearboxEnabled,
+  autoDelta,
+  manualDelta
+) => {
+  const vols = Array.isArray(volumesNormalized) ? volumesNormalized : [];
+  const dup = () => vols.map((v) => ({ ...v }));
+
+  if (gearboxEnabled) {
+    return [
+      normalizeTransmissionItem(
+        {
+          id: `${optionId}-gearbox-auto`,
+          label: "Avtomat",
+          hidden: false,
+          price_delta: autoDelta,
+          cylinder_volumes: dup(),
+        },
+        0,
+        `${optionId}-trans`
+      ),
+      normalizeTransmissionItem(
+        {
+          id: `${optionId}-gearbox-manual`,
+          label: "Mexanika",
+          hidden: false,
+          price_delta: manualDelta,
+          cylinder_volumes: dup(),
+        },
+        1,
+        `${optionId}-trans`
+      ),
+    ].filter(Boolean);
+  }
+
+  return [
+    normalizeTransmissionItem(
+      {
+        id: `${optionId}-gearbox-off`,
+        label: DEFAULT_TRANSMISSION_LABEL,
+        hidden: false,
+        price_delta: 0,
+        cylinder_volumes: dup(),
+      },
+      0,
+      `${optionId}-trans`
+    ),
+  ].filter(Boolean);
+};
+
 const normalizeFuelTypeItem = (
   option = {},
   index = 0,
@@ -130,15 +227,57 @@ const normalizeFuelTypeItem = (
   }
 
   const optionId = toOptionId(option?.id, `${prefix}-${index + 1}`);
-  const rawTransmissions = Array.isArray(option?.transmissions)
-    ? option.transmissions
-    : fallbackTransmissions;
+
+  let volumesNormalized = [];
+  let gearboxEnabled = false;
+  let automaticPriceDelta = 0;
+  let manualPriceDelta = 0;
+
+  const hasFuelLevelVolumes =
+    Array.isArray(option?.cylinder_volumes) && option.cylinder_volumes.length > 0;
+
+  if (hasFuelLevelVolumes) {
+    volumesNormalized = normalizeCylinderVolumeList(
+      option.cylinder_volumes,
+      `${optionId}-volume`
+    );
+    gearboxEnabled = Boolean(option.gearbox_program_enabled);
+    automaticPriceDelta = normalizePriceDelta(option.automatic_price_delta);
+    manualPriceDelta = normalizePriceDelta(option.manual_price_delta);
+  } else if (Array.isArray(option?.transmissions) && option.transmissions.length) {
+    const rawTrs = option.transmissions;
+    const mergedRaw = mergeCylinderVolumesFromTransmissionsRaw(rawTrs);
+    volumesNormalized = normalizeCylinderVolumeList(mergedRaw, `${optionId}-volume`);
+    const normalizedTrs = normalizeTransmissionList(rawTrs, `${optionId}-legacy-trans`);
+    const inferred = inferGearboxFromNormalizedTransmissions(normalizedTrs);
+    gearboxEnabled = inferred.enabled;
+    automaticPriceDelta = inferred.automatic_price_delta;
+    manualPriceDelta = inferred.manual_price_delta;
+  } else if (Array.isArray(fallbackTransmissions) && fallbackTransmissions.length) {
+    return normalizeFuelTypeItem(
+      { ...option, transmissions: fallbackTransmissions },
+      index,
+      prefix,
+      []
+    );
+  }
+
+  const transmissions = buildTransmissionsFromFuelShape(
+    optionId,
+    volumesNormalized,
+    gearboxEnabled,
+    automaticPriceDelta,
+    manualPriceDelta
+  );
 
   return {
     id: optionId,
     label,
     hidden: Boolean(option?.hidden),
-    transmissions: normalizeTransmissionList(rawTransmissions, `${optionId}-transmission`),
+    gearbox_program_enabled: gearboxEnabled,
+    automatic_price_delta: automaticPriceDelta,
+    manual_price_delta: manualPriceDelta,
+    transmissions,
   };
 };
 
@@ -156,7 +295,7 @@ const normalizeFuelTypeList = (
 const createSyntheticTransmission = (cylinderVolumes = []) => ({
   id: "transmission-default",
   label: DEFAULT_TRANSMISSION_LABEL,
-  hidden: true,
+  hidden: false,
   price_delta: 0,
   cylinder_volumes: normalizeCylinderVolumeList(
     cylinderVolumes,
@@ -287,11 +426,16 @@ const resolveOptionFromSelection = (options = [], optionId = "", config = {}) =>
 const resolveSelectedPath = (product, selections = {}, pathConfig = {}) => {
   const config = getNormalizedConfig(product?.config_options);
   const allTransmissions = getAllTransmissionsMerged(config);
-  const transmission = resolveOptionFromSelection(
+  let transmission = resolveOptionFromSelection(
     allTransmissions,
     selections.transmission,
     pathConfig
   );
+
+  if (!transmission && allTransmissions.length === 1) {
+    transmission = allTransmissions[0];
+  }
+
   let fuelType = resolveOptionFromSelection(
     config.fuel_types,
     selections.fuel_type,
@@ -300,7 +444,11 @@ const resolveSelectedPath = (product, selections = {}, pathConfig = {}) => {
   if (!fuelType && transmission) {
     fuelType = resolveFuelTypeContainingTransmission(config, transmission.id);
   }
-  const cylinderVolumesMerged = mergeCylinderVolumesForTransmission(transmission);
+
+  const primaryTransmissionForVolumes =
+    transmission || (allTransmissions.length ? allTransmissions[0] : null);
+  const cylinderVolumesMerged =
+    mergeCylinderVolumesForTransmission(primaryTransmissionForVolumes);
   const cylinderVolume = resolveOptionFromSelection(
     cylinderVolumesMerged,
     selections.cylinder_volume,
@@ -333,7 +481,10 @@ export const createEmptyFuelTypeItem = () => ({
   id: createOptionId(),
   label: "",
   hidden: false,
-  transmissions: [],
+  cylinder_volumes: [],
+  gearbox_program_enabled: false,
+  automatic_price_delta: "",
+  manual_price_delta: "",
 });
 
 export const createEmptyProductOptions = () => ({
@@ -424,18 +575,15 @@ export const serializeProductOptions = (rawOptions = {}) => {
       id: fuelType.id || createOptionId(),
       label: fuelType.label,
       hidden: false,
-      transmissions: fuelType.transmissions.map((transmission) => ({
-        id: transmission.id || createOptionId(),
-        label: transmission.label,
-        hidden: Boolean(transmission.hidden),
-        price_delta: transmission.price_delta || 0,
-        cylinder_volumes: (transmission.cylinder_volumes || []).map((volume) => ({
-          id: volume.id || createOptionId(),
-          label: volume.label,
-          count: normalizeCylinderCount(volume.count),
-          price_delta: volume.price_delta || 0,
-        })),
+      cylinder_volumes: (fuelType.transmissions[0]?.cylinder_volumes || []).map((volume) => ({
+        id: volume.id || createOptionId(),
+        label: volume.label,
+        count: normalizeCylinderCount(volume.count),
+        price_delta: volume.price_delta || 0,
       })),
+      gearbox_program_enabled: Boolean(fuelType.gearbox_program_enabled),
+      automatic_price_delta: fuelType.automatic_price_delta ?? 0,
+      manual_price_delta: fuelType.manual_price_delta ?? 0,
     })),
   };
 };
@@ -562,6 +710,16 @@ export const calculateConfiguredPrice = (product, locale, selections = {}, pathC
     selections,
     pathConfig
   );
+  const config = getNormalizedConfig(product?.config_options);
+  const allTransmissions = getAllTransmissionsMerged(config);
+  const gearboxOn = Boolean(config.fuel_types?.[0]?.gearbox_program_enabled);
+
+  if (gearboxOn && allTransmissions.length > 1) {
+    if (!transmission || !cylinderVolume) {
+      return getProductDefaultPrice(product, locale);
+    }
+  }
+
   const transmissionPrice = transmission
     ? parseNumericPrice(transmission?.price_delta)
     : null;
