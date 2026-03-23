@@ -457,12 +457,32 @@ const selectedPrice = computed(() =>
   })
 );
 const creditPlans = computed(() => getCreditPlans(store.product));
-const selectedCreditConfig = computed(
-  () =>
-    creditPlans.value.find(
-      (plan) => plan.months === Number(selectedCreditMonths.value)
-    ) || creditPlans.value[0] || null
-);
+
+/** Kredit mavjud bo‘lsa: 12 oylik reja bo‘lsa default shu, aks holda birinchi reja. */
+const setDefaultCreditMonthsForProduct = () => {
+  const plans = getCreditPlans(store.product);
+  if (!plans.length) {
+    selectedCreditMonths.value = null;
+    return;
+  }
+  const defaultPlan = plans.find((plan) => plan.months === 12) ?? plans[0] ?? null;
+  selectedCreditMonths.value = defaultPlan?.months ?? null;
+};
+
+const selectedCreditConfig = computed(() => {
+  const plans = creditPlans.value;
+  if (!plans.length) {
+    return null;
+  }
+  const m = Number(selectedCreditMonths.value);
+  if (Number.isFinite(m) && m > 0) {
+    const match = plans.find((plan) => plan.months === m);
+    if (match) {
+      return match;
+    }
+  }
+  return plans.find((plan) => plan.months === 12) ?? plans[0] ?? null;
+});
 const selectedCreditPlan = computed(() => {
   if (!hasCreditPricing(store.product) || !selectedCreditConfig.value) {
     return null;
@@ -818,7 +838,7 @@ const fetchProductData = async (id) => {
   }
 
   selectedOptions.value = {};
-  selectedCreditMonths.value = null;
+  setDefaultCreditMonthsForProduct();
   activeTab.value = "description";
   fuelGuideModalOpen.value = false;
   closeOrderModal();

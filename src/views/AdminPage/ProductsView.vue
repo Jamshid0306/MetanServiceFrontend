@@ -99,7 +99,11 @@ const createInitialProduct = () => ({
   is_active: true,
   images: [],
   oldImages: [],
-  options: createEmptyProductOptions(),
+  options: {
+    ...createEmptyProductOptions(),
+    // UI faqat bitta ichki vetkani ko'rsatadi (metan/propan emas).
+    fuel_types: [{ ...createEmptyFuelTypeItem(), label: "Standart" }],
+  },
 });
 const newProduct = ref(createInitialProduct());
 
@@ -958,21 +962,6 @@ const toggleProductActive = async (product) => {
                       Одна ветка на товар (внутри — КПП, поколения и баллоны).
                     </p>
                   </div>
-                  <button
-                    v-if="newProduct.options.fuel_types.length < FUEL_TYPE_CHOICES.length"
-                    type="button"
-                    @click="addFuelType"
-                    class="editor-secondary-btn"
-                  >
-                    Добавить ветку
-                  </button>
-                </div>
-
-                <div
-                  v-if="!newProduct.options.fuel_types.length"
-                  class="editor-empty-state"
-                >
-                  Конфигурация ещё не добавлена.
                 </div>
 
                 <div
@@ -980,42 +969,6 @@ const toggleProductActive = async (product) => {
                   :key="fuelType.id"
                   class="editor-option-group space-y-4"
                 >
-                  <div class="editor-option-head">
-                    <div>
-                      <h4 class="editor-option-title">
-                        Ветка {{ fuelTypeIndex + 1 }}
-                      </h4>
-                      <p class="editor-option-copy">
-                        Внутреннее имя ветки (по умолчанию «Standart»).
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      @click="removeFuelType(fuelTypeIndex)"
-                      class="editor-remove-btn"
-                    >
-                      ×
-                    </button>
-                  </div>
-
-                  <div class="editor-option-row editor-option-row-single">
-                    <select
-                      v-model="fuelType.label"
-                      class="editor-field editor-select"
-                      @change="onOptionLabelChange(fuelType)"
-                    >
-                      <option value="" disabled>Выберите значение</option>
-                      <option
-                        v-for="choice in getFuelTypeChoices(fuelType.label)"
-                        :key="choice"
-                        :value="choice"
-                        :disabled="isFuelTypeChoiceDisabled(choice, fuelTypeIndex)"
-                      >
-                        {{ choice }}
-                      </option>
-                    </select>
-                  </div>
-
                   <div class="space-y-4">
                     <div class="editor-option-head">
                       <div>

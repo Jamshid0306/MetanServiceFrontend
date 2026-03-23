@@ -149,6 +149,9 @@ const handleClick = (product) => {
     show: true,
     message: `${product[`name_${locale.value}`]} ${t("add_to_cart2")}`,
   };
+
+  // Add-to-cart button bosilganda bevosita product detail sahifaga o'tish.
+  goToDetail(id);
 };
 
 const filteredProducts = computed(() => {
