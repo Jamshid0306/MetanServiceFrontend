@@ -39,6 +39,13 @@ const getOptionFlow = () => {
     ? ["cylinder_volume", "transmission"]
     : ["cylinder_volume"];
 };
+
+const resolveDefaultBalloonProgramEnabled = () => {
+  const cfg = normalizeProductOptions(store.product?.config_options);
+  const ft = cfg?.fuel_types?.[0];
+  return Boolean(ft?.gearbox_program_enabled);
+};
+
 const basketStore = useBasketStore();
 const { t, locale, tm } = useI18n();
 const route = useRoute();
@@ -53,6 +60,12 @@ const summaryRef = ref(null);
 const notification = ref({ show: false, message: "" });
 const selectedOptions = ref({});
 const selectedCreditMonths = ref(null);
+/**
+ * Balloon program (avtomat/mexanika) yoqish/ochirish.
+ * - yo'q: transmission tanlovi yashiriladi va narx faqat balon hajmi narxidan hisoblanadi.
+ * - ha: transmission tanlovi (avtomat/mexanika) ko'rinadi va narx transmission + balon ustiga qo'shiladi.
+ */
+const balloonProgramEnabled = ref(false);
 const orderModalOpen = ref(false);
 const fuelGuideModalOpen = ref(false);
 const orderSubmitting = ref(false);
@@ -356,6 +369,7 @@ const effectiveSelectionPath = computed(() => {
   const nextPath = explicitSelectionPath.value ? { ...explicitSelectionPath.value } : {};
   const ft = optionConfig.value?.fuel_types?.[0];
   const gearboxOn = Boolean(ft?.gearbox_program_enabled);
+  const programEnabled = Boolean(balloonProgramEnabled.value);
   const allTransmissions = dedupeOptionsById(
     (optionConfig.value?.fuel_types || []).flatMap((ft) =>
       toVisibleOptions(ft.transmissions || [])
@@ -363,11 +377,18 @@ const effectiveSelectionPath = computed(() => {
   );
 
   let transmission = nextPath.transmission;
-  if (!transmission && allTransmissions.length === 1) {
-    transmission = resolveSingleVisibleOption(allTransmissions);
-  }
-  if (!gearboxOn && !transmission && allTransmissions.length) {
-    transmission = allTransmissions[0];
+  if (!programEnabled) {
+    // Transmission (Avtomat/Mexanika) tanlanmaydi.
+    transmission = null;
+    delete nextPath.transmission;
+    delete nextPath.fuel_type;
+  } else {
+    if (!transmission && allTransmissions.length === 1) {
+      transmission = resolveSingleVisibleOption(allTransmissions);
+    }
+    if (!gearboxOn && !transmission && allTransmissions.length) {
+      transmission = allTransmissions[0];
+    }
   }
 
   if (transmission) {
@@ -445,7 +466,9 @@ const requiredOptionGroupKeys = computed(() =>
   orderedOptionGroups.value.map((group) => group.key)
 );
 const isProductOptionSelectionComplete = computed(() => {
-  const keys = requiredOptionGroupKeys.value;
+  const keys = requiredOptionGroupKeys.value.filter(
+    (key) => !(key === "transmission" && !balloonProgramEnabled.value)
+  );
   if (!keys.length) {
     return true;
   }
@@ -838,6 +861,7 @@ const fetchProductData = async (id) => {
   }
 
   selectedOptions.value = {};
+  balloonProgramEnabled.value = resolveDefaultBalloonProgramEnabled();
   setDefaultCreditMonthsForProduct();
   activeTab.value = "description";
   fuelGuideModalOpen.value = false;
@@ -861,6 +885,15 @@ const fetchProductData = async (id) => {
   relatedProductRefs.value.forEach((el) => {
     if (el) observer.observe(el);
   });
+};
+
+const setBalloonProgramEnabled = (enabled) => {
+  balloonProgramEnabled.value = enabled;
+
+  // Transmission tanlovi o'chirilsa, narx transmissionPrice qo'shilmasdan faqat balon hajmi narxidan hisoblanadi.
+  const next = { ...(selectedOptions.value || {}) };
+  delete next.transmission;
+  selectedOptions.value = next;
 };
 
 const selectOption = (groupKey, optionId) => {
@@ -1129,10 +1162,12 @@ onBeforeUnmount(() => {
               <div class="detail-option-headline">
                 <div class="detail-option-heading">
                   <h3 class="text-sm font-semibold text-slate-700">
-                    {{ t(group.titleKey) }}
+                    {{ group.key === "transmission"
+                      ? t("productOptions.balloonProgramQuestion")
+                      : t(group.titleKey) }}
                   </h3>
                   <button
-                    v-if="group.key === 'transmission'"
+                    v-if="group.key === 'transmission' && balloonProgramEnabled"
                     type="button"
                     class="detail-info-trigger"
                     :aria-label="t('productOptions.fuelGuide.open')"
@@ -1142,6 +1177,27 @@ onBeforeUnmount(() => {
                   </button>
                 </div>
               </div>
+            <div
+              v-if="group.key === 'transmission'"
+              class="balloon-program-toggle"
+            >
+              <button
+                type="button"
+                class="balloon-program-toggle-btn"
+                :class="balloonProgramEnabled ? 'balloon-program-toggle-btn-active' : ''"
+                @click="setBalloonProgramEnabled(true)"
+              >
+                {{ t("productOptions.balloonProgramYes") }}
+              </button>
+              <button
+                type="button"
+                class="balloon-program-toggle-btn"
+                :class="!balloonProgramEnabled ? 'balloon-program-toggle-btn-active' : ''"
+                @click="setBalloonProgramEnabled(false)"
+              >
+                {{ t("productOptions.balloonProgramNo") }}
+              </button>
+            </div>
               <div
                 v-if="
                   group.key === 'cylinder_volume' &&
@@ -1185,7 +1241,7 @@ onBeforeUnmount(() => {
                 </div>
               </div>
               <div
-                v-else
+                v-else-if="group.key !== 'transmission' || balloonProgramEnabled"
                 :class="[
                   'detail-option-grid flex flex-wrap gap-2',
                   {
@@ -2116,6 +2172,38 @@ onBeforeUnmount(() => {
 .detail-option-group:first-of-type {
   padding-top: 0;
   border-top: none;
+}
+
+.balloon-program-toggle {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding-top: 0.2rem;
+}
+
+.balloon-program-toggle-btn {
+  border-radius: 16px;
+  border: 1px solid var(--detail-border);
+  background: var(--detail-surface-muted);
+  color: var(--detail-ink);
+  padding: 0.7rem 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.balloon-program-toggle-btn:hover {
+  border-color: rgba(24, 48, 79, 0.24);
+  background: var(--detail-accent-soft);
+}
+
+.balloon-program-toggle-btn-active {
+  border-color: var(--detail-accent);
+  background: var(--detail-accent);
+  color: #ffffff;
 }
 
 .detail-select-shell {
