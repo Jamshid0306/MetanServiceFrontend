@@ -783,8 +783,13 @@ export const calculateConfiguredPrice = (product, locale, selections = {}, pathC
     if (!cylinderVolume) {
       return getProductDefaultPrice(product, locale);
     }
-    // "Ha" bo‘lsa, lekin avtomat/mexanika tanlanmaguncha — default/placeholder narx.
+    // "Ha" + balon tanlangan, lekin avtomat/mexanika hali yo'q — balon narxini saqlab turamiz
+    // (default catalog narxi "yo'qolgan"dek ko'rinishining oldini oladi).
     if (!gearboxProgramDeclined && !transmission) {
+      const pendingCylinderPrice = parseNumericPrice(cylinderVolume?.price_delta);
+      if (pendingCylinderPrice !== null) {
+        return pendingCylinderPrice;
+      }
       return getProductDefaultPrice(product, locale);
     }
   }
