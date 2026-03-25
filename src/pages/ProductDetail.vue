@@ -510,20 +510,45 @@ const orderedOptionGroups = computed(() => optionGroups.value);
 const requiredOptionGroupKeys = computed(() =>
   orderedOptionGroups.value.map((group) => group.key)
 );
+const selectionHasValue = (bag, key) => {
+  const v = bag?.[key];
+  return v !== undefined && v !== null && String(v).trim() !== "";
+};
 const isProductOptionSelectionComplete = computed(() => {
+  const resolved = resolvedSelectedOptions.value;
+  const raw = selectedOptions.value;
   const hasTransmissionGroup = orderedOptionGroups.value.some(
     (g) => g.key === "transmission"
   );
-  if (hasTransmissionGroup && balloonProgramEnabled.value === null) {
-    return false;
-  }
-  const keys = requiredOptionGroupKeys.value.filter(
-    (key) => !(key === "transmission" && balloonProgramEnabled.value !== true)
-  );
+
+  // Transmission faqat "Ha" tanlanganda majburiy.
+  const keys = requiredOptionGroupKeys.value.filter((key) => {
+    if (key !== "transmission") {
+      return true;
+    }
+    return balloonProgramEnabled.value === true;
+  });
+
   if (!keys.length) {
     return true;
   }
-  return keys.every((key) => Boolean(selectedOptions.value[key]));
+
+  // "Programma kerakmi?" hali javobsiz: balon tanlangan bo‘lsa savatga ruxsat (transmissionsiz).
+  if (hasTransmissionGroup && balloonProgramEnabled.value === null) {
+    if (!keys.includes("cylinder_volume")) {
+      return keys.every((key) => selectionHasValue(resolved, key) || selectionHasValue(raw, key));
+    }
+    if (!selectionHasValue(resolved, "cylinder_volume") && !selectionHasValue(raw, "cylinder_volume")) {
+      return false;
+    }
+    return keys
+      .filter((k) => k !== "transmission")
+      .every((key) => selectionHasValue(resolved, key) || selectionHasValue(raw, key));
+  }
+
+  return keys.every(
+    (key) => selectionHasValue(resolved, key) || selectionHasValue(raw, key)
+  );
 });
 const selectedPrice = computed(() =>
   calculateConfiguredPrice(store.product, locale.value, resolvedSelectedOptions.value, {
