@@ -249,16 +249,36 @@ const buildOptionPaths = (config = {}) => {
 };
 const findPathByOptionId = (paths = [], groupKey, optionId, context = {}) => {
   const tid = context.transmissionId;
+  const cid = context.cylinderVolumeId;
   if (groupKey === "cylinder_volume" && tid) {
+    const oid = String(optionId || "").trim();
+    const tidStr = String(tid || "").trim();
     return (
       paths.find(
         (path) =>
-          path?.cylinder_volume?.id === optionId &&
-          path?.transmission?.id === tid
+          String(path?.cylinder_volume?.id || "").trim() === oid &&
+          String(path?.transmission?.id || "").trim() === tidStr
       ) || null
     );
   }
-  return paths.find((path) => path?.[groupKey]?.id === optionId) || null;
+  if (groupKey === "transmission" && cid) {
+    const oid = String(optionId || "").trim();
+    const cidStr = String(cid || "").trim();
+    const byBoth = paths.find(
+      (path) =>
+        String(path?.transmission?.id || "").trim() === oid &&
+        String(path?.cylinder_volume?.id || "").trim() === cidStr
+    );
+    if (byBoth) {
+      return byBoth;
+    }
+  }
+  const oid = String(optionId || "").trim();
+  return (
+    paths.find(
+      (path) => String(path?.[groupKey]?.id || "").trim() === oid
+    ) || null
+  );
 };
 const getDeepestSelectedGroup = (selections = {}) =>
   [...getOptionFlow()].reverse().find((key) => Boolean(selections?.[key])) || null;
@@ -382,7 +402,10 @@ const explicitSelectionPath = computed(() => {
     optionPaths.value,
     deepestGroup,
     selectedOptions.value[deepestGroup],
-    { transmissionId: selectedOptions.value.transmission }
+    {
+      transmissionId: selectedOptions.value.transmission,
+      cylinderVolumeId: selectedOptions.value.cylinder_volume,
+    }
   );
 
   return matchedPath ? prunePathToGroup(matchedPath, deepestGroup) : null;
@@ -655,25 +678,30 @@ const buildNextSelections = (currentSelections, groupKey, optionId) => {
     }, {});
   }
 
-  const matchedPath = findPathByOptionId(optionPaths.value, groupKey, optionId, {
+  const pathContext = {
     transmissionId: currentSelections?.transmission,
-  });
+    cylinderVolumeId: currentSelections?.cylinder_volume,
+  };
+  const matchedPath = findPathByOptionId(
+    optionPaths.value,
+    groupKey,
+    optionId,
+    pathContext
+  );
 
-  return flow.reduce((nextSelections, key, index) => {
-    if (index < groupIndex) {
-      const currentValue = currentSelections?.[key];
-
-      if (currentValue && matchedPath?.[key]?.id === currentValue) {
-        nextSelections[key] = currentValue;
-      }
+  // Flow tartibi UI tartibidan farq qilishi mumkin (avtomat/mexanika avval, balon keyin).
+  // Oldin `index < groupIndex` faqat "oldingi" kalitlarni saqlardi — transmission yo‘qolib qolardi.
+  const nextSelections = { [groupKey]: optionId };
+  for (const key of flow) {
+    if (key === groupKey) continue;
+    const cur = currentSelections?.[key];
+    if (!cur) continue;
+    const pathOpt = matchedPath?.[key];
+    if (pathOpt && String(pathOpt.id) === String(cur)) {
+      nextSelections[key] = cur;
     }
-
-    if (index === groupIndex) {
-      nextSelections[key] = optionId;
-    }
-
-    return nextSelections;
-  }, {});
+  }
+  return nextSelections;
 };
 
 const resetOrderForm = (orderType = canUseCreditOrder.value ? "credit" : "standard") => {
