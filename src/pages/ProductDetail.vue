@@ -533,6 +533,16 @@ const isProductOptionSelectionComplete = computed(() => {
     return true;
   }
 
+  // "Ha" + balon tanlash (bir nechta variant) bor: avtomat/mexanika tanlansa ham,
+  // foydalanuvchi balonni alohida tanlamaguncha savatga ruxsat yo‘q (resolved auto-fill hisoblanmaydi).
+  if (
+    balloonProgramEnabled.value === true &&
+    keys.includes("cylinder_volume") &&
+    !selectionHasValue(raw, "cylinder_volume")
+  ) {
+    return false;
+  }
+
   // "Programma kerakmi?" hali javobsiz: balon tanlangan bo‘lsa savatga ruxsat (transmissionsiz).
   if (hasTransmissionGroup && balloonProgramEnabled.value === null) {
     if (!keys.includes("cylinder_volume")) {
