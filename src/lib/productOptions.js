@@ -777,9 +777,14 @@ export const calculateConfiguredPrice = (product, locale, selections = {}, pathC
   const config = getNormalizedConfig(product?.config_options);
   const allTransmissions = getAllTransmissionsMerged(config);
   const gearboxOn = Boolean(config.fuel_types?.[0]?.gearbox_program_enabled);
+  const gearboxProgramDeclined = Boolean(pathConfig.gearboxProgramDeclined);
 
   if (gearboxOn && allTransmissions.length > 1) {
-    if (!transmission || !cylinderVolume) {
+    if (!cylinderVolume) {
+      return getProductDefaultPrice(product, locale);
+    }
+    // "Ha" bo‘lsa, lekin avtomat/mexanika tanlanmaguncha — default/placeholder narx.
+    if (!gearboxProgramDeclined && !transmission) {
       return getProductDefaultPrice(product, locale);
     }
   }

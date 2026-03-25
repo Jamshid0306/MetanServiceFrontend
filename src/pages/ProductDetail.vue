@@ -43,10 +43,9 @@ const getOptionFlow = () => {
 const resolveDefaultBalloonProgramEnabled = () => {
   const cfg = normalizeProductOptions(store.product?.config_options);
   const ft = cfg?.fuel_types?.[0];
-  // "Program kerakmi?" tugmasida foydalanuvchi tanlaguncha narxga avtomat/mehanika
-  // qo‘shimchasini qo‘shmaslik kerak. Shuning uchun default: false.
+  // Dastlab Ha/Yo‘q ikkalasi ham tanlanmagan ko‘rinsin; foydalanuvchi bosmaguncha null.
   void ft;
-  return false;
+  return null;
 };
 
 const basketStore = useBasketStore();
@@ -64,11 +63,11 @@ const notification = ref({ show: false, message: "" });
 const selectedOptions = ref({});
 const selectedCreditMonths = ref(null);
 /**
- * Balloon program (avtomat/mexanika) yoqish/ochirish.
- * - yo'q: transmission tanlovi yashiriladi va narx faqat balon hajmi narxidan hisoblanadi.
- * - ha: transmission tanlovi (avtomat/mexanika) ko'rinadi va narx transmission + balon ustiga qo'shiladi.
+ * Programma xizmati: null = hali tanlanmagan, true = Ha, false = Yo'q.
+ * - null / false: transmission narxi qo‘shilmaydi (null = savol javobsiz).
+ * - true: avtomat/mexanika tanlanadi.
  */
-const balloonProgramEnabled = ref(false);
+const balloonProgramEnabled = ref(null);
 const orderModalOpen = ref(false);
 const fuelGuideModalOpen = ref(false);
 const orderSubmitting = ref(false);
@@ -392,7 +391,7 @@ const effectiveSelectionPath = computed(() => {
   const nextPath = explicitSelectionPath.value ? { ...explicitSelectionPath.value } : {};
   const ft = optionConfig.value?.fuel_types?.[0];
   const gearboxOn = Boolean(ft?.gearbox_program_enabled);
-  const programEnabled = Boolean(balloonProgramEnabled.value);
+  const programEnabled = balloonProgramEnabled.value === true;
   const allTransmissions = dedupeOptionsById(
     (optionConfig.value?.fuel_types || []).flatMap((ft) =>
       toVisibleOptions(ft.transmissions || [])
@@ -463,19 +462,19 @@ const optionGroups = computed(() => {
     ? collectCylinderVolumes(optionConfig.value, null, firstTransmission)
     : [];
 
-  if (visibleCylinderVolumes.length > 1) {
-    groups.push({
-      key: "cylinder_volume",
-      titleKey: "productOptions.cylinderVolume",
-      options: visibleCylinderVolumes.map(mapOptionForDisplay),
-    });
-  }
-
   if (shouldShowTransmissionOptions(visibleTransmissions)) {
     groups.push({
       key: "transmission",
       titleKey: "productOptions.transmission",
       options: visibleTransmissions.map(mapOptionForDisplay),
+    });
+  }
+
+  if (visibleCylinderVolumes.length > 1) {
+    groups.push({
+      key: "cylinder_volume",
+      titleKey: "productOptions.cylinderVolume",
+      options: visibleCylinderVolumes.map(mapOptionForDisplay),
     });
   }
 
@@ -489,8 +488,14 @@ const requiredOptionGroupKeys = computed(() =>
   orderedOptionGroups.value.map((group) => group.key)
 );
 const isProductOptionSelectionComplete = computed(() => {
+  const hasTransmissionGroup = orderedOptionGroups.value.some(
+    (g) => g.key === "transmission"
+  );
+  if (hasTransmissionGroup && balloonProgramEnabled.value === null) {
+    return false;
+  }
   const keys = requiredOptionGroupKeys.value.filter(
-    (key) => !(key === "transmission" && !balloonProgramEnabled.value)
+    (key) => !(key === "transmission" && balloonProgramEnabled.value !== true)
   );
   if (!keys.length) {
     return true;
@@ -500,6 +505,7 @@ const isProductOptionSelectionComplete = computed(() => {
 const selectedPrice = computed(() =>
   calculateConfiguredPrice(store.product, locale.value, resolvedSelectedOptions.value, {
     useFallbackPath: false,
+    gearboxProgramDeclined: balloonProgramEnabled.value !== true,
   })
 );
 const creditPlans = computed(() => getCreditPlans(store.product));
@@ -544,6 +550,7 @@ const configuredBasketItem = computed(() =>
   store.product
     ? buildConfiguredBasketItem(store.product, resolvedSelectedOptions.value, 1, {
         useFallbackPath: false,
+        gearboxProgramDeclined: balloonProgramEnabled.value !== true,
       })
     : null
 );
@@ -911,7 +918,7 @@ const fetchProductData = async (id) => {
 };
 
 const setBalloonProgramEnabled = (enabled) => {
-  balloonProgramEnabled.value = enabled;
+  balloonProgramEnabled.value = enabled === true ? true : false;
 
   // Transmission tanlovi o'chirilsa, narx transmissionPrice qo'shilmasdan faqat balon hajmi narxidan hisoblanadi.
   const next = { ...(selectedOptions.value || {}) };
@@ -1228,20 +1235,27 @@ onBeforeUnmount(() => {
                 {{ t("productOptions.selectionHelp") }}
               </p>
             </div>
-            <div
+            <template
               v-for="group in orderedOptionGroups"
               :key="group.key"
-              class="detail-option-group"
             >
+              <div
+                v-if="group.key !== 'transmission' || balloonProgramEnabled !== false"
+                class="detail-option-group"
+              >
               <div class="detail-option-headline">
                 <div class="detail-option-heading">
                   <h3 class="text-sm font-semibold text-slate-700">
-                    {{ group.key === "transmission"
-                      ? t("productOptions.balloonProgramQuestion")
-                      : t(group.titleKey) }}
+                    {{
+                      group.key === "transmission"
+                        ? balloonProgramEnabled === true
+                          ? t("productOptions.transmission")
+                          : t("productOptions.balloonProgramQuestion")
+                        : t(group.titleKey)
+                    }}
                   </h3>
                   <button
-                    v-if="group.key === 'transmission' && balloonProgramEnabled"
+                    v-if="group.key === 'transmission' && balloonProgramEnabled === true"
                     type="button"
                     class="detail-info-trigger"
                     :aria-label="t('productOptions.fuelGuide.open')"
@@ -1252,25 +1266,43 @@ onBeforeUnmount(() => {
                 </div>
               </div>
             <div
-              v-if="group.key === 'transmission'"
+              v-if="group.key === 'transmission' && balloonProgramEnabled !== true"
               class="balloon-program-toggle"
+              role="radiogroup"
+              :aria-label="t('productOptions.balloonProgramQuestion')"
             >
-              <button
-                type="button"
+              <label
                 class="balloon-program-toggle-btn"
-                :class="balloonProgramEnabled ? 'balloon-program-toggle-btn-active' : ''"
-                @click="setBalloonProgramEnabled(true)"
+                :class="{
+                  'balloon-program-toggle-btn-active':
+                    balloonProgramEnabled === true,
+                }"
               >
-                {{ t("productOptions.balloonProgramYes") }}
-              </button>
-              <button
-                type="button"
+                <input
+                  type="radio"
+                  class="balloon-program-toggle-input"
+                  name="balloon-program-needed"
+                  :checked="balloonProgramEnabled === true"
+                  @change="setBalloonProgramEnabled(true)"
+                />
+                <span>{{ t("productOptions.balloonProgramYes") }}</span>
+              </label>
+              <label
                 class="balloon-program-toggle-btn"
-                :class="!balloonProgramEnabled ? 'balloon-program-toggle-btn-active' : ''"
-                @click="setBalloonProgramEnabled(false)"
+                :class="{
+                  'balloon-program-toggle-btn-active':
+                    balloonProgramEnabled === false,
+                }"
               >
-                {{ t("productOptions.balloonProgramNo") }}
-              </button>
+                <input
+                  type="radio"
+                  class="balloon-program-toggle-input"
+                  name="balloon-program-needed"
+                  :checked="balloonProgramEnabled === false"
+                  @change="setBalloonProgramEnabled(false)"
+                />
+                <span>{{ t("productOptions.balloonProgramNo") }}</span>
+              </label>
             </div>
               <div
                 v-if="
@@ -1315,7 +1347,7 @@ onBeforeUnmount(() => {
                 </div>
               </div>
               <div
-                v-else-if="group.key !== 'transmission' || balloonProgramEnabled"
+                v-else-if="group.key !== 'transmission' || balloonProgramEnabled === true"
                 :class="[
                   'detail-option-grid flex flex-wrap gap-2',
                   {
@@ -1351,6 +1383,7 @@ onBeforeUnmount(() => {
                 </button>
               </div>
             </div>
+            </template>
           </div>
 
           <div class="detail-order-tools detail-section">
@@ -2255,27 +2288,52 @@ onBeforeUnmount(() => {
   padding-top: 0.2rem;
 }
 
+.balloon-program-toggle-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0;
+}
+
 .balloon-program-toggle-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 16px;
   border: 1px solid var(--detail-border);
-  background: var(--detail-surface-muted);
-  color: var(--detail-ink);
+  background: var(--detail-surface);
+  color: #64748b;
   padding: 0.7rem 1rem;
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
   transition:
     border-color 0.2s ease,
     background 0.2s ease,
-    color 0.2s ease;
+    color 0.2s ease,
+    font-weight 0.15s ease;
 }
 
 .balloon-program-toggle-btn:hover {
   border-color: rgba(24, 48, 79, 0.24);
-  background: var(--detail-accent-soft);
+  background: var(--detail-surface-muted);
+  color: var(--detail-ink);
 }
 
 .balloon-program-toggle-btn-active {
   border-color: var(--detail-accent);
+  background: var(--detail-accent);
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.balloon-program-toggle-btn-active:hover {
   background: var(--detail-accent);
   color: #ffffff;
 }
