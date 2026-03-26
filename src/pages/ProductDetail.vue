@@ -1302,10 +1302,7 @@ onBeforeUnmount(() => {
               v-for="group in orderedOptionGroups"
               :key="group.key"
             >
-              <div
-                v-if="group.key !== 'transmission' || balloonProgramEnabled !== false"
-                class="detail-option-group"
-              >
+              <div class="detail-option-group">
               <div class="detail-option-headline">
                 <div class="detail-option-heading">
                   <h3 class="text-sm font-semibold text-slate-700">
@@ -1329,7 +1326,7 @@ onBeforeUnmount(() => {
                 </div>
               </div>
             <div
-              v-if="group.key === 'transmission' && balloonProgramEnabled !== true"
+              v-if="group.key === 'transmission'"
               class="balloon-program-toggle"
               role="radiogroup"
               :aria-label="t('productOptions.balloonProgramQuestion')"
@@ -1348,7 +1345,9 @@ onBeforeUnmount(() => {
                   :checked="balloonProgramEnabled === true"
                   @change="setBalloonProgramEnabled(true)"
                 />
-                <span>{{ t("productOptions.balloonProgramYes") }}</span>
+                <span class="balloon-program-toggle-label">
+                  {{ t("productOptions.balloonProgramYes") }}
+                </span>
               </label>
               <label
                 class="balloon-program-toggle-btn"
@@ -1364,7 +1363,9 @@ onBeforeUnmount(() => {
                   :checked="balloonProgramEnabled === false"
                   @change="setBalloonProgramEnabled(false)"
                 />
-                <span>{{ t("productOptions.balloonProgramNo") }}</span>
+                <span class="balloon-program-toggle-label">
+                  {{ t("productOptions.balloonProgramNo") }}
+                </span>
               </label>
             </div>
               <div
@@ -2367,6 +2368,8 @@ onBeforeUnmount(() => {
 .balloon-program-toggle-btn {
   position: relative;
   display: inline-flex;
+  flex: 1 1 0;
+  min-width: 110px;
   align-items: center;
   justify-content: center;
   border-radius: 16px;
@@ -2381,6 +2384,12 @@ onBeforeUnmount(() => {
     background 0.2s ease,
     color 0.2s ease,
     font-weight 0.15s ease;
+}
+
+.balloon-program-toggle-label {
+  display: inline-block;
+  white-space: nowrap;
+  line-height: 1.2;
 }
 
 .balloon-program-toggle-btn:hover {
