@@ -2371,8 +2371,9 @@ onBeforeUnmount(() => {
 .balloon-program-toggle-btn {
   position: relative;
   display: inline-flex;
-  flex: 1 1 0;
-  min-width: 110px;
+  flex: 0 0 auto;
+  width: max-content;
+  min-width: max-content;
   align-items: center;
   justify-content: center;
   border-radius: 16px;
