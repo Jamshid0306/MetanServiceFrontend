@@ -1170,7 +1170,7 @@ onBeforeUnmount(() => {
         class="detail-back cursor-pointer"
         :aria-label="t('nav.back')"
       >
-        <LeftArrow :size="40" />
+        <LeftArrow :size="24" />
       </button>
 
       <h2 class="detail-page-title text-center text-2xl font-bold sm:text-3xl">
@@ -1980,7 +1980,11 @@ onBeforeUnmount(() => {
 
 .detail-topbar {
   min-height: 48px;
-  padding-inline: 3.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  padding-inline: 0;
 }
 
 .detail-page-title {
@@ -1989,10 +1993,8 @@ onBeforeUnmount(() => {
 }
 
 .detail-back {
-  position: absolute;
-  left: 10px;
-  top: 50%;
-  transform: translateY(-50%);
+  position: static;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2003,6 +2005,7 @@ onBeforeUnmount(() => {
   background: var(--detail-surface);
   color: var(--detail-accent);
   padding: 0;
+  z-index: 3;
   transition:
     background 0.2s ease,
     border-color 0.2s ease,
@@ -3217,19 +3220,12 @@ onBeforeUnmount(() => {
   }
 
   .detail-topbar {
-    padding-inline: 3.2rem;
+    justify-content: flex-start;
+    gap: 0.7rem;
   }
 
-  /* Orqaga: skroll qilganda ham ko‘rinadi (nav ostida, sticky narx ustida) */
-  .detail-back {
-    position: fixed;
-    top: calc(env(safe-area-inset-top, 0px) + 6.25rem);
-    left: max(0.75rem, env(safe-area-inset-left, 0px));
-    transform: none;
-    z-index: 998;
-    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
-    background: rgba(255, 255, 255, 0.96);
-    backdrop-filter: blur(10px);
+  .detail-page-title {
+    text-align: left;
   }
 
   .detail-main {

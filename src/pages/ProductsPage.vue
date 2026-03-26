@@ -248,39 +248,49 @@ onMounted(async () => {
             :key="product.id"
             class="catalog-card group"
           >
-            <div @click="goToDetail(product.id)" class="cursor-pointer group">
-              <div class="catalog-meta">
-                <span class="catalog-id">#{{ product.id }}</span>
+            <div
+              @click="goToDetail(product.id)"
+              class="catalog-main cursor-pointer group"
+            >
+              <div class="catalog-media">
+                <img
+                  v-if="normalizeImages(product.images)[0]"
+                  :src="normalizeImages(product.images)[0]"
+                  :alt="product[`name_${locale}`]"
+                  class="catalog-image"
+                />
               </div>
-              <h3
-                class="catalog-title"
-              >
-                {{ product[`name_${locale}`] }}
-              </h3>
+              <div class="catalog-copy">
+                <div class="catalog-meta">
+                  <span class="catalog-id">#{{ product.id }}</span>
+                </div>
+                <h3 class="catalog-title">
+                  {{ product[`name_${locale}`] }}
+                </h3>
+                <div class="catalog-footer">
+                  <p class="catalog-price">
+                    {{ formatPrice(getProductDisplayPrice(product)) }}
+                  </p>
+                  <p
+                    v-if="getProductInstallment(product)"
+                    class="catalog-installment"
+                  >
+                    {{ formatInstallmentLabel(product) }}
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <div class="catalog-footer">
-              <p class="catalog-price">
-                {{ formatPrice(getProductDisplayPrice(product)) }}
-              </p>
-              <p
-                v-if="getProductInstallment(product)"
-                class="catalog-installment"
-              >
-                {{ formatInstallmentLabel(product) }}
-              </p>
-              <button
-                @click="handleClick(product)"
-                class="catalog-btn relative w-full flex items-center justify-center gap-1 sm:gap-2 text-white py-2 rounded-xl font-medium overflow-hidden transition-colors duration-300 cart-btn text-[13px] sm:text-sm md:text-base"
-              >
-                <span class="transition-all duration-300 max-sm:text-[10px]">
-                  {{ actionLabel() }}
-                </span>
-                <ArrowRight
-                  class="catalog-cart-icon absolute w-4 h-4 sm:w-5 sm:h-5 transition-all duration-500"
-                />
-              </button>
-            </div>
+            <button
+              @click="handleClick(product)"
+              class="catalog-btn"
+              :aria-label="`${actionLabel()} ${product[`name_${locale}`]}`"
+            >
+              <span class="catalog-btn-text">
+                {{ actionLabel() }}
+              </span>
+              <ArrowRight class="catalog-cart-icon" />
+            </button>
           </div>
         </transition-group>
       </main>
@@ -393,10 +403,10 @@ onMounted(async () => {
   border-radius: 20px;
   border: 1px solid rgba(20, 35, 56, 0.1);
   background: #ffffff;
-  padding: 10px;
+  padding: 10px 12px;
   display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
+  align-items: center;
+  gap: 0.9rem;
   transition:
     transform 0.3s ease,
     border-color 0.3s ease;
@@ -407,10 +417,23 @@ onMounted(async () => {
   border-color: rgba(20, 35, 56, 0.18);
 }
 
+.catalog-main {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.catalog-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .catalog-meta {
   display: flex;
   justify-content: flex-start;
-  margin-bottom: 6px;
+  margin-bottom: 0.35rem;
 }
 
 .catalog-id {
@@ -423,8 +446,9 @@ onMounted(async () => {
 }
 
 .catalog-media {
-  min-height: 170px;
-  height: 170px;
+  flex: 0 0 78px;
+  width: 78px;
+  height: 78px;
   border-radius: 16px;
   border: 1px solid rgba(20, 35, 56, 0.08);
   background: #f3f5f7;
@@ -435,7 +459,7 @@ onMounted(async () => {
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
   transition: transform 0.45s ease;
 }
 
@@ -444,26 +468,27 @@ onMounted(async () => {
 }
 
 .catalog-title {
-  margin-top: 10px;
+  margin-top: 0;
   text-align: left;
   color: #1b2d44;
-  font-size: 0.9rem;
-  font-weight: 700;
-  line-height: 1.4;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.3;
   min-height: unset;
+  word-break: break-word;
 }
 
 .catalog-footer {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(20, 35, 56, 0.08);
+  margin-top: 0.4rem;
+  padding-top: 0;
+  border-top: none;
 }
 
 .catalog-price {
-  color: #142338;
-  font-size: 1rem;
-  font-weight: 800;
-  margin-bottom: 0.45rem;
+  color: #6a7687;
+  font-size: 0.94rem;
+  font-weight: 600;
+  margin-bottom: 0.2rem;
   text-align: left;
 }
 
@@ -471,20 +496,27 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  padding: 0.28rem 0.6rem;
-  margin-bottom: 0.85rem;
-  background: rgba(24, 48, 79, 0.08);
+  padding: 0;
+  margin-bottom: 0;
+  background: transparent;
   color: #18304f;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
 }
 
-.cart-btn {
-  background: #18304f;
-  border: 1px solid rgba(20, 35, 56, 0.06);
-}
-
 .catalog-btn {
+  flex: 0 0 auto;
+  min-width: 132px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 14px;
+  border: 1px solid rgba(20, 35, 56, 0.08);
+  background: #18304f;
+  color: #ffffff;
+  padding: 0 0.95rem;
   transition: transform 0.25s ease;
 }
 
@@ -494,26 +526,80 @@ onMounted(async () => {
 }
 
 .catalog-cart-icon {
-  left: 12px;
+  width: 22px;
+  height: 22px;
+}
+
+.catalog-btn-text {
+  display: inline;
+  font-size: 0.88rem;
+  font-weight: 700;
 }
 
 @media (max-width: 640px) {
+  .products-page {
+    padding-top: 0.25rem;
+  }
+
+  .catalog-card {
+    padding: 12px 10px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    gap: 0.75rem;
+  }
+
+  .catalog-main {
+    gap: 0.8rem;
+  }
+
+  .catalog-meta {
+    display: none;
+  }
+
+  .catalog-media {
+    width: 72px;
+    height: 72px;
+    flex-basis: 72px;
+    border-radius: 14px;
+    background: #f7f7f7;
+  }
+
   .catalog-title {
-    font-size: 0.8rem;
-    min-height: 38px;
+    font-size: 0.9rem;
+    min-height: 0;
   }
 
   .catalog-price {
-    font-size: 0.88rem;
+    font-size: 0.78rem;
+    margin-bottom: 0;
   }
 
   .catalog-installment {
-    font-size: 0.68rem;
-    padding: 0.24rem 0.5rem;
+    display: none;
+  }
+
+  .catalog-btn {
+    margin-left: auto;
+    align-self: center;
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    border: none;
+    background: transparent;
+    color: #18304f;
+    padding: 0;
+  }
+
+  .catalog-btn-text {
+    display: none;
   }
 
   .catalog-cart-icon {
-    left: 8px;
+    width: 24px;
+    height: 24px;
+    color: currentColor;
   }
 }
 
