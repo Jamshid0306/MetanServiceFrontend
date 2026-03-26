@@ -485,19 +485,19 @@ const optionGroups = computed(() => {
     ? collectCylinderVolumes(optionConfig.value, null, firstTransmission)
     : [];
 
-  if (shouldShowTransmissionOptions(visibleTransmissions)) {
-    groups.push({
-      key: "transmission",
-      titleKey: "productOptions.transmission",
-      options: visibleTransmissions.map(mapOptionForDisplay),
-    });
-  }
-
   if (visibleCylinderVolumes.length > 1) {
     groups.push({
       key: "cylinder_volume",
       titleKey: "productOptions.cylinderVolume",
       options: visibleCylinderVolumes.map(mapOptionForDisplay),
+    });
+  }
+
+  if (shouldShowTransmissionOptions(visibleTransmissions)) {
+    groups.push({
+      key: "transmission",
+      titleKey: "productOptions.transmission",
+      options: visibleTransmissions.map(mapOptionForDisplay),
     });
   }
 
@@ -543,17 +543,8 @@ const isProductOptionSelectionComplete = computed(() => {
     return false;
   }
 
-  // "Programma kerakmi?" hali javobsiz: balon tanlangan bo‘lsa savatga ruxsat (transmissionsiz).
   if (hasTransmissionGroup && balloonProgramEnabled.value === null) {
-    if (!keys.includes("cylinder_volume")) {
-      return keys.every((key) => selectionHasValue(resolved, key) || selectionHasValue(raw, key));
-    }
-    if (!selectionHasValue(resolved, "cylinder_volume") && !selectionHasValue(raw, "cylinder_volume")) {
-      return false;
-    }
-    return keys
-      .filter((k) => k !== "transmission")
-      .every((key) => selectionHasValue(resolved, key) || selectionHasValue(raw, key));
+    return false;
   }
 
   return keys.every(
