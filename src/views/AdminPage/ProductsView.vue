@@ -244,14 +244,26 @@ const normalizeLegacyFuelLabel = (label = "") => {
 
 const resolveCylinderVolumeChoices = (fuelTypeLabel = "") => {
   const label = String(fuelTypeLabel || "").toLowerCase().trim();
-  const isPropan =
-    label.includes("propan") || label.includes("пропан") || label === "p" || label === "propan";
-  const isMetan =
-    label.includes("metan") || label.includes("метан") || label === "m" || label === "metan";
+  const isPropan = isPropanFuelType(fuelTypeLabel);
+  const isMetan = isMetanFuelType(fuelTypeLabel);
 
   if (isPropan) return PROPAN_CYLINDER_VOLUME_CHOICES;
   if (isMetan) return METAN_CYLINDER_VOLUME_CHOICES;
   return CYLINDER_VOLUME_CHOICES;
+};
+
+const isPropanFuelType = (fuelTypeLabel = "") => {
+  const label = String(fuelTypeLabel || "").toLowerCase().trim();
+  return (
+    label.includes("propan") || label.includes("пропан") || label === "p" || label === "propan"
+  );
+};
+
+const isMetanFuelType = (fuelTypeLabel = "") => {
+  const label = String(fuelTypeLabel || "").toLowerCase().trim();
+  return (
+    label.includes("metan") || label.includes("метан") || label === "m" || label === "metan"
+  );
 };
 
 const withCurrentChoice = (choices, currentValue = "") => {
@@ -1051,7 +1063,16 @@ const toggleProductActive = async (product) => {
                       :key="volume.id"
                       class="editor-option-row editor-option-row-volume"
                     >
+                      <input
+                        v-if="isPropanFuelType(fuelType.label)"
+                        v-model="volume.label"
+                        type="text"
+                        placeholder="Размер баллона"
+                        class="editor-field"
+                        @input="onOptionLabelChange(volume)"
+                      />
                       <select
+                        v-else
                         v-model="volume.label"
                         class="editor-field editor-select"
                         @change="onOptionLabelChange(volume)"
