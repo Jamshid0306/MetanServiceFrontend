@@ -123,6 +123,7 @@ const showPublicLayout = computed(
 const showPublicExtras = computed(
   () => showPublicLayout.value && !isAuthRoute.value
 );
+const showLoader = computed(() => loaderStore.loader && !isAuthRoute.value);
 
 const goToContact = () => {
   router.push({ path: "/", hash: "#contact" });
@@ -144,7 +145,7 @@ watch(
     <Nav v-if="showPublicLayout" />
     <RouterView />
     <Footer v-if="showPublicExtras" />
-    <Loader v-if="loaderStore.loader" />
+    <Loader v-if="showLoader" />
 
     <div v-if="showPublicExtras" class="app-mobile-dock lg:hidden">
       <transition name="contact-panel">
