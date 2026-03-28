@@ -1,5 +1,8 @@
 import { createRouter, createWebHistory } from "vue-router";
 import HomePage from "@/pages/HomePage.vue";
+import LoginPage from "@/pages/LoginPage.vue";
+import RegisterPage from "@/pages/RegisterPage.vue";
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage.vue";
 import { ref } from "vue";
 
 export const isLoading = ref(false);
@@ -38,7 +41,7 @@ const routes = [
   {
     path: "/login",
     name: "Login",
-    component: () => import("@/pages/LoginPage.vue"),
+    component: LoginPage,
     meta: {
       title: "Urganch Metan Service - Login",
       robots: "noindex,nofollow",
@@ -47,7 +50,7 @@ const routes = [
   {
     path: "/register",
     name: "Register",
-    component: () => import("@/pages/RegisterPage.vue"),
+    component: RegisterPage,
     meta: {
       title: "Urganch Metan Service - Register",
       robots: "noindex,nofollow",
@@ -56,7 +59,7 @@ const routes = [
   {
     path: "/forgot-password",
     name: "ForgotPassword",
-    component: () => import("@/pages/ForgotPasswordPage.vue"),
+    component: ForgotPasswordPage,
     meta: {
       title: "Urganch Metan Service - Parolni tiklash",
       robots: "noindex,nofollow",
@@ -162,6 +165,18 @@ router.afterEach((to) => {
   setTimeout(() => {
     isLoading.value = false;
   }, 300);
+});
+
+router.onError((error) => {
+  const message = String(error?.message || "");
+  const isChunkLoadError =
+    message.includes("Failed to fetch dynamically imported module") ||
+    message.includes("Importing a module script failed") ||
+    message.includes("Unable to preload CSS");
+
+  if (isChunkLoadError && typeof window !== "undefined") {
+    window.location.reload();
+  }
 });
 
 export default router;
