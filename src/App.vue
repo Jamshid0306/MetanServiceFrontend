@@ -115,6 +115,13 @@ const isContactRoute = computed(
 );
 const isBasketRoute = computed(() => route.path.startsWith("/basket"));
 const basketCount = computed(() => basketStore.basket.length);
+const isAuthRoute = computed(() =>
+  ["/login", "/register", "/forgot-password"].includes(route.path)
+);
+const showPublicLayout = computed(() => route.path !== "/admin");
+const showPublicExtras = computed(
+  () => showPublicLayout.value && !isAuthRoute.value
+);
 
 const goToContact = () => {
   router.push({ path: "/", hash: "#contact" });
@@ -133,12 +140,12 @@ watch(
 
 <template>
   <div>
-    <Nav v-if="route.path !== '/admin'" />
+    <Nav v-if="showPublicLayout" />
     <RouterView />
-    <Footer v-if="route.path !== '/admin'" />
+    <Footer v-if="showPublicExtras" />
     <Loader v-if="loaderStore.loader" />
 
-    <div v-if="route.path !== '/admin'" class="app-mobile-dock lg:hidden">
+    <div v-if="showPublicExtras" class="app-mobile-dock lg:hidden">
       <transition name="contact-panel">
         <div v-if="profileExpanded && customerProfile" class="mobile-profile-panel">
           <div class="mobile-profile-head">
@@ -252,7 +259,7 @@ watch(
       </div>
     </div>
 
-    <div v-if="route.path !== '/admin'" class="quick-contact">
+    <div v-if="showPublicExtras" class="quick-contact">
       <transition name="contact-panel">
         <div v-if="expanded" class="contact-panel">
           <p class="contact-panel-title">Urganch Metan Service</p>
