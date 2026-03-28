@@ -11,6 +11,7 @@ import Basket from "./icons/Basket.vue";
 import uzFlag from "@/assets/images/uz.png";
 import ruFlag from "@/assets/images/ru.png";
 import enFlag from "@/assets/images/en.png";
+import brandLogo from "@/assets/images/logo.jpg";
 
 const router = useRouter();
 const route = useRoute();
@@ -115,7 +116,7 @@ watch(
           <RouterLink to="/" class="brand-logo-wrap flex-shrink-0" aria-label="Home">
             <span class="logo-halo" />
             <img
-              src="/src/assets/images/logo.jpg"
+              :src="brandLogo"
               alt="Urganch Metan Service logo"
               class="brand-logo h-10 sm:h-12 md:h-14 w-auto max-w-[170px]"
             />

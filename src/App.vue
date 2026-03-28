@@ -30,7 +30,6 @@ const basketStore = useBasketStore();
 const customerProfile = ref(null);
 
 onMounted(() => {
-  loaderStore.loader = true;
   customerProfile.value = getStoredCustomerSession();
 
   if (typeof window !== "undefined") {
