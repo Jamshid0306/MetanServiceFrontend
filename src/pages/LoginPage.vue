@@ -1,31 +1,18 @@
 <script setup>
-import { computed, ref } from "vue";
+import { ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import TelegramLoginButton from "@/components/TelegramLoginButton.vue";
-import { useUzbekPhoneInput } from "@/composables/useUzbekPhoneInput";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
-import {
-  normalizeCustomerPhone,
-  storeCustomerSession,
-} from "@/lib/customerSession";
+import { storeCustomerSession } from "@/lib/customerSession";
 
 const router = useRouter();
 const { t } = useI18n();
 
-const { phone, onPhoneFocus, onPhoneBlur, onPhoneInput } = useUzbekPhoneInput();
+const identifier = ref("");
 const password = ref("");
 const submitting = ref(false);
 const errorMessage = ref("");
-
-const normalizedPhone = computed(() => normalizeCustomerPhone(phone.value));
-const isPhoneValid = computed(() => normalizedPhone.value.length === 12);
-
-const canSubmit = computed(
-  () =>
-    isPhoneValid.value &&
-    password.value.trim().length >= 8
-);
 
 const submitTelegramLogin = async (telegramUser) => {
   submitting.value = true;
@@ -56,12 +43,13 @@ const submitTelegramLogin = async (telegramUser) => {
 };
 
 const submitLogin = async () => {
-  if (!canSubmit.value) {
-    if (!isPhoneValid.value || !password.value.trim()) {
-      errorMessage.value = t("auth.fillRequired");
-    } else if (password.value.trim().length < 8) {
-      errorMessage.value = t("auth.passwordTooShort");
-    }
+  if (!identifier.value.trim() || !password.value.trim()) {
+    errorMessage.value = t("auth.fillRequired");
+    return;
+  }
+
+  if (password.value.trim().length < 8) {
+    errorMessage.value = t("auth.passwordTooShort");
     return;
   }
 
@@ -70,7 +58,7 @@ const submitLogin = async () => {
 
   try {
     const response = await apiClient.post("/customers/login", {
-      phone: normalizedPhone.value,
+      identifier: identifier.value.trim(),
       password: password.value,
     });
 
@@ -106,17 +94,13 @@ const submitLogin = async () => {
 
         <form class="auth-form" @submit.prevent="submitLogin">
           <label class="auth-field">
-            <span>{{ t("phone") }}</span>
+            <span>{{ t("auth.loginIdentifier") }}</span>
             <input
-              :value="phone"
-              type="tel"
-              inputmode="numeric"
-              autocomplete="tel-national"
-              :placeholder="t('auth.phonePlaceholder')"
+              v-model="identifier"
+              type="text"
+              autocomplete="username"
+              :placeholder="t('auth.loginIdentifierPlaceholder')"
               class="auth-input"
-              @focus="onPhoneFocus"
-              @blur="onPhoneBlur"
-              @input="onPhoneInput"
             />
           </label>
 

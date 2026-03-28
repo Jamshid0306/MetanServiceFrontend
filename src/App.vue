@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import { useI18n } from "vue-i18n";
 import Nav from "./components/Nav.vue";
@@ -15,21 +15,96 @@ import {
   CONTACT_PHONE_DISPLAY,
   CONTACT_PHONE_HREF,
 } from "./constants/contact";
+import {
+  clearCustomerSession,
+  getStoredCustomerSession,
+} from "./lib/customerSession";
 
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
 const expanded = ref(false);
+const profileExpanded = ref(false);
 const loaderStore = useLoaderStore();
 const basketStore = useBasketStore();
+const customerProfile = ref(null);
 
 onMounted(() => {
   loaderStore.loader = true;
+  customerProfile.value = getStoredCustomerSession();
+
+  if (typeof window !== "undefined") {
+    window.addEventListener("storage", syncCustomerProfile);
+  }
 });
+
+onUnmounted(() => {
+  if (typeof window !== "undefined") {
+    window.removeEventListener("storage", syncCustomerProfile);
+  }
+});
+
+const syncCustomerProfile = () => {
+  customerProfile.value = getStoredCustomerSession();
+};
 
 const toggleExpand = () => {
   expanded.value = !expanded.value;
+  if (expanded.value) {
+    profileExpanded.value = false;
+  }
 };
+
+const toggleProfile = () => {
+  syncCustomerProfile();
+
+  if (!customerProfile.value) {
+    router.push("/login");
+    return;
+  }
+
+  profileExpanded.value = !profileExpanded.value;
+  if (profileExpanded.value) {
+    expanded.value = false;
+  }
+};
+
+const logoutCustomer = () => {
+  clearCustomerSession();
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem("customer_access_token");
+  }
+  syncCustomerProfile();
+  profileExpanded.value = false;
+  router.push("/login");
+};
+
+const profileDisplayName = computed(() => {
+  const name = String(customerProfile.value?.name || "").trim();
+  if (!name) {
+    return t("nav.login");
+  }
+
+  const [firstWord] = name.split(/\s+/);
+  return firstWord || name;
+});
+
+const profileSecondaryText = computed(() => {
+  const telegramUsername = String(
+    customerProfile.value?.telegramUsername || customerProfile.value?.username || ""
+  ).trim();
+  const phone = String(customerProfile.value?.phone || "").trim();
+
+  if (telegramUsername) {
+    return `@${telegramUsername.replace(/^@+/, "")}`;
+  }
+
+  if (phone) {
+    return `+${phone}`;
+  }
+
+  return t("auth.userAccess");
+});
 
 const isHomeRoute = computed(() => route.path === "/" && route.hash !== "#contact");
 const isProductsRoute = computed(
@@ -49,6 +124,8 @@ watch(
   () => route.fullPath,
   () => {
     expanded.value = false;
+    profileExpanded.value = false;
+    syncCustomerProfile();
   }
 );
 </script>
@@ -62,6 +139,39 @@ watch(
     <Loader v-if="loaderStore.loader" />
 
     <div v-if="route.path !== '/admin'" class="app-mobile-dock lg:hidden">
+      <transition name="contact-panel">
+        <div v-if="profileExpanded && customerProfile" class="mobile-profile-panel">
+          <div class="mobile-profile-head">
+            <span class="mobile-profile-avatar">
+              {{ String(customerProfile.name || "U").trim().charAt(0).toUpperCase() }}
+            </span>
+            <div class="mobile-profile-copy">
+              <strong>{{ customerProfile.name }}</strong>
+              <small>{{ profileSecondaryText }}</small>
+            </div>
+          </div>
+
+          <div class="mobile-profile-meta">
+            <p v-if="customerProfile.telegramUsername">
+              <span>{{ t("auth.telegramUsername") }}</span>
+              <strong>@{{ customerProfile.telegramUsername }}</strong>
+            </p>
+            <p v-if="customerProfile.phone">
+              <span>{{ t("phone") }}</span>
+              <strong>+{{ customerProfile.phone }}</strong>
+            </p>
+          </div>
+
+          <button
+            type="button"
+            class="mobile-profile-logout"
+            @click="logoutCustomer"
+          >
+            {{ t("nav.logout") }}
+          </button>
+        </div>
+      </transition>
+
       <div class="app-mobile-dock-inner">
         <RouterLink
           to="/"
@@ -112,6 +222,32 @@ watch(
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2m18 0v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8m18 0l-9 6-9-6" />
           </svg>
           <span>{{ t("nav.contact") }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="app-mobile-dock-link app-mobile-dock-link-profile"
+          :class="{ 'app-mobile-dock-link-active': profileExpanded }"
+          @click="toggleProfile"
+        >
+          <span class="app-mobile-dock-profile-avatar">
+            <svg
+              v-if="!customerProfile"
+              class="app-mobile-dock-icon"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.8"
+                d="M15.75 6.75a3.75 3.75 0 1 1-7.5 0a3.75 3.75 0 0 1 7.5 0ZM4.5 20.12a7.5 7.5 0 0 1 15 0"
+              />
+            </svg>
+            <span v-else>{{ profileDisplayName.charAt(0).toUpperCase() }}</span>
+          </span>
+          <span>{{ profileDisplayName }}</span>
         </button>
       </div>
     </div>
@@ -234,7 +370,7 @@ watch(
 .app-mobile-dock-inner {
   pointer-events: auto;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.35rem;
   align-items: stretch;
   width: min(100%, 540px);
@@ -301,6 +437,122 @@ watch(
   font-size: 0.64rem;
   font-weight: 800;
   line-height: 1;
+}
+
+.app-mobile-dock-link-profile {
+  gap: 0.24rem;
+}
+
+.app-mobile-dock-profile-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(20, 48, 79, 0.1);
+  color: #18304f;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.mobile-profile-panel {
+  pointer-events: auto;
+  width: min(100%, 540px);
+  margin: 0 auto 0.55rem;
+  border: 1px solid rgba(20, 35, 56, 0.12);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 -10px 30px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(18px);
+  padding: 0.85rem;
+}
+
+.mobile-profile-head {
+  display: flex;
+  align-items: center;
+  gap: 0.72rem;
+}
+
+.mobile-profile-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #18304f 0%, #365c87 100%);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.mobile-profile-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-profile-copy strong {
+  color: #142338;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.mobile-profile-copy small {
+  margin-top: 0.12rem;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-profile-meta {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.8rem;
+}
+
+.mobile-profile-meta p {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 14px;
+  background: #f6f8fb;
+}
+
+.mobile-profile-meta span {
+  color: #64748b;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.mobile-profile-meta strong {
+  color: #142338;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-align: right;
+  word-break: break-word;
+}
+
+.mobile-profile-logout {
+  width: 100%;
+  margin-top: 0.8rem;
+  min-height: 44px;
+  border-radius: 16px;
+  border: 1px solid rgba(20, 48, 79, 0.14);
+  background: #18304f;
+  color: #fff;
+  font-size: 0.84rem;
+  font-weight: 800;
 }
 
 .quick-contact {

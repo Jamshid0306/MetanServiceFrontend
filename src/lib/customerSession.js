@@ -41,6 +41,8 @@ export const toCustomerSession = (customer = {}) => {
     name,
     phone,
     telegramId: customer?.telegram_id ?? customer?.telegramId ?? null,
+    telegramUsername:
+      customer?.telegram_username ?? customer?.telegramUsername ?? null,
     username: customer?.username ?? null,
     photoUrl: customer?.photo_url ?? customer?.photoUrl ?? null,
   };

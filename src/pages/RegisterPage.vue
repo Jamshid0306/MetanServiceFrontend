@@ -1,33 +1,21 @@
 <script setup>
-import { computed, ref } from "vue";
+import { ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import TelegramLoginButton from "@/components/TelegramLoginButton.vue";
-import { useUzbekPhoneInput } from "@/composables/useUzbekPhoneInput";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
-import {
-  normalizeCustomerPhone,
-  storeCustomerSession,
-} from "@/lib/customerSession";
+import { storeCustomerSession } from "@/lib/customerSession";
 
 const router = useRouter();
 const { t } = useI18n();
 
 const name = ref("");
-const { phone, onPhoneFocus, onPhoneBlur, onPhoneInput } = useUzbekPhoneInput();
+const telegramUsername = ref("");
 const password = ref("");
 const submitting = ref(false);
 const errorMessage = ref("");
-
-const normalizedPhone = computed(() => normalizeCustomerPhone(phone.value));
-const isPhoneValid = computed(() => normalizedPhone.value.length === 12);
-
-const canSubmit = computed(
-  () =>
-    name.value.trim().length > 0 &&
-    isPhoneValid.value &&
-    password.value.trim().length >= 8
-);
+const normalizeTelegramUsername = (value = "") =>
+  String(value || "").trim().replace(/^@+/, "").toLowerCase();
 
 const submitTelegramLogin = async (telegramUser) => {
   submitting.value = true;
@@ -58,12 +46,21 @@ const submitTelegramLogin = async (telegramUser) => {
 };
 
 const submitRegister = async () => {
-  if (!canSubmit.value) {
-    if (!name.value.trim() || !isPhoneValid.value || !password.value.trim()) {
-      errorMessage.value = t("auth.fillRequired");
-    } else if (password.value.trim().length < 8) {
-      errorMessage.value = t("auth.passwordTooShort");
-    }
+  const normalizedTelegramUsername = normalizeTelegramUsername(
+    telegramUsername.value
+  );
+
+  if (
+    !name.value.trim() ||
+    !normalizedTelegramUsername ||
+    !password.value.trim()
+  ) {
+    errorMessage.value = t("auth.fillRequired");
+    return;
+  }
+
+  if (password.value.trim().length < 8) {
+    errorMessage.value = t("auth.passwordTooShort");
     return;
   }
 
@@ -73,7 +70,7 @@ const submitRegister = async () => {
   try {
     const response = await apiClient.post("/customers/register", {
       name: name.value.trim(),
-      phone: normalizedPhone.value,
+      telegram_username: normalizedTelegramUsername,
       password: password.value,
     });
 
@@ -119,17 +116,13 @@ const submitRegister = async () => {
           </label>
 
           <label class="auth-field">
-            <span>{{ t("phone") }}</span>
+            <span>{{ t("auth.telegramUsername") }}</span>
             <input
-              :value="phone"
-              type="tel"
-              inputmode="numeric"
-              autocomplete="tel-national"
-              :placeholder="t('auth.phonePlaceholder')"
+              v-model="telegramUsername"
+              type="text"
+              autocomplete="username"
+              :placeholder="t('auth.telegramPlaceholder')"
               class="auth-input"
-              @focus="onPhoneFocus"
-              @blur="onPhoneBlur"
-              @input="onPhoneInput"
             />
           </label>
 
