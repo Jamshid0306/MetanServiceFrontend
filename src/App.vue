@@ -117,7 +117,9 @@ const basketCount = computed(() => basketStore.basket.length);
 const isAuthRoute = computed(() =>
   ["/login", "/register", "/forgot-password"].includes(route.path)
 );
-const showPublicLayout = computed(() => route.path !== "/admin");
+const showPublicLayout = computed(
+  () => route.path !== "/admin" && !isAuthRoute.value
+);
 const showPublicExtras = computed(
   () => showPublicLayout.value && !isAuthRoute.value
 );
