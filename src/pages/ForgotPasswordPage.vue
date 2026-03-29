@@ -1,9 +1,14 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, defineAsyncComponent, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import TelegramLoginButton from "@/components/TelegramLoginButton.vue";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
+
+const TelegramLoginButton = defineAsyncComponent({
+  loader: () => import("@/components/TelegramLoginButton.vue"),
+  delay: 0,
+  timeout: 120000,
+});
 import { normalizeCustomerPhone } from "@/lib/customerSession";
 
 const router = useRouter();
@@ -30,7 +35,9 @@ const handleTelegramAuth = async (telegramUser) => {
   successMessage.value = "";
 
   try {
-    const response = await apiClient.post("/customers/telegram", telegramUser);
+    const response = await apiClient.post("/customers/telegram", telegramUser, {
+      skipAuth: true,
+    });
 
     const rawPhone =
       response.data?.customer?.phone ||
@@ -99,10 +106,15 @@ const submitNewPassword = async () => {
         <p class="auth-subtitle">{{ t("auth.resetSubtitle") }}</p>
 
         <div class="auth-telegram-block">
-          <TelegramLoginButton
-            @auth="handleTelegramAuth"
-            @error="errorMessage = $event"
-          />
+          <Suspense>
+            <TelegramLoginButton
+              @auth="handleTelegramAuth"
+              @error="errorMessage = $event"
+            />
+            <template #fallback>
+              <div class="telegram-login-fallback" aria-hidden="true" />
+            </template>
+          </Suspense>
           <p class="auth-telegram-hint">{{ t("auth.resetTelegramHint") }}</p>
         </div>
 
@@ -196,6 +208,10 @@ const submitNewPassword = async () => {
   display: grid;
   gap: 0.7rem;
   margin-top: 1.2rem;
+}
+
+.telegram-login-fallback {
+  min-height: 48px;
 }
 
 .auth-telegram-hint {

@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { onBeforeUnmount, onMounted, ref, nextTick } from "vue";
 import { apiClient } from "@/lib/api";
 
 const emit = defineEmits(["auth", "error"]);
@@ -17,7 +17,11 @@ const cleanupWidget = () => {
   }
 
   if (widgetCallbackName && typeof window !== "undefined") {
-    delete window[widgetCallbackName];
+    try {
+      delete window[widgetCallbackName];
+    } catch {
+      window[widgetCallbackName] = undefined;
+    }
   }
 
   scriptEl = null;
@@ -26,25 +30,34 @@ const cleanupWidget = () => {
 
 onMounted(() => {
   const mountWidget = async () => {
-    if (!hostRef.value) {
-      return;
-    }
-
-    if (!botUsername.value) {
-      try {
-        const response = await apiClient.get("/customers/telegram/config");
-        botUsername.value = String(response.data?.bot_username || "").trim();
-      } catch {
-        botUsername.value = "";
-      }
-    }
-
-    if (!botUsername.value) {
-      emit("error", "Telegram login hozircha sozlanmagan.");
-      return;
-    }
-
     try {
+      await nextTick();
+      let attempts = 0;
+      while (attempts < 8 && !hostRef.value) {
+        await nextTick();
+        attempts += 1;
+      }
+      if (typeof window === "undefined" || !hostRef.value) {
+        emit("error", "Telegram tugmasi joylashmadi. Sahifani yangilang.");
+        return;
+      }
+
+      if (!botUsername.value) {
+        try {
+          const response = await apiClient.get("/customers/telegram/config", {
+            skipAuth: true,
+          });
+          botUsername.value = String(response.data?.bot_username || "").trim();
+        } catch {
+          botUsername.value = "";
+        }
+      }
+
+      if (!botUsername.value) {
+        emit("error", "Telegram login hozircha sozlanmagan.");
+        return;
+      }
+
       cleanupWidget();
 
       widgetCallbackName = `onTelegramAuth_${Math.random().toString(36).slice(2)}`;
