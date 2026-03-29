@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from "vue";
+import { onErrorCaptured, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import TelegramLoginButton from "@/components/TelegramLoginButton.vue";
@@ -13,6 +13,30 @@ const identifier = ref("");
 const password = ref("");
 const submitting = ref(false);
 const errorMessage = ref("");
+const telegramVisible = ref(false);
+const telegramFailed = ref(false);
+
+onMounted(() => {
+  if (typeof window !== "undefined") {
+    window.requestAnimationFrame(() => {
+      telegramVisible.value = true;
+    });
+  }
+});
+
+onErrorCaptured((error, instance) => {
+  const componentName = String(
+    instance?.type?.name || instance?.type?.__name || ""
+  );
+
+  if (componentName.includes("TelegramLoginButton")) {
+    telegramFailed.value = true;
+    errorMessage.value = t("auth.telegramLoadError");
+    return false;
+  }
+
+  return true;
+});
 
 const submitTelegramLogin = async (telegramUser) => {
   submitting.value = true;
@@ -67,15 +91,21 @@ const submitLogin = async () => {
         <h1 class="auth-title">{{ t("auth.loginTitle") }}</h1>
         <p class="auth-subtitle">{{ t("auth.loginSubtitle") }}</p>
 
-        <div class="auth-telegram-block">
+        <div v-if="telegramVisible && !telegramFailed" class="auth-telegram-block">
           <TelegramLoginButton
             @auth="submitTelegramLogin"
-            @error="errorMessage = $event"
+            @error="
+              telegramFailed = true;
+              errorMessage = $event;
+            "
           />
           <p class="auth-telegram-hint">{{ t("auth.telegramHint") }}</p>
         </div>
 
-        <div class="auth-divider">
+        <div
+          v-if="telegramVisible && !telegramFailed"
+          class="auth-divider"
+        >
           <span>{{ t("auth.orContinue") }}</span>
         </div>
 
