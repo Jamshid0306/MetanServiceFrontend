@@ -1,10 +1,27 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { onBeforeUnmount, onMounted, ref } from "vue";
 
 const emit = defineEmits(["auth", "error"]);
 
 const hostRef = ref(null);
 const botUsername = String(import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "").trim();
+const TELEGRAM_SCRIPT_SRC = "https://telegram.org/js/telegram-widget.js?23";
+
+let scriptEl = null;
+let widgetCallbackName = "";
+
+const cleanupWidget = () => {
+  if (hostRef.value) {
+    hostRef.value.innerHTML = "";
+  }
+
+  if (widgetCallbackName && typeof window !== "undefined") {
+    delete window[widgetCallbackName];
+  }
+
+  scriptEl = null;
+  widgetCallbackName = "";
+};
 
 onMounted(() => {
   if (!hostRef.value) {
@@ -17,24 +34,34 @@ onMounted(() => {
   }
 
   try {
-    const wrapper = document.createElement("div");
-    wrapper.innerHTML =
-      `<script async src="https://telegram.org/js/telegram-widget.js?23" ` +
-      `data-telegram-login="${botUsername}" ` +
-      `data-size="large" ` +
-      `data-onauth="onTelegramAuth(user)" ` +
-      `data-request-access="write"></` +
-      `script>`;
+    cleanupWidget();
 
-    window.onTelegramAuth = (user) => {
+    widgetCallbackName = `onTelegramAuth_${Math.random().toString(36).slice(2)}`;
+    window[widgetCallbackName] = (user) => {
       emit("auth", user);
     };
 
-    hostRef.value.innerHTML = "";
-    hostRef.value.appendChild(wrapper);
+    scriptEl = document.createElement("script");
+    scriptEl.async = true;
+    scriptEl.src = TELEGRAM_SCRIPT_SRC;
+    scriptEl.setAttribute("data-telegram-login", botUsername);
+    scriptEl.setAttribute("data-size", "large");
+    scriptEl.setAttribute("data-onauth", `${widgetCallbackName}(user)`);
+    scriptEl.setAttribute("data-request-access", "write");
+    scriptEl.onerror = () => {
+      emit("error", "Telegram tugmasini yuklab bo'lmadi.");
+      cleanupWidget();
+    };
+
+    hostRef.value.appendChild(scriptEl);
   } catch {
     emit("error", "Telegram tugmasini yuklab bo'lmadi.");
+    cleanupWidget();
   }
+});
+
+onBeforeUnmount(() => {
+  cleanupWidget();
 });
 </script>
 
