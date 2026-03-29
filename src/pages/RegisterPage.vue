@@ -1,7 +1,8 @@
 <script setup>
 import { ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
+import TelegramLoginButton from "@/components/TelegramLoginButton.vue";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
 import { storeCustomerSession } from "@/lib/customerSession";
 
@@ -16,6 +17,34 @@ const errorMessage = ref("");
 
 const normalizeTelegramUsername = (value = "") =>
   String(value || "").trim().replace(/^@+/, "").toLowerCase();
+
+const submitTelegramLogin = async (telegramUser) => {
+  submitting.value = true;
+  errorMessage.value = "";
+
+  try {
+    const response = await apiClient.post("/customers/telegram", telegramUser);
+
+    const customer = response.data?.customer || null;
+    const accessToken = response.data?.access_token || null;
+
+    if (typeof window !== "undefined" && accessToken) {
+      window.localStorage.setItem("customer_access_token", accessToken);
+    }
+
+    storeCustomerSession(customer);
+
+    if (customer?.has_password === false) {
+      router.push({ path: "/forgot-password", query: { mode: "set-password" } });
+    } else {
+      router.push("/");
+    }
+  } catch (error) {
+    errorMessage.value = getApiErrorMessage(error, t("auth.telegramFailed"));
+  } finally {
+    submitting.value = false;
+  }
+};
 
 const submitRegister = async () => {
   const normalizedTelegramUsername = normalizeTelegramUsername(telegramUsername.value);
@@ -51,58 +80,74 @@ const submitRegister = async () => {
 </script>
 
 <template>
-  <section class="register-page">
-    <div class="register-shell">
-      <div class="register-card">
-        <p class="register-kicker">{{ t("auth.userAccess") }}</p>
-        <h1 class="register-title">{{ t("auth.registerTitle") }}</h1>
-        <p class="register-subtitle">{{ t("auth.registerSubtitle") }}</p>
+  <section class="auth-page">
+    <div class="auth-shell">
+      <div class="auth-card">
+        <p class="auth-kicker">{{ t("auth.userAccess") }}</p>
+        <h1 class="auth-title">{{ t("auth.registerTitle") }}</h1>
+        <p class="auth-subtitle">{{ t("auth.registerSubtitle") }}</p>
 
-        <form class="register-form" @submit.prevent="submitRegister">
-          <label class="register-field">
+        <div class="auth-telegram-block">
+          <TelegramLoginButton
+            @auth="submitTelegramLogin"
+            @error="errorMessage = $event"
+          />
+          <p class="auth-telegram-hint">{{ t("auth.telegramHint") }}</p>
+        </div>
+
+        <div class="auth-divider">
+          <span>{{ t("auth.orContinue") }}</span>
+        </div>
+
+        <form class="auth-form" @submit.prevent="submitRegister">
+          <label class="auth-field">
             <span>{{ t("name") }}</span>
             <input
               v-model="name"
               type="text"
               :placeholder="t('auth.namePlaceholder')"
-              class="register-input"
+              class="auth-input"
             />
           </label>
 
-          <label class="register-field">
+          <label class="auth-field">
             <span>{{ t("auth.telegramUsername") }}</span>
             <input
               v-model="telegramUsername"
               type="text"
               autocomplete="username"
               :placeholder="t('auth.telegramPlaceholder')"
-              class="register-input"
+              class="auth-input"
             />
           </label>
 
-          <label class="register-field">
+          <label class="auth-field">
             <span>{{ t("auth.password") }}</span>
             <input
               v-model="password"
               type="password"
               autocomplete="new-password"
               :placeholder="t('auth.passwordPlaceholder')"
-              class="register-input"
+              class="auth-input"
             />
           </label>
 
-          <p v-if="errorMessage" class="register-error">{{ errorMessage }}</p>
+          <p v-if="errorMessage" class="auth-error">{{ errorMessage }}</p>
 
-          <button type="submit" class="register-submit" :disabled="submitting">
+          <button type="submit" class="auth-submit" :disabled="submitting">
             {{ submitting ? t("sending") : t("auth.registerSubmit") }}
           </button>
         </form>
 
-        <p class="register-switch">
+        <p class="auth-switch">
           {{ t("auth.haveAccount") }}
-          <RouterLink to="/login" class="register-switch-link">
+          <button
+            type="button"
+            class="auth-switch-link"
+            @click="router.push('/login')"
+          >
             {{ t("auth.loginLink") }}
-          </RouterLink>
+          </button>
         </p>
       </div>
     </div>
@@ -110,17 +155,17 @@ const submitRegister = async () => {
 </template>
 
 <style scoped>
-.register-page {
+.auth-page {
   min-height: calc(100vh - 180px);
   padding: 7rem 1rem 3rem;
 }
 
-.register-shell {
+.auth-shell {
   max-width: 520px;
   margin: 0 auto;
 }
 
-.register-card {
+.auth-card {
   border: 1px solid rgba(20, 35, 56, 0.08);
   border-radius: 24px;
   background: #ffffff;
@@ -128,7 +173,7 @@ const submitRegister = async () => {
   padding: 1.25rem;
 }
 
-.register-kicker {
+.auth-kicker {
   color: #64748b;
   font-size: 0.75rem;
   font-weight: 800;
@@ -136,37 +181,78 @@ const submitRegister = async () => {
   text-transform: uppercase;
 }
 
-.register-title {
+.auth-title {
   margin-top: 0.35rem;
   color: #142338;
   font-size: 2rem;
   font-weight: 800;
 }
 
-.register-subtitle {
+.auth-subtitle {
   margin-top: 0.5rem;
   color: #607188;
   line-height: 1.6;
 }
 
-.register-form {
+.auth-telegram-block {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 1.2rem;
+}
+
+.auth-telegram-hint {
+  color: #607188;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.auth-divider {
+  position: relative;
+  margin-top: 1.1rem;
+  text-align: center;
+}
+
+.auth-divider::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: rgba(20, 35, 56, 0.1);
+}
+
+.auth-divider span {
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  background: #ffffff;
+  color: #6b7b91;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0 0.75rem;
+}
+
+.auth-form {
   display: grid;
   gap: 0.9rem;
   margin-top: 1.25rem;
 }
 
-.register-field {
+.auth-field {
   display: grid;
   gap: 0.45rem;
 }
 
-.register-field span {
+.auth-field span {
   color: #304660;
   font-size: 0.88rem;
   font-weight: 700;
 }
 
-.register-input {
+.auth-input {
   width: 100%;
   border: 1px solid rgba(20, 35, 56, 0.12);
   border-radius: 14px;
@@ -176,18 +262,18 @@ const submitRegister = async () => {
   outline: none;
 }
 
-.register-input:focus {
+.auth-input:focus {
   border-color: #18304f;
   box-shadow: 0 0 0 4px rgba(24, 48, 79, 0.08);
 }
 
-.register-error {
+.auth-error {
   color: #b42318;
   font-size: 0.92rem;
   font-weight: 600;
 }
 
-.register-submit {
+.auth-submit {
   border: 1px solid #18304f;
   border-radius: 16px;
   background: #18304f;
@@ -196,32 +282,35 @@ const submitRegister = async () => {
   font-weight: 800;
 }
 
-.register-submit:disabled {
+.auth-submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.register-switch {
+.auth-switch {
   margin-top: 1rem;
   color: #607188;
   text-align: center;
 }
 
-.register-switch-link {
+.auth-switch-link {
+  border: none;
+  background: transparent;
   color: #18304f;
   font-weight: 700;
+  cursor: pointer;
 }
 
 @media (max-width: 640px) {
-  .register-page {
+  .auth-page {
     padding-top: 6.25rem;
   }
 
-  .register-card {
+  .auth-card {
     padding: 1rem;
   }
 
-  .register-title {
+  .auth-title {
     font-size: 1.7rem;
   }
 }

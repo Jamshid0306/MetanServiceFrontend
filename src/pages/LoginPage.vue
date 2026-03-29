@@ -1,27 +1,42 @@
 <script setup>
 import { ref } from "vue";
+import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
+import TelegramLoginButton from "@/components/TelegramLoginButton.vue";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
 import { storeCustomerSession } from "@/lib/customerSession";
+
+const router = useRouter();
+const { t } = useI18n();
 
 const identifier = ref("");
 const password = ref("");
 const submitting = ref(false);
 const errorMessage = ref("");
 
-const goTo = (path) => {
-  if (typeof window !== "undefined") {
-    window.location.href = path;
+const submitTelegramLogin = async (telegramUser) => {
+  submitting.value = true;
+  errorMessage.value = "";
+
+  try {
+    const response = await apiClient.post("/customers/telegram", telegramUser);
+    storeCustomerSession(response.data?.customer || null);
+    router.push("/");
+  } catch (error) {
+    errorMessage.value = getApiErrorMessage(error, t("auth.telegramFailed"));
+  } finally {
+    submitting.value = false;
   }
 };
 
 const submitLogin = async () => {
   if (!identifier.value.trim() || !password.value.trim()) {
-    errorMessage.value = "Iltimos, barcha maydonlarni to'ldiring.";
+    errorMessage.value = t("auth.fillRequired");
     return;
   }
 
   if (password.value.trim().length < 8) {
-    errorMessage.value = "Parol kamida 8 ta belgidan iborat bo'lishi kerak.";
+    errorMessage.value = t("auth.passwordTooShort");
     return;
   }
 
@@ -35,12 +50,9 @@ const submitLogin = async () => {
     });
 
     storeCustomerSession(response.data?.customer || null);
-    goTo("/");
+    router.push("/");
   } catch (error) {
-    errorMessage.value = getApiErrorMessage(
-      error,
-      "Login bajarilmadi. Qaytadan urinib ko'ring."
-    );
+    errorMessage.value = getApiErrorMessage(error, t("auth.loginFailed"));
   } finally {
     submitting.value = false;
   }
@@ -48,61 +60,71 @@ const submitLogin = async () => {
 </script>
 
 <template>
-  <section class="login-page">
-    <div class="login-shell">
-      <div class="login-card">
-        <p class="login-kicker">USER ACCESS</p>
-        <h1 class="login-title">Login</h1>
-        <p class="login-subtitle">
-          Telegram username yoki telefon raqam va parol bilan tizimga kiring.
-        </p>
+  <section class="auth-page">
+    <div class="auth-shell">
+      <div class="auth-card">
+        <p class="auth-kicker">{{ t("auth.userAccess") }}</p>
+        <h1 class="auth-title">{{ t("auth.loginTitle") }}</h1>
+        <p class="auth-subtitle">{{ t("auth.loginSubtitle") }}</p>
 
-        <form class="login-form" @submit.prevent="submitLogin">
-          <label class="login-field">
-            <span>Telegram username yoki telefon</span>
+        <div class="auth-telegram-block">
+          <TelegramLoginButton
+            @auth="submitTelegramLogin"
+            @error="errorMessage = $event"
+          />
+          <p class="auth-telegram-hint">{{ t("auth.telegramHint") }}</p>
+        </div>
+
+        <div class="auth-divider">
+          <span>{{ t("auth.orContinue") }}</span>
+        </div>
+
+        <form class="auth-form" @submit.prevent="submitLogin">
+          <label class="auth-field">
+            <span>{{ t("auth.loginIdentifier") }}</span>
             <input
               v-model="identifier"
               type="text"
               autocomplete="username"
-              placeholder="@username yoki 998901234567"
-              class="login-input"
+              :placeholder="t('auth.loginIdentifierPlaceholder')"
+              class="auth-input"
             />
           </label>
 
-          <label class="login-field">
-            <span>Parol</span>
+          <label class="auth-field">
+            <span>{{ t("auth.password") }}</span>
             <input
               v-model="password"
               type="password"
               autocomplete="current-password"
-              placeholder="Parolni kiriting"
-              class="login-input"
+              :placeholder="t('auth.passwordPlaceholder')"
+              class="auth-input"
             />
           </label>
 
           <button
             type="button"
-            class="login-link-button"
-            @click="goTo('/forgot-password')"
+            class="auth-link-button"
+            @click="router.push('/forgot-password')"
           >
-            Parolni unutdingizmi?
+            {{ t("auth.forgotPassword") }}
           </button>
 
-          <p v-if="errorMessage" class="login-error">{{ errorMessage }}</p>
+          <p v-if="errorMessage" class="auth-error">{{ errorMessage }}</p>
 
-          <button type="submit" class="login-submit" :disabled="submitting">
-            {{ submitting ? "Yuborilmoqda..." : "Kirish" }}
+          <button type="submit" class="auth-submit" :disabled="submitting">
+            {{ submitting ? t("sending") : t("auth.loginSubmit") }}
           </button>
         </form>
 
-        <p class="login-switch">
-          Akkountingiz yo'qmi?
+        <p class="auth-switch">
+          {{ t("auth.noAccount") }}
           <button
             type="button"
-            class="login-switch-link"
-            @click="goTo('/register')"
+            class="auth-switch-link"
+            @click="router.push('/register')"
           >
-            Ro'yxatdan o'tish
+            {{ t("auth.registerLink") }}
           </button>
         </p>
       </div>
@@ -111,17 +133,17 @@ const submitLogin = async () => {
 </template>
 
 <style scoped>
-.login-page {
+.auth-page {
   min-height: calc(100vh - 180px);
   padding: 7rem 1rem 3rem;
 }
 
-.login-shell {
+.auth-shell {
   max-width: 520px;
   margin: 0 auto;
 }
 
-.login-card {
+.auth-card {
   border: 1px solid rgba(20, 35, 56, 0.08);
   border-radius: 24px;
   background: #ffffff;
@@ -129,7 +151,7 @@ const submitLogin = async () => {
   padding: 1.25rem;
 }
 
-.login-kicker {
+.auth-kicker {
   color: #64748b;
   font-size: 0.75rem;
   font-weight: 800;
@@ -137,37 +159,78 @@ const submitLogin = async () => {
   text-transform: uppercase;
 }
 
-.login-title {
+.auth-title {
   margin-top: 0.35rem;
   color: #142338;
   font-size: 2rem;
   font-weight: 800;
 }
 
-.login-subtitle {
+.auth-subtitle {
   margin-top: 0.5rem;
   color: #607188;
   line-height: 1.6;
 }
 
-.login-form {
+.auth-telegram-block {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 1.2rem;
+}
+
+.auth-telegram-hint {
+  color: #607188;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.auth-divider {
+  position: relative;
+  margin-top: 1.1rem;
+  text-align: center;
+}
+
+.auth-divider::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: rgba(20, 35, 56, 0.1);
+}
+
+.auth-divider span {
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  background: #ffffff;
+  color: #6b7b91;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0 0.75rem;
+}
+
+.auth-form {
   display: grid;
   gap: 0.9rem;
   margin-top: 1.25rem;
 }
 
-.login-field {
+.auth-field {
   display: grid;
   gap: 0.45rem;
 }
 
-.login-field span {
+.auth-field span {
   color: #304660;
   font-size: 0.88rem;
   font-weight: 700;
 }
 
-.login-input {
+.auth-input {
   width: 100%;
   border: 1px solid rgba(20, 35, 56, 0.12);
   border-radius: 14px;
@@ -177,12 +240,12 @@ const submitLogin = async () => {
   outline: none;
 }
 
-.login-input:focus {
+.auth-input:focus {
   border-color: #18304f;
   box-shadow: 0 0 0 4px rgba(24, 48, 79, 0.08);
 }
 
-.login-link-button {
+.auth-link-button {
   justify-self: end;
   border: none;
   background: transparent;
@@ -193,13 +256,13 @@ const submitLogin = async () => {
   cursor: pointer;
 }
 
-.login-error {
+.auth-error {
   color: #b42318;
   font-size: 0.92rem;
   font-weight: 600;
 }
 
-.login-submit {
+.auth-submit {
   border: 1px solid #18304f;
   border-radius: 16px;
   background: #18304f;
@@ -208,18 +271,18 @@ const submitLogin = async () => {
   font-weight: 800;
 }
 
-.login-submit:disabled {
+.auth-submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.login-switch {
+.auth-switch {
   margin-top: 1rem;
   color: #607188;
   text-align: center;
 }
 
-.login-switch-link {
+.auth-switch-link {
   border: none;
   background: transparent;
   color: #18304f;
@@ -228,15 +291,15 @@ const submitLogin = async () => {
 }
 
 @media (max-width: 640px) {
-  .login-page {
+  .auth-page {
     padding-top: 6.25rem;
   }
 
-  .login-card {
+  .auth-card {
     padding: 1rem;
   }
 
-  .login-title {
+  .auth-title {
     font-size: 1.7rem;
   }
 }
