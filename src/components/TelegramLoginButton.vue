@@ -5,25 +5,8 @@ const emit = defineEmits(["auth", "error"]);
 
 const widgetRef = ref(null);
 const botUsername = String(import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "").trim();
-const widgetScriptUrl = "https://telegram.org/js/telegram-widget.js?22";
-const callbackName = `telegramLoginCallback_${Math.random().toString(36).slice(2)}`;
-
-const getWidgetLanguage = () => {
-  if (typeof window === "undefined") {
-    return "en";
-  }
-
-  const lang = String(window.localStorage?.getItem("lang") || "en").toLowerCase();
-  if (lang === "ru") {
-    return "ru";
-  }
-
-  if (lang === "en") {
-    return "en";
-  }
-
-  return "en";
-};
+const widgetScriptUrl = "https://telegram.org/js/telegram-widget.js?23";
+const callbackName = "onTelegramAuth";
 
 const renderWidget = () => {
   if (typeof window === "undefined" || !widgetRef.value) {
@@ -46,11 +29,8 @@ const renderWidget = () => {
     script.async = true;
     script.setAttribute("data-telegram-login", botUsername);
     script.setAttribute("data-size", "large");
-    script.setAttribute("data-radius", "16");
-    script.setAttribute("data-request-access", "write");
-    script.setAttribute("data-userpic", "false");
-    script.setAttribute("data-lang", getWidgetLanguage());
     script.setAttribute("data-onauth", `${callbackName}(user)`);
+    script.setAttribute("data-request-access", "write");
     script.onerror = () => {
       emit("error", "Telegram tugmasini yuklab bo'lmadi.");
     };
