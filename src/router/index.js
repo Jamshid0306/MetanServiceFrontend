@@ -1,8 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
 import HomePage from "@/pages/HomePage.vue";
-import LoginPage from "@/pages/LoginPage.vue";
-import RegisterPage from "@/pages/RegisterPage.vue";
-import ForgotPasswordPage from "@/pages/ForgotPasswordPage.vue";
 import { ref } from "vue";
 
 export const isLoading = ref(false);
@@ -41,7 +38,7 @@ const routes = [
   {
     path: "/login",
     name: "Login",
-    component: LoginPage,
+    component: () => import("@/pages/LoginPage.vue"),
     meta: {
       title: "Urganch Metan Service - Login",
       robots: "noindex,nofollow",
@@ -51,7 +48,7 @@ const routes = [
   {
     path: "/register",
     name: "Register",
-    component: RegisterPage,
+    component: () => import("@/pages/RegisterPage.vue"),
     meta: {
       title: "Urganch Metan Service - Register",
       robots: "noindex,nofollow",
@@ -61,7 +58,7 @@ const routes = [
   {
     path: "/forgot-password",
     name: "ForgotPassword",
-    component: ForgotPasswordPage,
+    component: () => import("@/pages/ForgotPasswordPage.vue"),
     meta: {
       title: "Urganch Metan Service - Parolni tiklash",
       robots: "noindex,nofollow",
