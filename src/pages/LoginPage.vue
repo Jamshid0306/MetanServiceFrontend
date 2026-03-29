@@ -14,8 +14,9 @@ const password = ref("");
 const submitting = ref(false);
 const errorMessage = ref("");
 
-const handleTelegramError = (message) => {
-  errorMessage.value = String(message || t("auth.telegramLoadError"));
+const handleLoginSuccess = (customer) => {
+  storeCustomerSession(customer);
+  router.push("/");
 };
 
 const submitTelegramLogin = async (telegramUser) => {
@@ -24,8 +25,7 @@ const submitTelegramLogin = async (telegramUser) => {
 
   try {
     const response = await apiClient.post("/customers/telegram", telegramUser);
-    storeCustomerSession(response.data?.customer || null);
-    router.push("/");
+    handleLoginSuccess(response.data?.customer || null);
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error, t("auth.telegramFailed"));
   } finally {
@@ -39,11 +39,6 @@ const submitLogin = async () => {
     return;
   }
 
-  if (password.value.trim().length < 8) {
-    errorMessage.value = t("auth.passwordTooShort");
-    return;
-  }
-
   submitting.value = true;
   errorMessage.value = "";
 
@@ -53,8 +48,7 @@ const submitLogin = async () => {
       password: password.value,
     });
 
-    storeCustomerSession(response.data?.customer || null);
-    router.push("/");
+    handleLoginSuccess(response.data?.customer || null);
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error, t("auth.loginFailed"));
   } finally {
@@ -74,7 +68,7 @@ const submitLogin = async () => {
         <div class="auth-telegram-block">
           <TelegramLoginButton
             @auth="submitTelegramLogin"
-            @error="handleTelegramError"
+            @error="errorMessage = $event"
           />
           <p class="auth-telegram-hint">{{ t("auth.telegramHint") }}</p>
         </div>
@@ -106,20 +100,22 @@ const submitLogin = async () => {
             />
           </label>
 
-          <button
-            type="button"
-            class="auth-link-button"
-            @click="router.push('/forgot-password')"
-          >
-            {{ t("auth.forgotPassword") }}
-          </button>
-
           <p v-if="errorMessage" class="auth-error">{{ errorMessage }}</p>
 
           <button type="submit" class="auth-submit" :disabled="submitting">
             {{ submitting ? t("sending") : t("auth.loginSubmit") }}
           </button>
         </form>
+
+        <div class="auth-links">
+          <button
+            type="button"
+            class="auth-secondary-link"
+            @click="router.push('/forgot-password')"
+          >
+            {{ t("auth.forgotPassword") }}
+          </button>
+        </div>
 
         <p class="auth-switch">
           {{ t("auth.noAccount") }}
@@ -245,62 +241,61 @@ const submitLogin = async () => {
 }
 
 .auth-input:focus {
-  border-color: #18304f;
-  box-shadow: 0 0 0 4px rgba(24, 48, 79, 0.08);
-}
-
-.auth-link-button {
-  justify-self: end;
-  border: none;
-  background: transparent;
-  color: #18304f;
-  font-size: 0.85rem;
-  font-weight: 600;
-  padding: 0;
-  cursor: pointer;
+  border-color: rgba(22, 163, 74, 0.45);
+  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.08);
 }
 
 .auth-error {
-  color: #b42318;
-  font-size: 0.92rem;
-  font-weight: 600;
+  color: #dc2626;
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 
 .auth-submit {
-  border: 1px solid #18304f;
-  border-radius: 16px;
-  background: #18304f;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #16a34a, #15803d);
   color: #ffffff;
-  padding: 0.95rem 1rem;
+  cursor: pointer;
   font-weight: 800;
+  padding: 0.95rem 1rem;
 }
 
 .auth-submit:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  cursor: wait;
+  opacity: 0.7;
 }
 
-.auth-switch {
-  margin-top: 1rem;
-  color: #607188;
-  text-align: center;
+.auth-links {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.8rem;
 }
 
+.auth-secondary-link,
 .auth-switch-link {
   border: none;
   background: transparent;
-  color: #18304f;
-  font-weight: 700;
+  color: #15803d;
   cursor: pointer;
+  font-weight: 700;
+  padding: 0;
+}
+
+.auth-switch {
+  color: #607188;
+  margin-top: 1.1rem;
+  text-align: center;
 }
 
 @media (max-width: 640px) {
   .auth-page {
-    padding-top: 6.25rem;
+    padding-top: 6rem;
   }
 
   .auth-card {
-    padding: 1rem;
+    border-radius: 20px;
+    padding: 1.1rem;
   }
 
   .auth-title {

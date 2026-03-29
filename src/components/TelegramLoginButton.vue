@@ -4,7 +4,7 @@ import { onBeforeUnmount, onMounted, ref } from "vue";
 const emit = defineEmits(["auth", "error"]);
 
 const hostRef = ref(null);
-const botUsername = "urganch_metan_servis_bot";
+const botUsername = String(import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "").trim();
 const TELEGRAM_SCRIPT_SRC = "https://telegram.org/js/telegram-widget.js?23";
 
 let scriptEl = null;
@@ -25,6 +25,11 @@ const cleanupWidget = () => {
 
 onMounted(() => {
   if (!hostRef.value) {
+    return;
+  }
+
+  if (!botUsername) {
+    emit("error", "Telegram login hozircha sozlanmagan.");
     return;
   }
 
