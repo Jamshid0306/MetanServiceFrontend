@@ -2,7 +2,6 @@
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import TelegramLoginButton from "@/components/TelegramLoginButton.vue";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
 import { normalizeCustomerPhone } from "@/lib/customerSession";
 
@@ -17,8 +16,11 @@ const confirmPassword = ref("");
 const submitting = ref(false);
 const errorMessage = ref("");
 const successMessage = ref("");
+const telegramSectionDisabled = true;
 
-const isReadyForPassword = computed(() => Boolean(verifiedPhone.value));
+const isReadyForPassword = computed(
+  () => telegramSectionDisabled || Boolean(verifiedPhone.value)
+);
 const canSubmit = computed(
   () =>
     isReadyForPassword.value &&
@@ -26,40 +28,12 @@ const canSubmit = computed(
     newPassword.value === confirmPassword.value
 );
 
-const handleTelegramAuth = async (telegramUser) => {
-  submitting.value = true;
-  errorMessage.value = "";
-  successMessage.value = "";
-
-  try {
-    const response = await apiClient.post("/customers/telegram", telegramUser);
-
-    const rawPhone =
-      response.data?.customer?.phone ||
-      response.data?.customer?.phone_number ||
-      "";
-
-    const normalized = normalizeCustomerPhone(rawPhone);
-
-    if (!normalized) {
-      throw new Error(t("auth.resetNoPhone"));
-    }
-
-    verifiedPhone.value = normalized;
-    resetToken.value = response.data?.reset_token || "";
-
-    successMessage.value = t("auth.resetVerified");
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, t("auth.telegramFailed"));
-  } finally {
-    submitting.value = false;
-  }
-};
-
 const submitNewPassword = async () => {
   if (!canSubmit.value) {
     if (!newPassword.value.trim() || !confirmPassword.value.trim()) {
       errorMessage.value = t("auth.fillRequired");
+    } else if (!telegramSectionDisabled && !verifiedPhone.value.trim()) {
+      errorMessage.value = t("auth.resetNoPhone");
     } else if (newPassword.value.trim().length < 8) {
       errorMessage.value = t("auth.passwordTooShort");
     } else if (newPassword.value !== confirmPassword.value) {
@@ -112,36 +86,13 @@ const submitNewPassword = async () => {
           {{ t("auth.resetSubtitle") }}
         </p>
 
-        <div class="mt-5 grid gap-3 justify-items-center">
-          <TelegramLoginButton
-            @auth="handleTelegramAuth"
-            @error="errorMessage = $event"
-          />
-          <p class="text-center text-[0.92rem] leading-relaxed text-slate-500">
-            {{ t("auth.resetTelegramHint") }}
-          </p>
-        </div>
-
-        <div
-          v-if="isReadyForPassword"
-          class="relative mt-5 text-center"
-        >
-          <span
-            class="relative z-[1] inline-block bg-[#f7f8f9] px-3 text-[0.82rem] font-bold tracking-[0.04em] text-slate-600"
-          >
-            {{ t("auth.orContinue") }}
-          </span>
-          <span
-            class="pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-slate-900/10"
-          />
-        </div>
-
         <form
           v-if="isReadyForPassword"
           class="mt-5 grid gap-4"
           @submit.prevent="submitNewPassword"
         >
           <div
+            v-if="!telegramSectionDisabled"
             class="flex items-center justify-between text-[0.9rem] text-slate-700"
           >
             <span>{{ t("phone") }}:</span>

@@ -2,7 +2,6 @@
 import { ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import TelegramLoginButton from "@/components/TelegramLoginButton.vue";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
 import { storeCustomerSession } from "@/lib/customerSession";
 
@@ -16,34 +15,6 @@ const submitting = ref(false);
 const errorMessage = ref("");
 const normalizeTelegramUsername = (value = "") =>
   String(value || "").trim().replace(/^@+/, "").toLowerCase();
-
-const submitTelegramLogin = async (telegramUser) => {
-  submitting.value = true;
-  errorMessage.value = "";
-
-  try {
-    const response = await apiClient.post("/customers/telegram", telegramUser);
-
-    const customer = response.data?.customer || null;
-    const accessToken = response.data?.access_token || null;
-
-    if (typeof window !== "undefined" && accessToken) {
-      window.localStorage.setItem("customer_access_token", accessToken);
-    }
-
-    storeCustomerSession(customer);
-
-    if (customer?.has_password === false) {
-      router.push({ path: "/forgot-password", query: { mode: "set-password" } });
-    } else {
-      router.push("/");
-    }
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, t("auth.telegramFailed"));
-  } finally {
-    submitting.value = false;
-  }
-};
 
 const submitRegister = async () => {
   const normalizedTelegramUsername = normalizeTelegramUsername(
@@ -91,18 +62,6 @@ const submitRegister = async () => {
         <p class="auth-kicker">{{ t("auth.userAccess") }}</p>
         <h1 class="auth-title">{{ t("auth.registerTitle") }}</h1>
         <p class="auth-subtitle">{{ t("auth.registerSubtitle") }}</p>
-
-        <div class="auth-telegram-block">
-          <TelegramLoginButton
-            @auth="submitTelegramLogin"
-            @error="errorMessage = $event"
-          />
-          <p class="auth-telegram-hint">{{ t("auth.telegramHint") }}</p>
-        </div>
-
-        <div class="auth-divider">
-          <span>{{ t("auth.orContinue") }}</span>
-        </div>
 
         <form class="auth-form" @submit.prevent="submitRegister">
           <label class="auth-field">
@@ -204,47 +163,6 @@ const submitRegister = async () => {
   display: grid;
   gap: 0.9rem;
   margin-top: 1.2rem;
-}
-
-.auth-telegram-block {
-  display: grid;
-  gap: 0.7rem;
-  margin-top: 1.2rem;
-}
-
-.auth-telegram-hint {
-  color: #607188;
-  font-size: 0.92rem;
-  line-height: 1.5;
-  text-align: center;
-}
-
-.auth-divider {
-  position: relative;
-  margin-top: 1.1rem;
-  text-align: center;
-}
-
-.auth-divider::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: 1px;
-  background: rgba(20, 35, 56, 0.1);
-}
-
-.auth-divider span {
-  position: relative;
-  z-index: 1;
-  display: inline-block;
-  background: #f7f8f9;
-  color: #6b7b91;
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 0 0.75rem;
 }
 
 .auth-field {
