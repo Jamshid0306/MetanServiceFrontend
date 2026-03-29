@@ -1,26 +1,27 @@
 <script setup>
 import { ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
 import { storeCustomerSession } from "@/lib/customerSession";
-
-const router = useRouter();
-const { t } = useI18n();
 
 const identifier = ref("");
 const password = ref("");
 const submitting = ref(false);
 const errorMessage = ref("");
 
+const goTo = (path) => {
+  if (typeof window !== "undefined") {
+    window.location.href = path;
+  }
+};
+
 const submitLogin = async () => {
   if (!identifier.value.trim() || !password.value.trim()) {
-    errorMessage.value = t("auth.fillRequired");
+    errorMessage.value = "Iltimos, barcha maydonlarni to'ldiring.";
     return;
   }
 
   if (password.value.trim().length < 8) {
-    errorMessage.value = t("auth.passwordTooShort");
+    errorMessage.value = "Parol kamida 8 ta belgidan iborat bo'lishi kerak.";
     return;
   }
 
@@ -34,9 +35,12 @@ const submitLogin = async () => {
     });
 
     storeCustomerSession(response.data?.customer || null);
-    router.push("/");
+    goTo("/");
   } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, t("auth.loginFailed"));
+    errorMessage.value = getApiErrorMessage(
+      error,
+      "Login bajarilmadi. Qaytadan urinib ko'ring."
+    );
   } finally {
     submitting.value = false;
   }
@@ -47,29 +51,31 @@ const submitLogin = async () => {
   <section class="login-page">
     <div class="login-shell">
       <div class="login-card">
-        <p class="login-kicker">{{ t("auth.userAccess") }}</p>
-        <h1 class="login-title">{{ t("auth.loginTitle") }}</h1>
-        <p class="login-subtitle">{{ t("auth.loginSubtitle") }}</p>
+        <p class="login-kicker">USER ACCESS</p>
+        <h1 class="login-title">Login</h1>
+        <p class="login-subtitle">
+          Telegram username yoki telefon raqam va parol bilan tizimga kiring.
+        </p>
 
         <form class="login-form" @submit.prevent="submitLogin">
           <label class="login-field">
-            <span>{{ t("auth.loginIdentifier") }}</span>
+            <span>Telegram username yoki telefon</span>
             <input
               v-model="identifier"
               type="text"
               autocomplete="username"
-              :placeholder="t('auth.loginIdentifierPlaceholder')"
+              placeholder="@username yoki 998901234567"
               class="login-input"
             />
           </label>
 
           <label class="login-field">
-            <span>{{ t("auth.password") }}</span>
+            <span>Parol</span>
             <input
               v-model="password"
               type="password"
               autocomplete="current-password"
-              :placeholder="t('auth.passwordPlaceholder')"
+              placeholder="Parolni kiriting"
               class="login-input"
             />
           </label>
@@ -77,23 +83,27 @@ const submitLogin = async () => {
           <button
             type="button"
             class="login-link-button"
-            @click="router.push('/forgot-password')"
+            @click="goTo('/forgot-password')"
           >
-            {{ t("auth.forgotPassword") }}
+            Parolni unutdingizmi?
           </button>
 
           <p v-if="errorMessage" class="login-error">{{ errorMessage }}</p>
 
           <button type="submit" class="login-submit" :disabled="submitting">
-            {{ submitting ? t("sending") : t("auth.loginSubmit") }}
+            {{ submitting ? "Yuborilmoqda..." : "Kirish" }}
           </button>
         </form>
 
         <p class="login-switch">
-          {{ t("auth.noAccount") }}
-          <RouterLink to="/register" class="login-switch-link">
-            {{ t("auth.registerLink") }}
-          </RouterLink>
+          Akkountingiz yo'qmi?
+          <button
+            type="button"
+            class="login-switch-link"
+            @click="goTo('/register')"
+          >
+            Ro'yxatdan o'tish
+          </button>
         </p>
       </div>
     </div>
@@ -210,8 +220,11 @@ const submitLogin = async () => {
 }
 
 .login-switch-link {
+  border: none;
+  background: transparent;
   color: #18304f;
   font-weight: 700;
+  cursor: pointer;
 }
 
 @media (max-width: 640px) {
