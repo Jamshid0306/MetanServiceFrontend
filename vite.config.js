@@ -16,7 +16,6 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (
-            /TelegramLoginButton\.vue/.test(id) ||
             /[/\\]pages[/\\]LoginPage\.vue/.test(id) ||
             /[/\\]pages[/\\]RegisterPage\.vue/.test(id) ||
             /[/\\]pages[/\\]ForgotPasswordPage\.vue/.test(id)

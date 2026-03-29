@@ -24,26 +24,6 @@
             </a>
 
             <a
-              :href="CONTACT_TELEGRAM_URL"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="footer-contact-row"
-            >
-              <span class="footer-contact-icon footer-contact-icon-tg" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">
-                  <path
-                    fill="currentColor"
-                    d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.23-.447-1.923-.875-1.09-.718-1.7-1.165-2.75-1.866-1.21-.82-1.42-1.005-1.45-1.44-.02-.32.08-.517.45-.735 1.14-.68 7.87-4.9 8.1-5.3.05-.1.07-.2-.04-.28-.1-.1-.24-.07-.36-.04-.16.04-2.65 1.7-7.48 4.9z"
-                  />
-                </svg>
-              </span>
-              <span class="footer-contact-meta">
-                <strong class="footer-contact-label">{{ t("footer.telegram") }}</strong>
-                <small class="footer-contact-value">{{ CONTACT_TELEGRAM_HANDLE }}</small>
-              </span>
-            </a>
-
-            <a
               :href="CONTACT_INSTAGRAM_URL"
               target="_blank"
               rel="noopener noreferrer"
@@ -120,8 +100,6 @@ import {
   CONTACT_MAP_URL,
   CONTACT_PHONE_DISPLAY,
   CONTACT_PHONE_HREF,
-  CONTACT_TELEGRAM_HANDLE,
-  CONTACT_TELEGRAM_URL,
 } from "@/constants/contact";
 const { t } = useI18n();
 </script>
@@ -243,11 +221,6 @@ const { t } = useI18n();
 
 .footer-contact-icon-map {
   background: rgba(16, 185, 129, 0.12);
-}
-
-.footer-contact-icon-tg {
-  background: rgba(34, 158, 217, 0.14);
-  color: #7dd3fc;
 }
 
 .footer-contact-meta {

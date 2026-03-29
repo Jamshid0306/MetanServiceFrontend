@@ -89,19 +89,10 @@ const profileDisplayName = computed(() => {
 });
 
 const profileSecondaryText = computed(() => {
-  const telegramUsername = String(
-    customerProfile.value?.telegramUsername || customerProfile.value?.username || ""
-  ).trim();
   const phone = String(customerProfile.value?.phone || "").trim();
-
-  if (telegramUsername) {
-    return `@${telegramUsername.replace(/^@+/, "")}`;
-  }
-
   if (phone) {
     return `+${phone}`;
   }
-
   return t("auth.userAccess");
 });
 
@@ -164,10 +155,6 @@ watch(
           </div>
 
           <div class="mobile-profile-meta">
-            <p v-if="customerProfile.telegramUsername">
-              <span>{{ t("auth.telegramUsername") }}</span>
-              <strong>@{{ customerProfile.telegramUsername }}</strong>
-            </p>
             <p v-if="customerProfile.phone">
               <span>{{ t("phone") }}</span>
               <strong>+{{ customerProfile.phone }}</strong>

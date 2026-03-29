@@ -2,7 +2,6 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import TelegramLoginButton from "@/components/TelegramLoginButton.vue";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
 import { storeCustomerSession } from "@/lib/customerSession";
 
@@ -19,22 +18,6 @@ const handleLoginSuccess = (customer) => {
   router.push("/");
 };
 
-const submitTelegramLogin = async (telegramUser) => {
-  submitting.value = true;
-  errorMessage.value = "";
-
-  try {
-    const response = await apiClient.post("/customers/telegram", telegramUser, {
-      skipAuth: true,
-    });
-    handleLoginSuccess(response.data?.customer || null);
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, t("auth.telegramFailed"));
-  } finally {
-    submitting.value = false;
-  }
-};
-
 const submitLogin = async () => {
   if (!identifier.value.trim() || !password.value.trim()) {
     errorMessage.value = t("auth.fillRequired");
@@ -45,10 +28,14 @@ const submitLogin = async () => {
   errorMessage.value = "";
 
   try {
-    const response = await apiClient.post("/customers/login", {
-      identifier: identifier.value.trim(),
-      password: password.value,
-    });
+    const response = await apiClient.post(
+      "/customers/login",
+      {
+        identifier: identifier.value.trim(),
+        password: password.value,
+      },
+      { skipAuth: true }
+    );
     handleLoginSuccess(response.data?.customer || null);
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error, t("auth.loginFailed"));
@@ -59,246 +46,241 @@ const submitLogin = async () => {
 </script>
 
 <template>
-  <section class="auth-page">
-    <div class="auth-shell">
-      <div class="auth-card">
-        <p class="auth-kicker">{{ t("auth.userAccess") }}</p>
-        <h1 class="auth-title">{{ t("auth.loginTitle") }}</h1>
-        <p class="auth-subtitle">{{ t("auth.loginSubtitle") }}</p>
+  <main class="login-page">
+    <div class="login-inner">
+      <header class="login-head">
+        <p class="login-kicker">{{ t("auth.userAccess") }}</p>
+        <h1 class="login-title">{{ t("auth.loginTitle") }}</h1>
+        <p class="login-lead">{{ t("auth.loginSubtitle") }}</p>
+      </header>
 
-        <div class="auth-telegram-block">
-          <TelegramLoginButton
-            @auth="submitTelegramLogin"
-            @error="errorMessage = $event"
+      <form class="login-form" @submit.prevent="submitLogin">
+        <label class="login-field">
+          <span class="login-label">{{ t("auth.loginIdentifier") }}</span>
+          <input
+            v-model="identifier"
+            type="text"
+            name="identifier"
+            autocomplete="username"
+            :placeholder="t('auth.loginIdentifierPlaceholder')"
+            class="login-input"
           />
-          <p class="auth-telegram-hint">{{ t("auth.telegramHint") }}</p>
-        </div>
+        </label>
 
-        <div class="auth-divider">
-          <span>{{ t("auth.orContinue") }}</span>
-        </div>
+        <label class="login-field">
+          <span class="login-label">{{ t("auth.password") }}</span>
+          <input
+            v-model="password"
+            type="password"
+            name="password"
+            autocomplete="current-password"
+            :placeholder="t('auth.passwordPlaceholder')"
+            class="login-input"
+          />
+        </label>
 
-        <form class="auth-form" @submit.prevent="submitLogin">
-          <label class="auth-field">
-            <span>{{ t("auth.loginIdentifier") }}</span>
-            <input
-              v-model="identifier"
-              type="text"
-              autocomplete="username"
-              :placeholder="t('auth.loginIdentifierPlaceholder')"
-              class="auth-input"
-            />
-          </label>
+        <p v-if="errorMessage" class="login-error" role="alert">{{ errorMessage }}</p>
 
-          <label class="auth-field">
-            <span>{{ t("auth.password") }}</span>
-            <input
-              v-model="password"
-              type="password"
-              autocomplete="current-password"
-              :placeholder="t('auth.passwordPlaceholder')"
-              class="auth-input"
-            />
-          </label>
+        <button type="submit" class="login-submit" :disabled="submitting">
+          {{ submitting ? t("sending") : t("auth.loginSubmit") }}
+        </button>
+      </form>
 
-          <p v-if="errorMessage" class="auth-error">{{ errorMessage }}</p>
-
-          <button type="submit" class="auth-submit" :disabled="submitting">
-            {{ submitting ? t("sending") : t("auth.loginSubmit") }}
-          </button>
-        </form>
-
-        <button
-          type="button"
-          class="auth-inline-link"
-          @click="router.push('/forgot-password')"
-        >
+      <nav class="login-nav">
+        <button type="button" class="login-link" @click="router.push('/forgot-password')">
           {{ t("auth.forgotPassword") }}
         </button>
-
-        <p class="auth-switch">
+        <p class="login-switch">
           {{ t("auth.noAccount") }}
-          <button
-            type="button"
-            class="auth-switch-link"
-            @click="router.push('/register')"
-          >
+          <button type="button" class="login-link login-link-strong" @click="router.push('/register')">
             {{ t("auth.registerLink") }}
           </button>
         </p>
-      </div>
+      </nav>
     </div>
-  </section>
+  </main>
 </template>
 
 <style scoped>
-.auth-page {
-  min-height: calc(100vh - 180px);
-  padding: 7rem 1rem 3rem;
+.login-page {
+  min-height: min(100vh, 100dvh);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5.5rem 1rem 2rem;
+  box-sizing: border-box;
 }
 
-.auth-shell {
-  max-width: 520px;
-  margin: 0 auto;
-}
-
-.auth-card {
-  border: 1px solid rgba(20, 35, 56, 0.08);
-  border-radius: 24px;
-  background: #ffffff;
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
-  padding: 1.25rem;
-}
-
-.auth-kicker {
-  color: #64748b;
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.auth-title {
-  margin-top: 0.35rem;
-  color: #142338;
-  font-size: 2rem;
-  font-weight: 800;
-}
-
-.auth-subtitle {
-  margin-top: 0.5rem;
-  color: #607188;
-  line-height: 1.6;
-}
-
-.auth-telegram-block {
-  display: grid;
-  gap: 0.7rem;
-  margin-top: 1.2rem;
-}
-
-.auth-telegram-hint {
-  color: #607188;
-  font-size: 0.92rem;
-  line-height: 1.5;
-  text-align: center;
-}
-
-.auth-divider {
-  position: relative;
-  margin-top: 1.1rem;
-  text-align: center;
-}
-
-.auth-divider::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: 1px;
-  background: rgba(20, 35, 56, 0.1);
-}
-
-.auth-divider span {
-  position: relative;
-  z-index: 1;
-  display: inline-block;
-  background: #ffffff;
-  color: #6b7b91;
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 0 0.75rem;
-}
-
-.auth-form {
-  display: grid;
-  gap: 0.9rem;
-  margin-top: 1.25rem;
-}
-
-.auth-field {
-  display: grid;
-  gap: 0.45rem;
-}
-
-.auth-field span {
-  color: #304660;
-  font-size: 0.88rem;
-  font-weight: 700;
-}
-
-.auth-input {
+.login-inner {
   width: 100%;
-  border: 1px solid rgba(20, 35, 56, 0.12);
-  border-radius: 14px;
+  max-width: 420px;
+  padding: 1.75rem 1.5rem;
+  border-radius: 20px;
+  border: 1px solid rgba(20, 35, 56, 0.1);
   background: #ffffff;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+}
+
+.login-head {
+  margin-bottom: 1.5rem;
+}
+
+.login-kicker {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.login-title {
+  margin: 0.5rem 0 0;
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: #142338;
-  padding: 0.92rem 1rem;
+  line-height: 1.2;
+}
+
+.login-lead {
+  margin: 0.5rem 0 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #5c6b82;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.login-label {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #304660;
+}
+
+.login-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(20, 35, 56, 0.14);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  font-size: 1rem;
+  color: #142338;
+  background: #fafbfc;
   outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
 }
 
-.auth-input:focus {
-  border-color: rgba(22, 163, 74, 0.45);
-  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.08);
+.login-input::placeholder {
+  color: #94a3b8;
 }
 
-.auth-error {
-  color: #dc2626;
+.login-input:hover {
+  background: #ffffff;
+}
+
+.login-input:focus {
+  background: #ffffff;
+  border-color: rgba(24, 48, 79, 0.45);
+  box-shadow: 0 0 0 3px rgba(24, 48, 79, 0.1);
+}
+
+.login-error {
+  margin: 0;
   font-size: 0.9rem;
-  line-height: 1.5;
+  font-weight: 600;
+  color: #b42318;
+  line-height: 1.45;
 }
 
-.auth-submit {
+.login-submit {
+  margin-top: 0.25rem;
+  width: 100%;
   border: none;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #16a34a, #15803d);
+  border-radius: 12px;
+  padding: 0.95rem 1rem;
+  font-size: 1rem;
+  font-weight: 800;
   color: #ffffff;
   cursor: pointer;
-  font-weight: 800;
-  padding: 0.95rem 1rem;
+  background: linear-gradient(135deg, #18304f 0%, #24466f 100%);
+  transition: opacity 0.15s ease, transform 0.1s ease;
 }
 
-.auth-submit:disabled {
-  cursor: wait;
-  opacity: 0.7;
+.login-submit:hover:not(:disabled) {
+  opacity: 0.95;
 }
 
-.auth-inline-link,
-.auth-switch-link {
-  border: none;
-  background: transparent;
-  color: #15803d;
-  cursor: pointer;
-  font-weight: 700;
-  padding: 0;
+.login-submit:active:not(:disabled) {
+  transform: scale(0.99);
 }
 
-.auth-inline-link {
-  display: block;
-  margin-top: 0.9rem;
-  margin-left: auto;
+.login-submit:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
-.auth-switch {
-  color: #607188;
-  margin-top: 1.1rem;
+.login-nav {
+  margin-top: 1.35rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
   text-align: center;
 }
 
-@media (max-width: 640px) {
-  .auth-page {
-    padding-top: 6rem;
+.login-switch {
+  margin: 0;
+  font-size: 0.92rem;
+  color: #607188;
+}
+
+.login-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #18304f;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.login-link:hover {
+  color: #142338;
+}
+
+.login-link-strong {
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.login-link-strong:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 480px) {
+  .login-inner {
+    padding: 1.5rem 1.15rem;
   }
 
-  .auth-card {
-    border-radius: 20px;
-    padding: 1.1rem;
-  }
-
-  .auth-title {
-    font-size: 1.7rem;
+  .login-title {
+    font-size: 1.45rem;
   }
 }
 </style>

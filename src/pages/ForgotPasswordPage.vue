@@ -1,71 +1,35 @@
 <script setup>
-import { computed, ref } from "vue";
+import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import TelegramLoginButton from "@/components/TelegramLoginButton.vue";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
 import { normalizeCustomerPhone } from "@/lib/customerSession";
 
 const router = useRouter();
 const { t } = useI18n();
 
-const verifiedPhone = ref("");
+const phone = ref("");
 const newPassword = ref("");
 const confirmPassword = ref("");
 const submitting = ref(false);
 const errorMessage = ref("");
 const successMessage = ref("");
 
-const isReadyForPassword = computed(() => Boolean(verifiedPhone.value));
-const canSubmit = computed(
-  () =>
-    isReadyForPassword.value &&
-    newPassword.value.trim().length >= 8 &&
-    newPassword.value === confirmPassword.value
-);
+const submitReset = async () => {
+  const normalizedPhone = normalizeCustomerPhone(phone.value);
 
-const handleTelegramAuth = async (telegramUser) => {
-  submitting.value = true;
-  errorMessage.value = "";
-  successMessage.value = "";
-
-  try {
-    const response = await apiClient.post("/customers/telegram", telegramUser, {
-      skipAuth: true,
-    });
-
-    const rawPhone =
-      response.data?.customer?.phone ||
-      response.data?.customer?.phone_number ||
-      "";
-
-    const normalized = normalizeCustomerPhone(rawPhone);
-
-    if (!normalized) {
-      errorMessage.value = t("auth.resetNoPhone");
-      return;
-    }
-
-    verifiedPhone.value = normalized;
-    successMessage.value = t("auth.resetVerified");
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, t("auth.telegramFailed"));
-  } finally {
-    submitting.value = false;
+  if (!normalizedPhone || !newPassword.value.trim() || !confirmPassword.value.trim()) {
+    errorMessage.value = t("auth.fillRequired");
+    return;
   }
-};
 
-const submitNewPassword = async () => {
-  if (!canSubmit.value) {
-    if (!newPassword.value.trim() || !confirmPassword.value.trim()) {
-      errorMessage.value = t("auth.fillRequired");
-    } else if (!verifiedPhone.value.trim()) {
-      errorMessage.value = t("auth.resetNoPhone");
-    } else if (newPassword.value.trim().length < 8) {
-      errorMessage.value = t("auth.passwordTooShort");
-    } else if (newPassword.value !== confirmPassword.value) {
-      errorMessage.value = t("auth.passwordsDontMatch");
-    }
+  if (newPassword.value.trim().length < 8) {
+    errorMessage.value = t("auth.passwordTooShort");
+    return;
+  }
+
+  if (newPassword.value !== confirmPassword.value) {
+    errorMessage.value = t("auth.passwordsDontMatch");
     return;
   }
 
@@ -74,10 +38,14 @@ const submitNewPassword = async () => {
   successMessage.value = "";
 
   try {
-    await apiClient.post("/customers/reset-password", {
-      phone: verifiedPhone.value,
-      password: newPassword.value.trim(),
-    });
+    await apiClient.post(
+      "/customers/reset-password",
+      {
+        phone: normalizedPhone,
+        password: newPassword.value.trim(),
+      },
+      { skipAuth: true }
+    );
 
     successMessage.value = t("auth.resetSuccess");
 
@@ -85,7 +53,7 @@ const submitNewPassword = async () => {
       router.push("/login");
     }, 1200);
   } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, t("auth.registerFailed"));
+    errorMessage.value = getApiErrorMessage(error, t("auth.resetFailed"));
   } finally {
     submitting.value = false;
   }
@@ -100,33 +68,24 @@ const submitNewPassword = async () => {
         <h1 class="auth-title">{{ t("auth.resetTitle") }}</h1>
         <p class="auth-subtitle">{{ t("auth.resetSubtitle") }}</p>
 
-        <div class="auth-telegram-block">
-          <TelegramLoginButton
-            @auth="handleTelegramAuth"
-            @error="errorMessage = $event"
-          />
-          <p class="auth-telegram-hint">{{ t("auth.resetTelegramHint") }}</p>
-        </div>
-
-        <div v-if="isReadyForPassword" class="auth-divider">
-          <span>{{ t("auth.orContinue") }}</span>
-        </div>
-
-        <form
-          v-if="isReadyForPassword"
-          class="auth-form"
-          @submit.prevent="submitNewPassword"
-        >
-          <div class="auth-meta">
+        <form class="auth-form" @submit.prevent="submitReset">
+          <label class="auth-field">
             <span>{{ t("phone") }}</span>
-            <strong>+{{ verifiedPhone }}</strong>
-          </div>
+            <input
+              v-model="phone"
+              type="tel"
+              autocomplete="tel"
+              :placeholder="t('auth.phonePlaceholder')"
+              class="auth-input"
+            />
+          </label>
 
           <label class="auth-field">
             <span>{{ t("auth.newPassword") }}</span>
             <input
               v-model="newPassword"
               type="password"
+              autocomplete="new-password"
               :placeholder="t('auth.newPasswordPlaceholder')"
               class="auth-input"
             />
@@ -137,6 +96,7 @@ const submitNewPassword = async () => {
             <input
               v-model="confirmPassword"
               type="password"
+              autocomplete="new-password"
               :placeholder="t('auth.confirmPasswordPlaceholder')"
               class="auth-input"
             />
@@ -149,6 +109,12 @@ const submitNewPassword = async () => {
             {{ submitting ? t("sending") : t("auth.resetSubmit") }}
           </button>
         </form>
+
+        <p class="auth-switch">
+          <button type="button" class="auth-switch-link" @click="router.push('/login')">
+            {{ t("auth.loginLink") }}
+          </button>
+        </p>
       </div>
     </div>
   </section>
@@ -194,59 +160,10 @@ const submitNewPassword = async () => {
   line-height: 1.6;
 }
 
-.auth-telegram-block {
-  display: grid;
-  gap: 0.7rem;
-  margin-top: 1.2rem;
-}
-
-.auth-telegram-hint {
-  color: #607188;
-  font-size: 0.92rem;
-  line-height: 1.5;
-  text-align: center;
-}
-
-.auth-divider {
-  position: relative;
-  margin-top: 1.1rem;
-  text-align: center;
-}
-
-.auth-divider::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: 1px;
-  background: rgba(20, 35, 56, 0.1);
-}
-
-.auth-divider span {
-  position: relative;
-  z-index: 1;
-  display: inline-block;
-  background: #ffffff;
-  color: #6b7b91;
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 0 0.75rem;
-}
-
 .auth-form {
   display: grid;
   gap: 0.9rem;
   margin-top: 1.25rem;
-}
-
-.auth-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: #304660;
-  font-size: 0.9rem;
 }
 
 .auth-field {
@@ -299,6 +216,19 @@ const submitNewPassword = async () => {
 .auth-submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.auth-switch {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.auth-switch-link {
+  border: none;
+  background: transparent;
+  color: #18304f;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 @media (max-width: 640px) {
