@@ -47,7 +47,6 @@ const submitLogin = async () => {
       identifier: identifier.value.trim(),
       password: password.value,
     });
-
     handleLoginSuccess(response.data?.customer || null);
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error, t("auth.loginFailed"));
@@ -107,15 +106,13 @@ const submitLogin = async () => {
           </button>
         </form>
 
-        <div class="auth-links">
-          <button
-            type="button"
-            class="auth-secondary-link"
-            @click="router.push('/forgot-password')"
-          >
-            {{ t("auth.forgotPassword") }}
-          </button>
-        </div>
+        <button
+          type="button"
+          class="auth-inline-link"
+          @click="router.push('/forgot-password')"
+        >
+          {{ t("auth.forgotPassword") }}
+        </button>
 
         <p class="auth-switch">
           {{ t("auth.noAccount") }}
@@ -266,13 +263,7 @@ const submitLogin = async () => {
   opacity: 0.7;
 }
 
-.auth-links {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 0.8rem;
-}
-
-.auth-secondary-link,
+.auth-inline-link,
 .auth-switch-link {
   border: none;
   background: transparent;
@@ -280,6 +271,12 @@ const submitLogin = async () => {
   cursor: pointer;
   font-weight: 700;
   padding: 0;
+}
+
+.auth-inline-link {
+  display: block;
+  margin-top: 0.9rem;
+  margin-left: auto;
 }
 
 .auth-switch {
