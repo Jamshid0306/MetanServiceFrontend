@@ -1,66 +1,85 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted } from "vue";
 
 const emit = defineEmits(["auth", "error"]);
 
-const widgetRef = ref(null);
 const botUsername = String(import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "").trim();
-const widgetScriptUrl = "https://telegram.org/js/telegram-widget.js?23";
-const callbackName = "onTelegramAuth";
 
-const renderWidget = () => {
-  if (typeof window === "undefined" || !widgetRef.value) {
+const widgetSrc = computed(() => {
+  if (!botUsername) {
+    return "";
+  }
+
+  const params = new URLSearchParams({
+    bot: botUsername,
+  });
+
+  return `/telegram-login-widget.html?${params.toString()}`;
+});
+
+const handleMessage = (event) => {
+  if (typeof window === "undefined") {
     return;
   }
 
+  if (event.origin !== window.location.origin) {
+    return;
+  }
+
+  const payload = event.data || {};
+  if (payload?.source !== "telegram-login-widget") {
+    return;
+  }
+
+  if (payload.type === "auth" && payload.user) {
+    emit("auth", payload.user);
+    return;
+  }
+
+  if (payload.type === "error") {
+    emit("error", payload.message || "Telegram tugmasini yuklab bo'lmadi.");
+  }
+};
+
+onMounted(() => {
   if (!botUsername) {
     emit("error", "Telegram login hozircha sozlanmagan.");
     return;
   }
 
-  try {
-    widgetRef.value.innerHTML = "";
-
-    window[callbackName] = (user) => {
-      emit("auth", user);
-    };
-
-    const script = document.createElement("script");
-    script.async = true;
-    script.setAttribute("data-telegram-login", botUsername);
-    script.setAttribute("data-size", "large");
-    script.setAttribute("data-onauth", `${callbackName}(user)`);
-    script.setAttribute("data-request-access", "write");
-    script.onerror = () => {
-      emit("error", "Telegram tugmasini yuklab bo'lmadi.");
-    };
-    script.src = widgetScriptUrl;
-
-    widgetRef.value.appendChild(script);
-  } catch {
-    emit("error", "Telegram tugmasini yuklab bo'lmadi.");
-  }
-};
-
-onMounted(() => {
-  renderWidget();
+  window.addEventListener("message", handleMessage);
 });
 
 onBeforeUnmount(() => {
   if (typeof window !== "undefined") {
-    delete window[callbackName];
+    window.removeEventListener("message", handleMessage);
   }
 });
 </script>
 
 <template>
-  <div ref="widgetRef" class="telegram-widget-host" />
+  <div class="telegram-widget-frame-wrap">
+    <iframe
+      v-if="widgetSrc"
+      :src="widgetSrc"
+      title="Telegram login"
+      class="telegram-widget-frame"
+      loading="eager"
+    />
+  </div>
 </template>
 
 <style scoped>
-.telegram-widget-host {
-  min-height: 42px;
+.telegram-widget-frame-wrap {
   display: grid;
   justify-items: center;
+}
+
+.telegram-widget-frame {
+  width: 100%;
+  max-width: 320px;
+  height: 64px;
+  border: 0;
+  background: transparent;
 }
 </style>
