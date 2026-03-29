@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 const emit = defineEmits(["auth", "error"]);
@@ -9,6 +9,7 @@ const widgetRef = ref(null);
 const callbackName = `telegramLoginCallback_${Math.random().toString(36).slice(2)}`;
 const botUsername = String(import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "").trim();
 const isConfigured = computed(() => Boolean(botUsername));
+let renderCheckTimer = null;
 const widgetLang = computed(() => {
   if (locale.value === "ru") {
     return "ru";
@@ -21,11 +22,21 @@ const widgetLang = computed(() => {
   return "en";
 });
 
-const renderWidget = () => {
+const clearRenderCheckTimer = () => {
+  if (typeof window !== "undefined" && renderCheckTimer) {
+    window.clearTimeout(renderCheckTimer);
+    renderCheckTimer = null;
+  }
+};
+
+const renderWidget = async () => {
+  await nextTick();
+
   if (!widgetRef.value || !isConfigured.value || typeof window === "undefined") {
     return;
   }
 
+  clearRenderCheckTimer();
   widgetRef.value.innerHTML = "";
   window[callbackName] = (user) => {
     emit("auth", user);
@@ -33,7 +44,6 @@ const renderWidget = () => {
 
   const script = document.createElement("script");
   script.async = true;
-  script.src = "https://telegram.org/js/telegram-widget.js?22";
   script.setAttribute("data-telegram-login", botUsername);
   script.setAttribute("data-size", "large");
   script.setAttribute("data-radius", "16");
@@ -41,9 +51,22 @@ const renderWidget = () => {
   script.setAttribute("data-userpic", "false");
   script.setAttribute("data-lang", widgetLang.value);
   script.setAttribute("data-onauth", `${callbackName}(user)`);
+  script.onload = () => {
+    clearRenderCheckTimer();
+    renderCheckTimer = window.setTimeout(() => {
+      const hasRenderedIframe = Boolean(widgetRef.value?.querySelector("iframe"));
+      const hasRenderedButton = Boolean(widgetRef.value?.querySelector("script + *"));
+
+      if (!hasRenderedIframe && !hasRenderedButton) {
+        emit("error", t("auth.telegramLoadError"));
+      }
+    }, 1200);
+  };
   script.onerror = () => {
+    clearRenderCheckTimer();
     emit("error", t("auth.telegramLoadError"));
   };
+  script.src = "https://telegram.org/js/telegram-widget.js?22";
 
   widgetRef.value.appendChild(script);
 };
@@ -52,7 +75,12 @@ onMounted(() => {
   renderWidget();
 });
 
+watch(locale, () => {
+  renderWidget();
+});
+
 onBeforeUnmount(() => {
+  clearRenderCheckTimer();
   if (typeof window !== "undefined") {
     delete window[callbackName];
   }
