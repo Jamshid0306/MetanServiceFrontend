@@ -1,10 +1,11 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from "vue";
+import { apiClient } from "@/lib/api";
 
 const emit = defineEmits(["auth", "error"]);
 
 const hostRef = ref(null);
-const botUsername = String(import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "").trim();
+const botUsername = ref(String(import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "").trim());
 const TELEGRAM_SCRIPT_SRC = "https://telegram.org/js/telegram-widget.js?23";
 
 let scriptEl = null;
@@ -24,40 +25,56 @@ const cleanupWidget = () => {
 };
 
 onMounted(() => {
-  if (!hostRef.value) {
-    return;
-  }
+  const mountWidget = async () => {
+    if (!hostRef.value) {
+      return;
+    }
 
-  if (!botUsername) {
-    emit("error", "Telegram login hozircha sozlanmagan.");
-    return;
-  }
+    if (!botUsername.value) {
+      try {
+        const response = await apiClient.get("/customers/telegram/config");
+        botUsername.value = String(response.data?.bot_username || "").trim();
+      } catch {
+        botUsername.value = "";
+      }
+    }
 
-  try {
-    cleanupWidget();
+    if (!botUsername.value) {
+      emit("error", "Telegram login hozircha sozlanmagan.");
+      return;
+    }
 
-    widgetCallbackName = `onTelegramAuth_${Math.random().toString(36).slice(2)}`;
-    window[widgetCallbackName] = (user) => {
-      emit("auth", user);
-    };
+    try {
+      cleanupWidget();
 
-    scriptEl = document.createElement("script");
-    scriptEl.async = true;
-    scriptEl.src = TELEGRAM_SCRIPT_SRC;
-    scriptEl.setAttribute("data-telegram-login", botUsername);
-    scriptEl.setAttribute("data-size", "large");
-    scriptEl.setAttribute("data-onauth", `${widgetCallbackName}(user)`);
-    scriptEl.setAttribute("data-request-access", "write");
-    scriptEl.onerror = () => {
+      widgetCallbackName = `onTelegramAuth_${Math.random().toString(36).slice(2)}`;
+      window[widgetCallbackName] = (user) => {
+        emit("auth", user);
+      };
+
+      scriptEl = document.createElement("script");
+      scriptEl.async = true;
+      scriptEl.src = TELEGRAM_SCRIPT_SRC;
+      scriptEl.setAttribute(
+        "data-telegram-login",
+        botUsername.value.replace(/^@+/, "")
+      );
+      scriptEl.setAttribute("data-size", "large");
+      scriptEl.setAttribute("data-onauth", `${widgetCallbackName}(user)`);
+      scriptEl.setAttribute("data-request-access", "write");
+      scriptEl.onerror = () => {
+        emit("error", "Telegram tugmasini yuklab bo'lmadi.");
+        cleanupWidget();
+      };
+
+      hostRef.value.appendChild(scriptEl);
+    } catch {
       emit("error", "Telegram tugmasini yuklab bo'lmadi.");
       cleanupWidget();
-    };
+    }
+  };
 
-    hostRef.value.appendChild(scriptEl);
-  } catch {
-    emit("error", "Telegram tugmasini yuklab bo'lmadi.");
-    cleanupWidget();
-  }
+  void mountWidget();
 });
 
 onBeforeUnmount(() => {
