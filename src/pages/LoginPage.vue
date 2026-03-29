@@ -2,7 +2,6 @@
 import { ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import TelegramLoginButton from "@/components/TelegramLoginButton.vue";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
 import { storeCustomerSession } from "@/lib/customerSession";
 
@@ -13,34 +12,6 @@ const identifier = ref("");
 const password = ref("");
 const submitting = ref(false);
 const errorMessage = ref("");
-
-const submitTelegramLogin = async (telegramUser) => {
-  submitting.value = true;
-  errorMessage.value = "";
-
-  try {
-    const response = await apiClient.post("/customers/telegram", telegramUser);
-
-    const customer = response.data?.customer || null;
-    const accessToken = response.data?.access_token || null;
-
-    if (typeof window !== "undefined" && accessToken) {
-      window.localStorage.setItem("customer_access_token", accessToken);
-    }
-
-    storeCustomerSession(customer);
-
-    if (customer?.has_password === false) {
-      router.push({ path: "/forgot-password", query: { mode: "set-password" } });
-    } else {
-      router.push("/");
-    }
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, t("auth.telegramFailed"));
-  } finally {
-    submitting.value = false;
-  }
-};
 
 const submitLogin = async () => {
   if (!identifier.value.trim() || !password.value.trim()) {
@@ -79,18 +50,6 @@ const submitLogin = async () => {
         <p class="auth-kicker">{{ t("auth.userAccess") }}</p>
         <h1 class="auth-title">{{ t("auth.loginTitle") }}</h1>
         <p class="auth-subtitle">{{ t("auth.loginSubtitle") }}</p>
-
-        <div class="auth-telegram-block">
-          <TelegramLoginButton
-            @auth="submitTelegramLogin"
-            @error="errorMessage = $event"
-          />
-          <p class="auth-telegram-hint">{{ t("auth.telegramHint") }}</p>
-        </div>
-
-        <div class="auth-divider">
-          <span>{{ t("auth.orContinue") }}</span>
-        </div>
 
         <form class="auth-form" @submit.prevent="submitLogin">
           <label class="auth-field">
@@ -192,47 +151,6 @@ const submitLogin = async () => {
   display: grid;
   gap: 0.9rem;
   margin-top: 1.2rem;
-}
-
-.auth-telegram-block {
-  display: grid;
-  gap: 0.7rem;
-  margin-top: 1.2rem;
-}
-
-.auth-telegram-hint {
-  color: #607188;
-  font-size: 0.92rem;
-  line-height: 1.5;
-  text-align: center;
-}
-
-.auth-divider {
-  position: relative;
-  margin-top: 1.1rem;
-  text-align: center;
-}
-
-.auth-divider::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: 1px;
-  background: rgba(20, 35, 56, 0.1);
-}
-
-.auth-divider span {
-  position: relative;
-  z-index: 1;
-  display: inline-block;
-  background: #f7f8f9;
-  color: #6b7b91;
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 0 0.75rem;
 }
 
 .auth-field {
