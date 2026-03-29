@@ -13,19 +13,14 @@ const telegramUsername = ref("");
 const password = ref("");
 const submitting = ref(false);
 const errorMessage = ref("");
+
 const normalizeTelegramUsername = (value = "") =>
   String(value || "").trim().replace(/^@+/, "").toLowerCase();
 
 const submitRegister = async () => {
-  const normalizedTelegramUsername = normalizeTelegramUsername(
-    telegramUsername.value
-  );
+  const normalizedTelegramUsername = normalizeTelegramUsername(telegramUsername.value);
 
-  if (
-    !name.value.trim() ||
-    !normalizedTelegramUsername ||
-    !password.value.trim()
-  ) {
+  if (!name.value.trim() || !normalizedTelegramUsername || !password.value.trim()) {
     errorMessage.value = t("auth.fillRequired");
     return;
   }
@@ -56,59 +51,56 @@ const submitRegister = async () => {
 </script>
 
 <template>
-  <section class="auth-page">
-    <div class="auth-shell">
-      <div class="auth-card">
-        <p class="auth-kicker">{{ t("auth.userAccess") }}</p>
-        <h1 class="auth-title">{{ t("auth.registerTitle") }}</h1>
-        <p class="auth-subtitle">{{ t("auth.registerSubtitle") }}</p>
+  <section class="register-page">
+    <div class="register-shell">
+      <div class="register-card">
+        <p class="register-kicker">{{ t("auth.userAccess") }}</p>
+        <h1 class="register-title">{{ t("auth.registerTitle") }}</h1>
+        <p class="register-subtitle">{{ t("auth.registerSubtitle") }}</p>
 
-        <form class="auth-form" @submit.prevent="submitRegister">
-          <label class="auth-field">
+        <form class="register-form" @submit.prevent="submitRegister">
+          <label class="register-field">
             <span>{{ t("name") }}</span>
             <input
               v-model="name"
               type="text"
               :placeholder="t('auth.namePlaceholder')"
-              class="auth-input"
+              class="register-input"
             />
           </label>
 
-          <label class="auth-field">
+          <label class="register-field">
             <span>{{ t("auth.telegramUsername") }}</span>
             <input
               v-model="telegramUsername"
               type="text"
               autocomplete="username"
               :placeholder="t('auth.telegramPlaceholder')"
-              class="auth-input"
+              class="register-input"
             />
           </label>
 
-          <label class="auth-field">
+          <label class="register-field">
             <span>{{ t("auth.password") }}</span>
             <input
               v-model="password"
               type="password"
+              autocomplete="new-password"
               :placeholder="t('auth.passwordPlaceholder')"
-              class="auth-input"
+              class="register-input"
             />
           </label>
 
-          <p v-if="errorMessage" class="auth-error">{{ errorMessage }}</p>
+          <p v-if="errorMessage" class="register-error">{{ errorMessage }}</p>
 
-          <button
-            type="submit"
-            class="auth-submit"
-            :disabled="submitting"
-          >
+          <button type="submit" class="register-submit" :disabled="submitting">
             {{ submitting ? t("sending") : t("auth.registerSubmit") }}
           </button>
         </form>
 
-        <p class="auth-switch">
+        <p class="register-switch">
           {{ t("auth.haveAccount") }}
-          <RouterLink to="/login" class="auth-switch-link">
+          <RouterLink to="/login" class="register-switch-link">
             {{ t("auth.loginLink") }}
           </RouterLink>
         </p>
@@ -118,131 +110,119 @@ const submitRegister = async () => {
 </template>
 
 <style scoped>
-.auth-page {
+.register-page {
   min-height: calc(100vh - 180px);
-  padding: 7.5rem 1rem 3rem;
+  padding: 7rem 1rem 3rem;
 }
 
-.auth-shell {
-  max-width: 1120px;
+.register-shell {
+  max-width: 520px;
   margin: 0 auto;
 }
 
-.auth-card {
-  width: min(460px, 100%);
-  margin: 0 auto;
-  border-radius: 28px;
+.register-card {
   border: 1px solid rgba(20, 35, 56, 0.08);
-  background: linear-gradient(180deg, #fcfcfb 0%, #f4f6f8 100%);
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
-  padding: 1.4rem;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+  padding: 1.25rem;
 }
 
-.auth-kicker {
-  font-size: 0.72rem;
+.register-kicker {
+  color: #64748b;
+  font-size: 0.75rem;
   font-weight: 800;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #6a7d71;
 }
 
-.auth-title {
-  margin-top: 0.45rem;
+.register-title {
+  margin-top: 0.35rem;
   color: #142338;
-  font-size: clamp(1.7rem, 3vw, 2.3rem);
+  font-size: 2rem;
   font-weight: 800;
 }
 
-.auth-subtitle {
+.register-subtitle {
   margin-top: 0.5rem;
   color: #607188;
   line-height: 1.6;
 }
 
-.auth-form {
+.register-form {
   display: grid;
   gap: 0.9rem;
-  margin-top: 1.2rem;
+  margin-top: 1.25rem;
 }
 
-.auth-field {
+.register-field {
   display: grid;
   gap: 0.45rem;
 }
 
-.auth-field span {
+.register-field span {
   color: #304660;
-  font-size: 0.86rem;
+  font-size: 0.88rem;
   font-weight: 700;
 }
 
-.auth-input {
+.register-input {
   width: 100%;
-  border-radius: 16px;
   border: 1px solid rgba(20, 35, 56, 0.12);
+  border-radius: 14px;
   background: #ffffff;
   color: #142338;
-  padding: 0.9rem 1rem;
+  padding: 0.92rem 1rem;
   outline: none;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
 }
 
-.auth-input:focus {
+.register-input:focus {
   border-color: #18304f;
   box-shadow: 0 0 0 4px rgba(24, 48, 79, 0.08);
 }
 
-.auth-error {
+.register-error {
   color: #b42318;
   font-size: 0.92rem;
   font-weight: 600;
 }
 
-.auth-submit {
-  width: 100%;
-  border-radius: 18px;
+.register-submit {
   border: 1px solid #18304f;
+  border-radius: 16px;
   background: #18304f;
   color: #ffffff;
-  padding: 1rem 1.2rem;
+  padding: 0.95rem 1rem;
   font-weight: 800;
-  transition:
-    background 0.2s ease,
-    border-color 0.2s ease,
-    opacity 0.2s ease;
 }
 
-.auth-submit:hover:not(:disabled) {
-  background: #12263d;
-  border-color: #12263d;
-}
-
-.auth-submit:disabled {
+.register-submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.auth-switch {
+.register-switch {
   margin-top: 1rem;
   color: #607188;
   text-align: center;
 }
 
-.auth-switch-link {
+.register-switch-link {
   color: #18304f;
   font-weight: 700;
 }
 
 @media (max-width: 640px) {
-  .auth-page {
-    padding-top: 6.6rem;
+  .register-page {
+    padding-top: 6.25rem;
   }
 
-  .auth-card {
-    border-radius: 22px;
+  .register-card {
     padding: 1rem;
+  }
+
+  .register-title {
+    font-size: 1.7rem;
   }
 }
 </style>

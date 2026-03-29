@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import HomePage from "@/pages/HomePage.vue";
+import LoginPage from "@/pages/LoginPage.vue";
 import RegisterPage from "@/pages/RegisterPage.vue";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage.vue";
 import { ref } from "vue";
@@ -40,7 +41,7 @@ const routes = [
   {
     path: "/login",
     name: "Login",
-    component: () => import("@/pages/LoginPage.vue"),
+    component: LoginPage,
     meta: {
       title: "Urganch Metan Service - Login",
       robots: "noindex,nofollow",
