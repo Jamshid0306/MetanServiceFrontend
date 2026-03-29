@@ -115,15 +115,18 @@ const isContactRoute = computed(
 const isBasketRoute = computed(() => route.path.startsWith("/basket"));
 const basketCount = computed(() => basketStore.basket.length);
 const isAuthRoute = computed(() =>
-  ["/login", "/register", "/forgot-password"].includes(route.path)
+  ["Login", "Register", "ForgotPassword"].includes(String(route.name || ""))
 );
+const isLoaderDisabledRoute = computed(() => Boolean(route.meta?.disableGlobalLoader));
 const showPublicLayout = computed(
   () => route.path !== "/admin" && !isAuthRoute.value
 );
 const showPublicExtras = computed(
   () => showPublicLayout.value && !isAuthRoute.value
 );
-const showLoader = computed(() => loaderStore.loader && !isAuthRoute.value);
+const showLoader = computed(
+  () => loaderStore.loader && !isAuthRoute.value && !isLoaderDisabledRoute.value
+);
 
 const goToContact = () => {
   router.push({ path: "/", hash: "#contact" });

@@ -41,10 +41,11 @@ const routes = [
     path: "/login",
     name: "Login",
     component: () => import("@/pages/LoginPage.vue"),
-    // meta: {
-    //   title: "Urganch Metan Service - Login",
-    //   robots: "noindex,nofollow",
-    // },
+    meta: {
+      title: "Urganch Metan Service - Login",
+      robots: "noindex,nofollow",
+      disableGlobalLoader: true,
+    },
   },
   {
     path: "/register",
@@ -53,6 +54,7 @@ const routes = [
     meta: {
       title: "Urganch Metan Service - Register",
       robots: "noindex,nofollow",
+      disableGlobalLoader: true,
     },
   },
   {
@@ -62,6 +64,7 @@ const routes = [
     meta: {
       title: "Urganch Metan Service - Parolni tiklash",
       robots: "noindex,nofollow",
+      disableGlobalLoader: true,
     },
   },
   {
