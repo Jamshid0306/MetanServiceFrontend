@@ -12,6 +12,20 @@ export default defineConfig({
     },
   },
   build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (
+            /TelegramLoginButton\.vue/.test(id) ||
+            /[/\\]pages[/\\]LoginPage\.vue/.test(id) ||
+            /[/\\]pages[/\\]RegisterPage\.vue/.test(id) ||
+            /[/\\]pages[/\\]ForgotPasswordPage\.vue/.test(id)
+          ) {
+            return "auth-flow";
+          }
+        },
+      },
+    },
     minify: "terser",
     terserOptions: {
       compress: {
