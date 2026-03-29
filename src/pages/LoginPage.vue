@@ -1,4 +1,4 @@
-<script setup>
+<!-- <script setup>
 import { ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -322,4 +322,11 @@ const submitLogin = async () => {
     padding: 1rem;
   }
 }
-</style>
+</style> -->
+
+
+<script setup>
+</script>
+<template>
+  asdfasdfasdfasdf
+</template>
