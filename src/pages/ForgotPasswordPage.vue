@@ -10,7 +10,6 @@ const router = useRouter();
 const { t } = useI18n();
 
 const verifiedPhone = ref("");
-const resetToken = ref("");
 const newPassword = ref("");
 const confirmPassword = ref("");
 const submitting = ref(false);
@@ -46,7 +45,6 @@ const handleTelegramAuth = async (telegramUser) => {
     }
 
     verifiedPhone.value = normalized;
-    resetToken.value = response.data?.reset_token || "";
     successMessage.value = t("auth.resetVerified");
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error, t("auth.telegramFailed"));
@@ -77,7 +75,6 @@ const submitNewPassword = async () => {
     await apiClient.post("/customers/reset-password", {
       phone: verifiedPhone.value,
       password: newPassword.value.trim(),
-      reset_token: resetToken.value || undefined,
     });
 
     successMessage.value = t("auth.resetSuccess");

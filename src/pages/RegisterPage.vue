@@ -26,11 +26,6 @@ const submitTelegramLogin = async (telegramUser) => {
     const response = await apiClient.post("/customers/telegram", telegramUser);
 
     const customer = response.data?.customer || null;
-    const accessToken = response.data?.access_token || null;
-
-    if (typeof window !== "undefined" && accessToken) {
-      window.localStorage.setItem("customer_access_token", accessToken);
-    }
 
     storeCustomerSession(customer);
 
