@@ -21,7 +21,7 @@ const productSearch = ref("");
 const createInitialService = () => ({
   name: { uz: "", ru: "", en: "" },
   characteristic: { uz: "", ru: "", en: "" },
-  price: { uz: "", ru: "", en: "" },
+  price: "",
   product_ids: [],
 });
 
@@ -66,11 +66,7 @@ const openUpdateModal = (service) => {
       ru: service.characteristic_ru || "",
       en: service.characteristic_en || "",
     },
-    price: {
-      uz: formatNumericInput(service.price_uz),
-      ru: formatNumericInput(service.price_ru),
-      en: formatNumericInput(service.price_en),
-    },
+    price: formatNumericInput(service.price_uz || service.price_ru || service.price_en),
     product_ids: Array.isArray(service.product_ids) ? [...service.product_ids] : [],
   };
   showModal.value = true;
@@ -96,9 +92,9 @@ const submitService = async () => {
     characteristic_uz: serviceForm.value.characteristic.uz.trim(),
     characteristic_ru: serviceForm.value.characteristic.ru.trim(),
     characteristic_en: serviceForm.value.characteristic.en.trim(),
-    price_uz: serviceForm.value.price.uz.trim(),
-    price_ru: serviceForm.value.price.ru.trim(),
-    price_en: serviceForm.value.price.en.trim(),
+    price_uz: serviceForm.value.price.trim(),
+    price_ru: serviceForm.value.price.trim(),
+    price_en: serviceForm.value.price.trim(),
     product_ids: [...serviceForm.value.product_ids],
   };
 
@@ -108,9 +104,9 @@ const submitService = async () => {
     return;
   }
 
-  if (!payload.price_uz || !payload.price_ru || !payload.price_en) {
+  if (!payload.price_uz) {
     saving.value = false;
-    showNotification("Xizmat narxlarini 3 tilda kiriting.", "error");
+    showNotification("Xizmat narxini kiriting.", "error");
     return;
   }
 
@@ -341,14 +337,14 @@ onMounted(async () => {
                 </label>
 
                 <label class="editor-label">
-                  Цена
+                  Цена для всех языков
                   <div class="service-price-input-wrap">
                     <input
-                      :value="serviceForm.price[currentLang]"
+                      :value="serviceForm.price"
                       type="text"
                       class="editor-field service-editor-field"
                       placeholder="Например: 250 000"
-                      @input="serviceForm.price[currentLang] = formatNumericInput($event.target.value)"
+                      @input="serviceForm.price = formatNumericInput($event.target.value)"
                     />
                     <span class="service-price-suffix">сум</span>
                   </div>
@@ -358,24 +354,24 @@ onMounted(async () => {
                   <div class="service-language-preview-head">
                     <div>
                       <h4>Быстрый обзор переводов</h4>
-                      <p>Сразу видно, какие языки уже заполнены.</p>
+                      <p>Название меняется по языку, цена одна и та же для всех версий.</p>
                     </div>
                   </div>
 
                   <div class="service-language-preview-row">
                     <span>UZ</span>
                     <strong>{{ serviceForm.name.uz || "—" }}</strong>
-                    <em>{{ serviceForm.price.uz || "Цена не указана" }}</em>
+                    <em>{{ serviceForm.price || "Цена не указана" }}</em>
                   </div>
                   <div class="service-language-preview-row">
                     <span>RU</span>
                     <strong>{{ serviceForm.name.ru || "—" }}</strong>
-                    <em>{{ serviceForm.price.ru || "Цена не указана" }}</em>
+                    <em>{{ serviceForm.price || "Цена не указана" }}</em>
                   </div>
                   <div class="service-language-preview-row">
                     <span>EN</span>
                     <strong>{{ serviceForm.name.en || "—" }}</strong>
-                    <em>{{ serviceForm.price.en || "Цена не указана" }}</em>
+                    <em>{{ serviceForm.price || "Цена не указана" }}</em>
                   </div>
                 </div>
               </div>
@@ -809,10 +805,31 @@ onMounted(async () => {
 }
 
 .service-editor-field {
+  width: 100%;
+  min-height: 50px;
+  padding: 0.88rem 1rem;
   border-radius: 16px;
   background: linear-gradient(180deg, #fbfdff 0%, #f4f9ff 100%);
   border: 1px solid rgba(20, 49, 95, 0.1);
   color: #142338;
+  outline: none;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+
+.service-editor-field:focus {
+  border-color: rgba(24, 93, 168, 0.26);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(24, 93, 168, 0.08);
+}
+
+.editor-textarea.service-editor-field {
+  min-height: 144px;
+  padding-top: 0.95rem;
+  padding-bottom: 0.95rem;
+  resize: vertical;
 }
 
 .service-editor-field::placeholder {
@@ -1028,24 +1045,70 @@ onMounted(async () => {
 
 .service-modal-action-btn {
   min-width: 148px;
+  min-height: 50px;
+  padding: 0 1.2rem;
+  border-radius: 18px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    color 0.18s ease,
+    opacity 0.18s ease;
 }
 
 .service-modal-actions .editor-secondary-btn {
-  background: #eef3f8;
+  background: linear-gradient(180deg, #ffffff 0%, #f3f7fb 100%);
   color: #28405c;
-  border: 1px solid rgba(20, 49, 95, 0.08);
-  box-shadow: none;
+  border: 1px solid rgba(20, 49, 95, 0.12);
+  box-shadow:
+    0 10px 22px rgba(15, 23, 42, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
 }
 
 .service-modal-actions .products-create-btn {
   min-width: 148px;
-  background: linear-gradient(135deg, #1f8f5f, #157347);
+  border: 1px solid rgba(21, 115, 71, 0.18);
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.2), transparent 42%),
+    linear-gradient(135deg, #25a66a, #157347);
   color: #ffffff;
-  box-shadow: 0 16px 28px rgba(21, 115, 71, 0.22);
+  box-shadow:
+    0 16px 30px rgba(21, 115, 71, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.service-modal-actions .editor-secondary-btn:hover:not(:disabled),
+.service-modal-actions .products-create-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.service-modal-actions .editor-secondary-btn:hover:not(:disabled) {
+  border-color: rgba(20, 49, 95, 0.18);
+  box-shadow:
+    0 14px 28px rgba(15, 23, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
 }
 
 .service-modal-actions .products-create-btn:hover {
-  box-shadow: 0 20px 34px rgba(21, 115, 71, 0.28);
+  box-shadow:
+    0 22px 38px rgba(21, 115, 71, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.service-modal-actions .editor-secondary-btn:active:not(:disabled),
+.service-modal-actions .products-create-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.service-modal-actions .editor-secondary-btn:disabled,
+.service-modal-actions .products-create-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+  transform: none;
+  box-shadow: none;
 }
 
 @media (max-width: 900px) {
