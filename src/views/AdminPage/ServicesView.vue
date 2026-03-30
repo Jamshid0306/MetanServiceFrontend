@@ -233,9 +233,14 @@ onMounted(async () => {
         <Motion class="editor-modal service-editor-modal">
           <div class="service-modal-hero">
             <div class="service-modal-hero-copy">
-              <p class="editor-eyebrow">
-                {{ isUpdate ? "Редактирование" : "Новая услуга" }}
-              </p>
+              <div class="service-modal-topline">
+                <p class="editor-eyebrow">
+                  {{ isUpdate ? "Редактирование" : "Новая услуга" }}
+                </p>
+                <span class="service-modal-chip">
+                  {{ isUpdate ? "Режим обновления" : "Черновик" }}
+                </span>
+              </div>
               <h2 class="editor-title">
                 {{ isUpdate ? "Обновить услугу" : "Добавить услугу" }}
               </h2>
@@ -248,10 +253,12 @@ onMounted(async () => {
               <div class="service-stat-card">
                 <span>Язык</span>
                 <strong>{{ currentLang.toUpperCase() }}</strong>
+                <small>Текущая вкладка</small>
               </div>
               <div class="service-stat-card">
                 <span>Товаров</span>
                 <strong>{{ selectedProductsCount }}</strong>
+                <small>Выбрано в услуге</small>
               </div>
             </div>
           </div>
@@ -292,6 +299,9 @@ onMounted(async () => {
                     Все поля ниже редактируются для выбранного языка.
                   </p>
                 </div>
+                <div class="service-form-badge">
+                  {{ serviceForm.name[currentLang] ? "Заполнено" : "Нужно название" }}
+                </div>
               </div>
 
               <label class="editor-label">
@@ -329,17 +339,27 @@ onMounted(async () => {
               </label>
 
               <div class="service-language-preview">
+                <div class="service-language-preview-head">
+                  <div>
+                    <h4>Быстрый обзор переводов</h4>
+                    <p>Сразу видно, какие языки уже заполнены.</p>
+                  </div>
+                </div>
+
                 <div class="service-language-preview-row">
                   <span>UZ</span>
                   <strong>{{ serviceForm.name.uz || "—" }}</strong>
+                  <em>{{ serviceForm.price.uz || "Цена не указана" }}</em>
                 </div>
                 <div class="service-language-preview-row">
                   <span>RU</span>
                   <strong>{{ serviceForm.name.ru || "—" }}</strong>
+                  <em>{{ serviceForm.price.ru || "Цена не указана" }}</em>
                 </div>
                 <div class="service-language-preview-row">
                   <span>EN</span>
                   <strong>{{ serviceForm.name.en || "—" }}</strong>
+                  <em>{{ serviceForm.price.en || "Цена не указана" }}</em>
                 </div>
               </div>
             </div>
@@ -388,6 +408,10 @@ onMounted(async () => {
                 <div v-if="!filteredProducts.length" class="service-empty-state">
                   По вашему поиску товары не найдены.
                 </div>
+              </div>
+
+              <div class="service-selection-note">
+                Отмеченные товары сразу получат эту услугу в клиентской карточке товара.
               </div>
             </div>
           </div>
@@ -528,42 +552,69 @@ onMounted(async () => {
   width: min(1080px, calc(100vw - 2rem));
   max-height: min(92vh, 980px);
   overflow: hidden;
-  border-radius: 28px;
+  border: 1px solid rgba(214, 228, 247, 0.72);
+  border-radius: 32px;
   background:
-    radial-gradient(circle at top right, rgba(223, 236, 255, 0.9), transparent 32%),
-    linear-gradient(180deg, #163055 0%, #10233f 18%, #ffffff 18.1%, #ffffff 100%);
+    radial-gradient(circle at top right, rgba(180, 220, 255, 0.52), transparent 30%),
+    radial-gradient(circle at top left, rgba(82, 166, 255, 0.2), transparent 26%),
+    linear-gradient(180deg, #0f2444 0%, #15345d 15%, #f6faff 15.1%, #ffffff 100%);
   box-shadow:
-    0 30px 80px rgba(15, 23, 42, 0.32),
-    0 8px 24px rgba(20, 49, 95, 0.18);
+    0 34px 90px rgba(15, 23, 42, 0.34),
+    0 12px 30px rgba(20, 49, 95, 0.16);
 }
 
 .service-editor-overlay {
-  background: rgba(4, 12, 24, 0.58);
-  backdrop-filter: blur(10px);
+  background:
+    radial-gradient(circle at top, rgba(55, 119, 191, 0.16), transparent 24%),
+    rgba(4, 12, 24, 0.7);
+  backdrop-filter: blur(14px);
 }
 
 .service-editor-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
+  gap: 1.1rem;
   align-items: start;
 }
 
 .service-modal-hero {
+  position: relative;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 1.1rem 1.2rem 0.5rem;
+  gap: 1.2rem;
+  padding: 1.35rem 1.35rem 0.85rem;
 }
 
 .service-modal-hero-copy {
   max-width: 720px;
 }
 
+.service-modal-topline {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.service-modal-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(182, 215, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f2f7ff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 .service-modal-subtitle {
   margin-top: 0.45rem;
-  color: rgba(219, 231, 251, 0.82);
+  max-width: 660px;
+  color: rgba(230, 239, 253, 0.84);
   line-height: 1.6;
 }
 
@@ -573,11 +624,13 @@ onMounted(async () => {
 }
 
 .service-stat-card {
-  min-width: 108px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.06);
-  padding: 0.85rem 0.95rem;
+  min-width: 132px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.06));
+  padding: 0.95rem 1rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .service-stat-card span {
@@ -590,9 +643,17 @@ onMounted(async () => {
 
 .service-stat-card strong {
   display: block;
-  margin-top: 0.3rem;
-  font-size: 1.15rem;
+  margin-top: 0.34rem;
+  font-size: 1.2rem;
   color: #fff;
+}
+
+.service-stat-card small {
+  display: block;
+  margin-top: 0.22rem;
+  color: rgba(219, 231, 251, 0.66);
+  font-size: 0.72rem;
+  line-height: 1.4;
 }
 
 .service-modal-header {
@@ -619,22 +680,40 @@ onMounted(async () => {
 .service-products-panel {
   display: grid;
   gap: 1rem;
-  border-radius: 24px;
+  border-radius: 26px;
   background: #ffffff;
-  border: 1px solid rgba(20, 49, 95, 0.08);
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
-  padding: 1.1rem;
+  border: 1px solid rgba(20, 49, 95, 0.07);
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  padding: 1.2rem;
 }
 
 .service-panel-head,
 .service-products-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
   margin-bottom: 0.15rem;
+}
+
+.service-form-badge {
+  flex-shrink: 0;
+  min-height: 34px;
+  padding: 0.5rem 0.8rem;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #eff7ff 0%, #e8f3ff 100%);
+  color: #1b4d84;
+  border: 1px solid rgba(27, 77, 132, 0.12);
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .service-editor-field {
   border-radius: 16px;
-  background: #f8fbff;
-  border: 1px solid rgba(20, 49, 95, 0.12);
+  background: linear-gradient(180deg, #fbfdff 0%, #f4f9ff 100%);
+  border: 1px solid rgba(20, 49, 95, 0.1);
   color: #142338;
 }
 
@@ -649,7 +728,7 @@ onMounted(async () => {
 .service-price-suffix {
   position: absolute;
   top: 50%;
-  right: 1rem;
+  right: 1.05rem;
   transform: translateY(-50%);
   color: #607188;
   font-size: 0.82rem;
@@ -659,24 +738,48 @@ onMounted(async () => {
 
 .service-language-preview {
   display: grid;
-  gap: 0.55rem;
-  border-radius: 20px;
-  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
-  border: 1px solid rgba(20, 49, 95, 0.08);
-  padding: 0.9rem 1rem;
+  gap: 0.7rem;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top right, rgba(208, 232, 255, 0.4), transparent 36%),
+    linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  border: 1px solid rgba(20, 49, 95, 0.07);
+  padding: 1rem;
+}
+
+.service-language-preview-head h4 {
+  font-size: 0.96rem;
+  font-weight: 800;
+  color: #17345f;
+}
+
+.service-language-preview-head p {
+  margin-top: 0.2rem;
+  color: #68809e;
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .service-language-preview-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  gap: 0.8rem;
+  border-radius: 16px;
+  padding: 0.72rem 0.8rem;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(20, 49, 95, 0.06);
 }
 
 .service-language-preview-row span {
-  min-width: 2rem;
-  color: #607188;
-  font-size: 0.78rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  color: #204876;
+  background: #eaf4ff;
+  border-radius: 10px;
+  font-size: 0.76rem;
   font-weight: 800;
   letter-spacing: 0.08em;
 }
@@ -684,6 +787,13 @@ onMounted(async () => {
 .service-language-preview-row strong {
   color: #14315f;
   font-size: 0.92rem;
+}
+
+.service-language-preview-row em {
+  font-style: normal;
+  color: #5f7794;
+  font-size: 0.8rem;
+  font-weight: 700;
   text-align: right;
 }
 
@@ -691,6 +801,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  padding: 0.2rem 0;
 }
 
 .service-search-field {
@@ -700,9 +811,9 @@ onMounted(async () => {
 .service-selected-pill {
   flex-shrink: 0;
   border-radius: 999px;
-  background: #eef7ff;
+  background: linear-gradient(180deg, #eff7ff 0%, #e6f2ff 100%);
   color: #14315f;
-  border: 1px solid rgba(20, 49, 95, 0.12);
+  border: 1px solid rgba(20, 49, 95, 0.1);
   padding: 0.65rem 0.85rem;
   font-size: 0.84rem;
   font-weight: 700;
@@ -711,31 +822,39 @@ onMounted(async () => {
 .service-products-list {
   display: grid;
   gap: 0.65rem;
-  max-height: 360px;
+  max-height: 372px;
   overflow: auto;
-  padding-right: 0.2rem;
+  padding: 0.2rem 0.3rem 0.2rem 0;
 }
 
 .service-product-item {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
-  border-radius: 14px;
-  background: #f8fbff;
-  border: 1px solid transparent;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fbfdff 0%, #f5faff 100%);
+  border: 1px solid rgba(20, 49, 95, 0.06);
   padding: 0.9rem 0.95rem;
   color: #14315f;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .service-product-item:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
   background: #f1f7ff;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
 }
 
 .service-product-item-active {
-  border-color: rgba(125, 211, 252, 0.4);
-  background: #eaf4ff;
+  border-color: rgba(68, 154, 238, 0.24);
+  background:
+    linear-gradient(180deg, rgba(234, 244, 255, 0.96) 0%, rgba(244, 249, 255, 0.96) 100%);
+  box-shadow: 0 16px 30px rgba(20, 79, 149, 0.08);
 }
 
 .service-product-copy {
@@ -755,11 +874,22 @@ onMounted(async () => {
 }
 
 .service-empty-state {
-  border-radius: 16px;
+  border-radius: 18px;
   border: 1px dashed rgba(20, 49, 95, 0.16);
-  padding: 1rem;
+  padding: 1.1rem;
   text-align: center;
   color: #607188;
+  background: #f9fbfe;
+}
+
+.service-selection-note {
+  border-radius: 18px;
+  padding: 0.95rem 1rem;
+  background: linear-gradient(180deg, #f8fbff 0%, #eff6ff 100%);
+  border: 1px solid rgba(20, 49, 95, 0.08);
+  color: #5a728f;
+  font-size: 0.84rem;
+  line-height: 1.55;
 }
 
 .delete-modal {
@@ -794,7 +924,7 @@ onMounted(async () => {
   bottom: 0;
   margin-top: 1.1rem;
   padding: 1rem 0 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.96) 32%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.98) 34%);
 }
 
 @media (max-width: 900px) {
@@ -811,9 +941,50 @@ onMounted(async () => {
     width: 100%;
   }
 
+  .service-modal-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .service-products-toolbar {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .service-language-preview-row {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .service-language-preview-row em {
+    grid-column: 2;
+    text-align: left;
+  }
+}
+
+@media (max-width: 640px) {
+  .service-editor-modal {
+    width: min(100vw - 1rem, 1080px);
+    max-height: 94vh;
+    border-radius: 24px;
+  }
+
+  .service-modal-hero,
+  .service-form-panel,
+  .service-products-panel {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .service-panel-head,
+  .service-products-head {
+    flex-direction: column;
+  }
+
+  .service-form-badge,
+  .service-selected-pill {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
   }
 }
 </style>
