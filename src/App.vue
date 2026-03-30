@@ -100,9 +100,6 @@ const isHomeRoute = computed(() => route.path === "/" && route.hash !== "#contac
 const isProductsRoute = computed(
   () => route.path.startsWith("/products") || route.path.startsWith("/product")
 );
-const isContactRoute = computed(
-  () => route.path === "/" && route.hash === "#contact"
-);
 const isBasketRoute = computed(() => route.path.startsWith("/basket"));
 const basketCount = computed(() => basketStore.basket.length);
 const isAuthRoute = computed(() =>
@@ -118,10 +115,6 @@ const showPublicExtras = computed(
 const showLoader = computed(
   () => loaderStore.loader && !isAuthRoute.value && !isLoaderDisabledRoute.value
 );
-
-const goToContact = () => {
-  router.push({ path: "/", hash: "#contact" });
-};
 
 watch(
   () => route.fullPath,
@@ -210,18 +203,6 @@ watch(
           </svg>
           <span>{{ t("basket") }}</span>
         </RouterLink>
-
-        <button
-          type="button"
-          class="app-mobile-dock-link"
-          :class="{ 'app-mobile-dock-link-active': isContactRoute }"
-          @click="goToContact"
-        >
-          <svg class="app-mobile-dock-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2m18 0v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8m18 0l-9 6-9-6" />
-          </svg>
-          <span>{{ t("nav.contact") }}</span>
-        </button>
 
         <button
           type="button"
@@ -369,7 +350,7 @@ watch(
 .app-mobile-dock-inner {
   pointer-events: auto;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.35rem;
   align-items: stretch;
   width: min(100%, 540px);

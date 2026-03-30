@@ -6,6 +6,7 @@ import { useProductsStore } from "../store/productsStore";
 import { useBasketStore } from "../store/basketStore";
 import { useLoaderStore } from "@/store/loaderStore";
 import { resolveAssetUrl } from "@/lib/api";
+import { matchesProductSearch, scoreProductSearch } from "@/lib/productSearch";
 import { CONTACT_PHONE_HREF } from "@/constants/contact";
 import Basket from "./icons/Basket.vue";
 import uzFlag from "@/assets/images/uz.png";
@@ -46,16 +47,17 @@ const getProductOrder = (product) => {
 
 const filteredProducts = computed(() => {
   if (!searchQuery.value || searchQuery.value.length < 2) return [];
+
   return (productsStore.products || [])
-    .filter((p) => {
-    const name = p[`name_${locale.value}`]?.toLowerCase() || "";
-    return name.includes(searchQuery.value.toLowerCase());
-    })
+    .filter((product) => matchesProductSearch(product, searchQuery.value))
     .sort(
       (a, b) =>
+        scoreProductSearch(b, searchQuery.value, locale.value) -
+          scoreProductSearch(a, searchQuery.value, locale.value) ||
         getProductOrder(a) - getProductOrder(b) ||
         Number(a?.id ?? 0) - Number(b?.id ?? 0)
-    );
+    )
+    .slice(0, 12);
 });
 
 const selectProduct = (product) => {
@@ -86,7 +88,7 @@ onMounted(async () => {
   if (savedLang) locale.value = savedLang;
 
   if (!productsStore.products.length) {
-    await productsStore.fetchProducts(200, 0);
+    await productsStore.fetchProducts(1000, 0);
   }
 
   window.addEventListener("scroll", handleScroll);

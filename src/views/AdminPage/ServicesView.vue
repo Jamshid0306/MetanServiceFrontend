@@ -349,31 +349,6 @@ onMounted(async () => {
                     <span class="service-price-suffix">сум</span>
                   </div>
                 </label>
-
-                <div class="service-language-preview">
-                  <div class="service-language-preview-head">
-                    <div>
-                      <h4>Быстрый обзор переводов</h4>
-                      <p>Название меняется по языку, цена одна и та же для всех версий.</p>
-                    </div>
-                  </div>
-
-                  <div class="service-language-preview-row">
-                    <span>UZ</span>
-                    <strong>{{ serviceForm.name.uz || "—" }}</strong>
-                    <em>{{ serviceForm.price || "Цена не указана" }}</em>
-                  </div>
-                  <div class="service-language-preview-row">
-                    <span>RU</span>
-                    <strong>{{ serviceForm.name.ru || "—" }}</strong>
-                    <em>{{ serviceForm.price || "Цена не указана" }}</em>
-                  </div>
-                  <div class="service-language-preview-row">
-                    <span>EN</span>
-                    <strong>{{ serviceForm.name.en || "—" }}</strong>
-                    <em>{{ serviceForm.price || "Цена не указана" }}</em>
-                  </div>
-                </div>
               </div>
 
               <div class="editor-panel service-products-panel">
@@ -417,16 +392,12 @@ onMounted(async () => {
                       <span>{{ product.name_uz || product.name_en || "Название не заполнено" }}</span>
                     </div>
                   </label>
-                  <div v-if="!filteredProducts.length" class="service-empty-state">
-                    По вашему поиску товары не найдены.
-                  </div>
-                </div>
-
-                <div class="service-selection-note">
-                  Отмеченные товары сразу получат эту услугу в клиентской карточке товара.
+                <div v-if="!filteredProducts.length" class="service-empty-state">
+                  По вашему поиску товары не найдены.
                 </div>
               </div>
             </div>
+          </div>
 
             <div class="editor-actions service-modal-actions">
               <button type="button" class="editor-secondary-btn service-modal-action-btn" @click="showModal = false">
@@ -851,67 +822,6 @@ onMounted(async () => {
   pointer-events: none;
 }
 
-.service-language-preview {
-  display: grid;
-  gap: 0.7rem;
-  border-radius: 22px;
-  background:
-    radial-gradient(circle at top right, rgba(208, 232, 255, 0.4), transparent 36%),
-    linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
-  border: 1px solid rgba(20, 49, 95, 0.07);
-  padding: 1rem;
-}
-
-.service-language-preview-head h4 {
-  font-size: 0.96rem;
-  font-weight: 800;
-  color: #17345f;
-}
-
-.service-language-preview-head p {
-  margin-top: 0.2rem;
-  color: #68809e;
-  font-size: 0.82rem;
-  line-height: 1.45;
-}
-
-.service-language-preview-row {
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.8rem;
-  border-radius: 16px;
-  padding: 0.72rem 0.8rem;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(20, 49, 95, 0.06);
-}
-
-.service-language-preview-row span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 34px;
-  color: #204876;
-  background: #eaf4ff;
-  border-radius: 10px;
-  font-size: 0.76rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-}
-
-.service-language-preview-row strong {
-  color: #14315f;
-  font-size: 0.92rem;
-}
-
-.service-language-preview-row em {
-  font-style: normal;
-  color: #5f7794;
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-align: right;
-}
-
 .service-products-toolbar {
   display: flex;
   align-items: center;
@@ -995,16 +905,6 @@ onMounted(async () => {
   text-align: center;
   color: #607188;
   background: #f9fbfe;
-}
-
-.service-selection-note {
-  border-radius: 18px;
-  padding: 0.95rem 1rem;
-  background: linear-gradient(180deg, #f8fbff 0%, #eff6ff 100%);
-  border: 1px solid rgba(20, 49, 95, 0.08);
-  color: #5a728f;
-  font-size: 0.84rem;
-  line-height: 1.55;
 }
 
 .delete-modal {
@@ -1139,14 +1039,6 @@ onMounted(async () => {
     grid-template-columns: 1fr;
   }
 
-  .service-language-preview-row {
-    grid-template-columns: 44px minmax(0, 1fr);
-  }
-
-  .service-language-preview-row em {
-    grid-column: 2;
-    text-align: left;
-  }
 }
 
 @media (max-width: 640px) {

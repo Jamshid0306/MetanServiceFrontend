@@ -9,6 +9,7 @@ import { useProductsStore } from "@/store/productsStore";
 import { useLoaderStore } from "@/store/loaderStore";
 import { resolveAssetUrl, resolveAssetUrls } from "@/lib/api";
 import { formatPriceValue, getProductDefaultPrice, getInstallmentPlan } from "@/lib/productOptions";
+import { matchesProductSearch, scoreProductSearch } from "@/lib/productSearch";
 
 const router = useRouter();
 const { t, locale } = useI18n();
@@ -22,6 +23,7 @@ const initialMin = ref(0);
 const initialMax = ref(0);
 
 const isFilterModalOpen = ref(false);
+const searchQuery = ref("");
 let filterModalAutoCloseTimer = null;
 
 const normalizeImages = (images) => {
@@ -95,12 +97,17 @@ const fetchProducts = async () => {
 };
 
 const isAnyFilterActive = computed(() => {
-  return minValue.value !== initialMin.value || maxValue.value !== initialMax.value;
+  return (
+    minValue.value !== initialMin.value ||
+    maxValue.value !== initialMax.value ||
+    searchQuery.value.trim().length > 0
+  );
 });
 
 const clearFilters = () => {
   minValue.value = initialMin.value;
   maxValue.value = initialMax.value;
+  searchQuery.value = "";
 
   // Close modal on mobile after resetting filters.
   if (isFilterModalOpen.value) closeFilterModal();
@@ -140,14 +147,29 @@ const filteredProducts = computed(() => {
 
   const result = [...priceFiltered, ...withoutPrice];
 
-  // Sort by admin-defined order; same order -> sequential by id.
-  result.sort(
-    (a, b) =>
+  const query = searchQuery.value.trim();
+  const searchedResult = query
+    ? result.filter((product) => matchesProductSearch(product, query))
+    : result;
+
+  // With search: relevance first. Without search: admin order first.
+  searchedResult.sort((a, b) => {
+    if (query) {
+      return (
+        scoreProductSearch(b, query, locale.value) -
+          scoreProductSearch(a, query, locale.value) ||
+        getProductOrder(a) - getProductOrder(b) ||
+        Number(a?.id ?? 0) - Number(b?.id ?? 0)
+      );
+    }
+
+    return (
       getProductOrder(a) - getProductOrder(b) ||
       Number(a?.id ?? 0) - Number(b?.id ?? 0)
-  );
+    );
+  });
 
-  return result;
+  return searchedResult;
 });
 
 const goToDetail = (id) => {
@@ -238,6 +260,39 @@ onMounted(async () => {
       </aside>
 
       <main class="flex-1">
+        <div class="catalog-search-shell">
+          <div class="catalog-search-wrap">
+            <svg
+              class="catalog-search-icon"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            <input
+              v-model="searchQuery"
+              type="search"
+              :placeholder="t('nav.search_products') + '...'"
+              class="catalog-search-input"
+            />
+            <button
+              v-if="searchQuery"
+              type="button"
+              class="catalog-search-clear"
+              @click="searchQuery = ''"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
         <transition-group
           tag="div"
           name="fade-slide"
@@ -397,6 +452,60 @@ onMounted(async () => {
   border: 1px solid rgba(20, 35, 56, 0.1);
   border-radius: 18px;
   backdrop-filter: blur(8px);
+}
+
+.catalog-search-shell {
+  margin-bottom: 1rem;
+}
+
+.catalog-search-wrap {
+  position: relative;
+}
+
+.catalog-search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  width: 1.05rem;
+  height: 1.05rem;
+  transform: translateY(-50%);
+  color: #64748b;
+}
+
+.catalog-search-input {
+  width: 100%;
+  min-height: 52px;
+  border-radius: 18px;
+  border: 1px solid rgba(20, 35, 56, 0.1);
+  background: rgba(255, 255, 255, 0.96);
+  color: #18304f;
+  padding: 0.95rem 3rem 0.95rem 2.9rem;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.catalog-search-input:focus {
+  border-color: rgba(24, 48, 79, 0.2);
+  box-shadow: 0 0 0 4px rgba(24, 48, 79, 0.08);
+  background: #ffffff;
+}
+
+.catalog-search-clear {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: none;
+  background: #eef2f6;
+  color: #42546d;
+  font-size: 1.15rem;
+  line-height: 1;
 }
 
 .catalog-card {

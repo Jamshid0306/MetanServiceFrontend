@@ -524,6 +524,12 @@ const optionGroups = computed(() => {
 });
 
 const orderedOptionGroups = computed(() => optionGroups.value);
+const hasTransmissionGroup = computed(() =>
+  orderedOptionGroups.value.some((group) => group.key === "transmission")
+);
+const transmissionGroup = computed(() =>
+  orderedOptionGroups.value.find((group) => group.key === "transmission") || null
+);
 
 /** Ko‘rinadigan barcha variant guruhlari tanlangan bo‘lsa true (yoki tanlash shart bo‘lmasa). */
 const requiredOptionGroupKeys = computed(() =>
@@ -536,10 +542,6 @@ const selectionHasValue = (bag, key) => {
 const isProductOptionSelectionComplete = computed(() => {
   const resolved = resolvedSelectedOptions.value;
   const raw = selectedOptions.value;
-  const hasTransmissionGroup = orderedOptionGroups.value.some(
-    (g) => g.key === "transmission"
-  );
-
   // Transmission faqat "Ha" tanlanganda majburiy.
   const keys = requiredOptionGroupKeys.value.filter((key) => {
     if (key !== "transmission") {
@@ -1279,107 +1281,150 @@ onBeforeUnmount(() => {
       </div>
     </transition>
 
-    <div class="detail-main flex flex-col lg:flex-row gap-12 pb-[20px] animate-slide-in-up">
-      <div class="detail-gallery lg:w-1/2 flex justify-center items-center flex-col gap-4">
-        <div class="detail-gallery-stage">
-          <Swiper
-            ref="swiperRef"
-            class="detail-swiper h-[450px] w-full rounded-2xl bg-white"
-            space-between="10"
-            slides-per-view="1"
-            :onSwiper="(swiper) => (swiperInstance = swiper)"
-          >
-            <SwiperSlide v-for="(img, index) in images" :key="index">
-              <img
-                :src="img"
-                alt="Product"
-                class="detail-slide-image h-[450px] w-full rounded-2xl object-contain transition-transform duration-500"
-              />
-            </SwiperSlide>
-          </Swiper>
-        </div>
-        <div class="detail-thumbs flex gap-2 overflow-x-auto mt-2">
-          <img
-            v-for="(img, index) in images"
-            :key="index"
-            :src="img"
-            class="detail-thumb h-24 w-24 cursor-pointer rounded-xl border object-cover transition-all duration-300"
-            @click="goToSlide(index)"
-          />
-        </div>
-      </div>
-
-      <div class="detail-info lg:w-1/2 flex flex-col gap-[20px] justify-center">
-        <div ref="summaryRef" class="detail-summary detail-section">
-          <div class="detail-summary-head">
-            <span class="detail-product-id">ID {{ store.product?.id }}</span>
-          </div>
-          <h1
-            class="detail-name text-4xl font-bold text-gray-900 tracking-tight leading-snug"
-          >
-            {{ store.product[`name_${locale}`] }}
-          </h1>
-
-          <div class="detail-price-box">
-            <span
-              v-if="optionGroups.length"
-              class="detail-price-label text-sm font-semibold uppercase tracking-[0.16em] text-slate-500"
-            >
-              {{ t("productOptions.totalPrice") }}
-            </span>
-            <span class="detail-price text-3xl font-semibold">
-              {{ currentOrderTotalLabel }}
-            </span>
-
-            <div
-              v-if="selectedCreditPlan && selectedCreditConfig"
-              class="detail-credit-inline"
-            >
-              <div
-                v-if="creditPlans.length"
-                class="detail-credit-inline-block"
+    <div class="detail-layout animate-slide-in-up">
+      <div class="detail-main flex flex-col lg:flex-row gap-12 pb-[20px]">
+        <div class="detail-gallery-column">
+          <div class="detail-gallery lg:w-1/2 flex justify-center items-center flex-col gap-4">
+            <div class="detail-gallery-stage">
+              <Swiper
+                ref="swiperRef"
+                class="detail-swiper h-[450px] w-full rounded-2xl bg-white"
+                space-between="10"
+                slides-per-view="1"
+                :onSwiper="(swiper) => (swiperInstance = swiper)"
               >
-                <div class="credit-plan-switcher detail-credit-plan-switcher">
-                  <button
-                    v-for="plan in creditPlans"
-                    :key="`${plan.months}-${plan.percent}`"
-                    type="button"
-                    class="credit-plan-btn"
-                    :class="
-                      selectedCreditConfig?.months === plan.months
-                        ? 'credit-plan-btn-active'
-                        : ''
-                    "
-                    @click="selectedCreditMonths = plan.months"
-                  >
-                    <span>
-                      {{ plan.months }} {{ t("credit.months") }}
-                    </span>
-                  </button>
-                </div>
-              </div>
+                <SwiperSlide v-for="(img, index) in images" :key="index">
+                  <img
+                    :src="img"
+                    alt="Product"
+                    class="detail-slide-image h-[450px] w-full rounded-2xl object-contain transition-transform duration-500"
+                  />
+                </SwiperSlide>
+              </Swiper>
+            </div>
+            <div class="detail-thumbs flex gap-2 overflow-x-auto mt-2">
+              <img
+                v-for="(img, index) in images"
+                :key="index"
+                :src="img"
+                class="detail-thumb h-24 w-24 cursor-pointer rounded-xl border object-cover transition-all duration-300"
+                @click="goToSlide(index)"
+              />
+            </div>
+          </div>
 
-              <div class="detail-credit-payment">
-                <strong class="detail-credit-inline-value">
-                  <span>{{ selectedCreditConfig.months }} {{ t("credit.months") }}</span>
-                  <span
-                    class="detail-credit-inline-separator"
-                    aria-hidden="true"
-                  >
-                    •
-                  </span>
-                  <span>{{ formatPrice(selectedCreditPlan.monthlyPayment) }}</span>
-                </strong>
+          <section class="detail-copy-section detail-copy-section-desktop animate-fade-in-up">
+            <div class="detail-tabs flex gap-4 mt-4 mb-2">
+              <span
+                @click="activeTab = 'description'"
+                :class="
+                    activeTab === 'description'
+                    ? 'detail-tab detail-tab-active'
+                    : 'detail-tab'
+                "
+                class="pb-1 font-semibold transition-all"
+              >
+                {{ $t("description") }}
+              </span>
+              <span
+                @click="activeTab = 'characteristic'"
+                :class="
+                    activeTab === 'characteristic'
+                    ? 'detail-tab detail-tab-active'
+                    : 'detail-tab'
+                "
+                class="pb-1 font-semibold transition-all"
+                >{{ $t("characteristic") }}
+              </span>
+            </div>
+            <div class="detail-copy-body">
+              <span
+                v-if="activeTab !== 'characteristic'"
+                v-html="store.product[`description_${locale}`]"
+                class="detail-content animate-fade-in"
+              ></span>
+              <span
+                v-if="activeTab === 'characteristic'"
+                v-html="
+                  store.product[`characteristic_${locale}`]?.replace(/\r?\n/g, '<br>')
+                "
+                class="detail-content animate-fade-in"
+              ></span>
+            </div>
+          </section>
+        </div>
+
+        <div class="detail-info lg:w-1/2 flex flex-col gap-[20px] justify-center">
+          <div ref="summaryRef" class="detail-summary detail-section">
+            <div class="detail-summary-head">
+              <span class="detail-product-id">ID {{ store.product?.id }}</span>
+            </div>
+            <h1
+              class="detail-name text-4xl font-bold text-gray-900 tracking-tight leading-snug"
+            >
+              {{ store.product[`name_${locale}`] }}
+            </h1>
+
+            <div class="detail-price-box">
+              <span
+                v-if="optionGroups.length"
+                class="detail-price-label text-sm font-semibold uppercase tracking-[0.16em] text-slate-500"
+              >
+                {{ t("productOptions.totalPrice") }}
+              </span>
+              <span class="detail-price text-3xl font-semibold">
+                {{ currentOrderTotalLabel }}
+              </span>
+
+              <div
+                v-if="selectedCreditPlan && selectedCreditConfig"
+                class="detail-credit-inline"
+              >
+                <div
+                  v-if="creditPlans.length"
+                  class="detail-credit-inline-block"
+                >
+                  <div class="credit-plan-switcher detail-credit-plan-switcher">
+                    <button
+                      v-for="plan in creditPlans"
+                      :key="`${plan.months}-${plan.percent}`"
+                      type="button"
+                      class="credit-plan-btn"
+                      :class="
+                        selectedCreditConfig?.months === plan.months
+                          ? 'credit-plan-btn-active'
+                          : ''
+                      "
+                      @click="selectedCreditMonths = plan.months"
+                    >
+                      <span>
+                        {{ plan.months }} {{ t("credit.months") }}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="detail-credit-payment">
+                  <strong class="detail-credit-inline-value">
+                    <span>{{ selectedCreditConfig.months }} {{ t("credit.months") }}</span>
+                    <span
+                      class="detail-credit-inline-separator"
+                      aria-hidden="true"
+                    >
+                      •
+                    </span>
+                    <span>{{ formatPrice(selectedCreditPlan.monthlyPayment) }}</span>
+                  </strong>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <div class="detail-actions">
-          <div
-            v-if="optionGroups.length"
-            class="detail-options detail-section"
-          >
+          <div class="detail-actions">
+            <div
+              v-if="optionGroups.length"
+              class="detail-options detail-section"
+            >
             <div class="detail-options-head">
               <p class="detail-options-kicker">
                 {{ t("productOptions.selectionHelp") }}
@@ -1389,17 +1434,14 @@ onBeforeUnmount(() => {
               v-for="group in orderedOptionGroups"
               :key="group.key"
             >
-              <div class="detail-option-group">
+              <div
+                v-if="group.key !== 'transmission'"
+                class="detail-option-group"
+              >
               <div class="detail-option-headline">
                 <div class="detail-option-heading">
                   <h3 class="text-sm font-semibold text-slate-700">
-                    {{
-                      group.key === "transmission"
-                        ? balloonProgramEnabled === true
-                          ? t("productOptions.transmission")
-                          : t("productOptions.balloonProgramQuestion")
-                        : t(group.titleKey)
-                    }}
+                    {{ t(group.titleKey) }}
                   </h3>
                   <button
                     v-if="group.key === 'transmission' && balloonProgramEnabled === true"
@@ -1412,49 +1454,6 @@ onBeforeUnmount(() => {
                   </button>
                 </div>
               </div>
-            <div
-              v-if="group.key === 'transmission'"
-              class="balloon-program-toggle"
-              role="radiogroup"
-              :aria-label="t('productOptions.balloonProgramQuestion')"
-            >
-              <label
-                class="balloon-program-toggle-btn"
-                :class="{
-                  'balloon-program-toggle-btn-active':
-                    balloonProgramEnabled === true,
-                }"
-              >
-                <input
-                  type="radio"
-                  class="balloon-program-toggle-input"
-                  name="balloon-program-needed"
-                  :checked="balloonProgramEnabled === true"
-                  @change="setBalloonProgramEnabled(true)"
-                />
-                <span class="balloon-program-toggle-label">
-                  {{ t("productOptions.balloonProgramYes") }}
-                </span>
-              </label>
-              <label
-                class="balloon-program-toggle-btn"
-                :class="{
-                  'balloon-program-toggle-btn-active':
-                    balloonProgramEnabled === false,
-                }"
-              >
-                <input
-                  type="radio"
-                  class="balloon-program-toggle-input"
-                  name="balloon-program-needed"
-                  :checked="balloonProgramEnabled === false"
-                  @change="setBalloonProgramEnabled(false)"
-                />
-                <span class="balloon-program-toggle-label">
-                  {{ t("productOptions.balloonProgramNo") }}
-                </span>
-              </label>
-            </div>
               <div
                 v-if="
                   group.key === 'cylinder_volume' &&
@@ -1538,19 +1537,109 @@ onBeforeUnmount(() => {
           </div>
 
           <div
-            v-if="additionalServices.length"
+            v-if="additionalServices.length || hasTransmissionGroup"
             class="detail-services detail-section"
           >
             <div class="detail-options-head">
               <p class="detail-options-kicker">
                 {{ t("productOptions.additionalServices") }}
               </p>
-              <p class="detail-services-copy">
-                {{ t("productOptions.additionalServicesHelp") }}
-              </p>
             </div>
 
-            <div class="detail-services-list">
+            <div
+              v-if="hasTransmissionGroup"
+              class="detail-option-group detail-services-program-group"
+            >
+              <div class="detail-option-headline">
+                <div class="detail-option-heading">
+                  <h3 class="text-sm font-semibold text-slate-700">
+                    {{ t("productOptions.balloonProgramQuestion") }}
+                  </h3>
+                </div>
+              </div>
+              <div
+                class="balloon-program-toggle"
+                role="radiogroup"
+                :aria-label="t('productOptions.balloonProgramQuestion')"
+              >
+                <label
+                  class="balloon-program-toggle-btn"
+                  :class="{
+                    'balloon-program-toggle-btn-active':
+                      balloonProgramEnabled === true,
+                  }"
+                >
+                  <input
+                    type="radio"
+                    class="balloon-program-toggle-input"
+                    name="balloon-program-needed"
+                    :checked="balloonProgramEnabled === true"
+                    @change="setBalloonProgramEnabled(true)"
+                  />
+                  <span class="balloon-program-toggle-label">
+                    {{ t("productOptions.balloonProgramYes") }}
+                  </span>
+                </label>
+                <label
+                  class="balloon-program-toggle-btn"
+                  :class="{
+                    'balloon-program-toggle-btn-active':
+                      balloonProgramEnabled === false,
+                  }"
+                >
+                  <input
+                    type="radio"
+                    class="balloon-program-toggle-input"
+                    name="balloon-program-needed"
+                    :checked="balloonProgramEnabled === false"
+                    @change="setBalloonProgramEnabled(false)"
+                  />
+                  <span class="balloon-program-toggle-label">
+                    {{ t("productOptions.balloonProgramNo") }}
+                  </span>
+                </label>
+              </div>
+
+              <div
+                v-if="transmissionGroup && balloonProgramEnabled === true"
+                class="detail-services-transmission"
+              >
+                <div class="detail-option-headline">
+                  <div class="detail-option-heading">
+                    <h3 class="text-sm font-semibold text-slate-700">
+                      {{ t("productOptions.transmission") }}
+                    </h3>
+                    <button
+                      type="button"
+                      class="detail-info-trigger"
+                      :aria-label="t('productOptions.fuelGuide.open')"
+                      @click="openFuelGuideModal"
+                    >
+                      <CircleHelp class="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div class="detail-option-grid detail-option-grid-transmission flex flex-wrap gap-2">
+                  <button
+                    v-for="option in transmissionGroup.options"
+                    :key="option.id"
+                    type="button"
+                    @click="selectOption(transmissionGroup.key, option.id)"
+                    class="detail-option"
+                    :class="
+                      selectedOptions[transmissionGroup.key] === option.id
+                        ? 'detail-option-active'
+                        : ''
+                    "
+                  >
+                    <span>{{ option.label }}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="additionalServices.length" class="detail-services-list">
               <label
                 v-for="service in additionalServices"
                 :key="service.id"
@@ -1630,12 +1719,13 @@ onBeforeUnmount(() => {
                 {{ t("order_now") }}
               </button>
             </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <section class="detail-copy-section animate-fade-in-up">
+    <section class="detail-copy-section detail-copy-section-mobile animate-fade-in-up">
       <div class="detail-tabs flex gap-4 mt-4 mb-2">
         <span
           @click="activeTab = 'description'"
@@ -2147,13 +2237,25 @@ onBeforeUnmount(() => {
 
 .detail-main {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: clamp(1rem, 3vw, 2rem);
   padding: 0;
   border: none;
   background: transparent;
   backdrop-filter: none;
+}
+
+.detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(1rem, 3vw, 2rem);
+}
+
+.detail-gallery-column {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
 }
 
 .detail-gallery {
@@ -2723,6 +2825,12 @@ onBeforeUnmount(() => {
   gap: 0.8rem;
 }
 
+.detail-services-transmission {
+  display: grid;
+  gap: 0.8rem;
+  padding-top: 0.2rem;
+}
+
 .detail-service-option {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -3151,6 +3259,10 @@ onBeforeUnmount(() => {
   padding-top: 1rem;
 }
 
+.detail-copy-section-mobile {
+  display: none;
+}
+
 .detail-tabs {
   border-bottom: 1px solid var(--detail-border);
   padding-bottom: 0.6rem;
@@ -3371,8 +3483,12 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1024px) {
-  .detail-main {
-    grid-template-columns: 1fr;
+  .detail-copy-section-desktop {
+    display: none;
+  }
+
+  .detail-copy-section-mobile {
+    display: block;
   }
 
   .detail-price-sticky {
@@ -3399,6 +3515,21 @@ onBeforeUnmount(() => {
 
   .order-modal-panel {
     width: min(760px, 100%);
+  }
+}
+
+@media (min-width: 1025px) {
+  .detail-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .detail-copy-section-mobile {
+    display: none;
+  }
+
+  .detail-copy-section {
+    margin-top: 0;
   }
 }
 
