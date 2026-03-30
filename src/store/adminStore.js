@@ -25,6 +25,7 @@ export const useAdminStore = defineStore("admin", {
     refreshToken: getInitialRefreshToken(),
     products: [],
     heroSlides: [],
+    services: [],
     lastError: "",
   }),
   actions: {
@@ -145,6 +146,7 @@ export const useAdminStore = defineStore("admin", {
       this.refreshToken = null;
       this.products = [];
       this.heroSlides = [];
+      this.services = [];
       this.lastError = message;
     },
 
@@ -241,6 +243,72 @@ export const useAdminStore = defineStore("admin", {
         return true;
       } catch (err) {
         this.handleAdminError(err, "Mahsulotni o'chirib bo'lmadi.");
+        return false;
+      }
+    },
+
+    async getServices() {
+      if (!(await this.ensureAccessToken())) return false;
+      this.lastError = "";
+
+      try {
+        const res = await apiClient.get("/products/services");
+        this.services = Array.isArray(res.data?.services) ? res.data.services : [];
+        return true;
+      } catch (err) {
+        this.handleAdminError(err, "Xizmatlar yuklanmadi.");
+        this.services = [];
+        return false;
+      }
+    },
+
+    async createService(payload) {
+      if (!(await this.ensureAccessToken())) return false;
+      this.lastError = "";
+
+      try {
+        const res = await apiClient.post("/products/services", payload);
+        if (res.data?.success) {
+          useProductsStore().invalidateCaches();
+          await this.getServices();
+          return true;
+        }
+        return false;
+      } catch (err) {
+        this.handleAdminError(err, "Xizmat qo‘shib bo‘lmadi.");
+        return false;
+      }
+    },
+
+    async updateService(serviceId, payload) {
+      if (!(await this.ensureAccessToken())) return false;
+      this.lastError = "";
+
+      try {
+        const res = await apiClient.put(`/products/services/${serviceId}`, payload);
+        if (res.data?.success) {
+          useProductsStore().invalidateCaches();
+          await this.getServices();
+          return true;
+        }
+        return false;
+      } catch (err) {
+        this.handleAdminError(err, "Xizmatni yangilab bo‘lmadi.");
+        return false;
+      }
+    },
+
+    async deleteService(serviceId) {
+      if (!(await this.ensureAccessToken())) return false;
+      this.lastError = "";
+
+      try {
+        await apiClient.delete(`/products/services/${serviceId}`);
+        useProductsStore().invalidateCaches();
+        await this.getServices();
+        return true;
+      } catch (err) {
+        this.handleAdminError(err, "Xizmatni o‘chirib bo‘lmadi.");
         return false;
       }
     },

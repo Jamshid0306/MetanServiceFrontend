@@ -2,6 +2,7 @@
 import Login from "../components/Login.vue";
 import HeroSlidesView from "../views/AdminPage/HeroSlidesView.vue";
 import ProductsView from "../views/AdminPage/ProductsView.vue";
+import ServicesView from "../views/AdminPage/ServicesView.vue";
 import { useAdminStore } from "../store/adminStore";
 
 const store = useAdminStore();
@@ -30,6 +31,7 @@ void store.restoreSession();
 
         <div class="admin-content p-4 sm:p-6">
           <HeroSlidesView />
+          <ServicesView />
           <ProductsView />
         </div>
       </main>

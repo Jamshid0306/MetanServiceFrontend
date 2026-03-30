@@ -61,6 +61,7 @@ const swiperRef = ref(null);
 const summaryRef = ref(null);
 const notification = ref({ show: false, message: "" });
 const selectedOptions = ref({});
+const selectedExtraServiceIds = ref([]);
 const selectedCreditMonths = ref(null);
 /**
  * Programma xizmati: null = hali tanlanmagan, true = Ha, false = Yo'q.
@@ -160,6 +161,24 @@ const formatSelectedOptionLabel = (option) => {
 
   return label;
 };
+const getServiceName = (service, targetLocale = locale.value) =>
+  String(service?.[`name_${targetLocale}`] || service?.name_uz || "")
+    .trim();
+const getServiceCharacteristic = (service, targetLocale = locale.value) =>
+  String(
+    service?.[`characteristic_${targetLocale}`] ||
+      service?.characteristic_uz ||
+      ""
+  ).trim();
+const getServicePrice = (service, targetLocale = locale.value) =>
+  parseNumericPrice(service?.[`price_${targetLocale}`] ?? service?.price_uz);
+const buildSelectedExtraServiceOption = (service) => ({
+  title_key: "productOptions.additionalService",
+  group_key: "extra_service",
+  id: service.id,
+  label: getServiceName(service),
+  price_delta: getServicePrice(service) || 0,
+});
 const getOptionSelectPlaceholder = (groupKey) => {
   if (locale.value === "ru") {
     return "Выберите размер баллона";
@@ -557,6 +576,30 @@ const selectedPrice = computed(() =>
     gearboxProgramDeclined: balloonProgramEnabled.value !== true,
   })
 );
+const additionalServices = computed(() =>
+  Array.isArray(store.product?.extra_services) ? store.product.extra_services : []
+);
+const selectedAdditionalServices = computed(() =>
+  additionalServices.value.filter((service) =>
+    selectedExtraServiceIds.value.includes(service.id)
+  )
+);
+const additionalServicesTotal = computed(() =>
+  selectedAdditionalServices.value.reduce(
+    (total, service) => total + (getServicePrice(service) || 0),
+    0
+  )
+);
+const combinedSelectedPrice = computed(() => {
+  const basePrice = selectedPrice.value;
+  const numericBasePrice = parseNumericPrice(basePrice);
+
+  if (numericBasePrice === null) {
+    return basePrice;
+  }
+
+  return numericBasePrice + additionalServicesTotal.value;
+});
 const creditPlans = computed(() => getCreditPlans(store.product));
 
 /** Kredit mavjud bo‘lsa: 12 oylik reja bo‘lsa default shu, aks holda birinchi reja. */
@@ -590,21 +633,57 @@ const selectedCreditPlan = computed(() => {
   }
 
   return calculateCreditPlan(
-    selectedPrice.value,
+    combinedSelectedPrice.value,
     selectedCreditConfig.value.percent,
     selectedCreditConfig.value.months
   );
 });
 const configuredBasketItem = computed(() =>
   store.product
-    ? buildConfiguredBasketItem(store.product, resolvedSelectedOptions.value, 1, {
-        useFallbackPath: false,
-        gearboxProgramDeclined: balloonProgramEnabled.value !== true,
-      })
+    ? (() => {
+        const baseItem = buildConfiguredBasketItem(
+          store.product,
+          resolvedSelectedOptions.value,
+          1,
+          {
+            useFallbackPath: false,
+            gearboxProgramDeclined: balloonProgramEnabled.value !== true,
+          }
+        );
+        const serviceOptions = selectedAdditionalServices.value.map(
+          buildSelectedExtraServiceOption
+        );
+        const numericPriceUz = parseNumericPrice(baseItem.selected_price_uz);
+        const numericPriceRu = parseNumericPrice(baseItem.selected_price_ru);
+        const numericPriceEn = parseNumericPrice(baseItem.selected_price_en);
+        const extraPriceUz = selectedAdditionalServices.value.reduce(
+          (total, service) => total + (getServicePrice(service, "uz") || 0),
+          0
+        );
+        const extraPriceRu = selectedAdditionalServices.value.reduce(
+          (total, service) => total + (getServicePrice(service, "ru") || 0),
+          0
+        );
+        const extraPriceEn = selectedAdditionalServices.value.reduce(
+          (total, service) => total + (getServicePrice(service, "en") || 0),
+          0
+        );
+
+        return {
+          ...baseItem,
+          selected_options: [...baseItem.selected_options, ...serviceOptions],
+          selected_price_uz:
+            numericPriceUz === null ? baseItem.selected_price_uz : numericPriceUz + extraPriceUz,
+          selected_price_ru:
+            numericPriceRu === null ? baseItem.selected_price_ru : numericPriceRu + extraPriceRu,
+          selected_price_en:
+            numericPriceEn === null ? baseItem.selected_price_en : numericPriceEn + extraPriceEn,
+        };
+      })()
     : null
 );
 const currentOrderTotal = computed(() => {
-  const numericPrice = parseNumericPrice(selectedPrice.value);
+  const numericPrice = parseNumericPrice(combinedSelectedPrice.value);
   return numericPrice === null ? 0 : numericPrice;
 });
 const currentOrderTotalLabel = computed(() => {
@@ -612,11 +691,17 @@ const currentOrderTotalLabel = computed(() => {
     return formatPrice(currentOrderTotal.value);
   }
 
-  if (typeof selectedPrice.value === "string" && selectedPrice.value.trim()) {
-    return selectedPrice.value;
+  if (
+    typeof combinedSelectedPrice.value === "string" &&
+    combinedSelectedPrice.value.trim()
+  ) {
+    if (additionalServicesTotal.value > 0) {
+      return `${combinedSelectedPrice.value} + ${formatPrice(additionalServicesTotal.value)}`;
+    }
+    return combinedSelectedPrice.value;
   }
 
-  return formatPrice(selectedPrice.value);
+  return formatPrice(combinedSelectedPrice.value);
 });
 const canUseCreditOrder = computed(
   () => hasCreditPricing(store.product) && Boolean(selectedCreditConfig.value)
@@ -945,6 +1030,7 @@ const fetchProductData = async (id) => {
   }
 
   selectedOptions.value = {};
+  selectedExtraServiceIds.value = [];
   balloonProgramEnabled.value = resolveDefaultBalloonProgramEnabled();
   setDefaultCreditMonthsForProduct();
   activeTab.value = "description";
@@ -1056,6 +1142,16 @@ const handleClick = (product) => {
   basketStore.addToBasket(
     buildConfiguredBasketItem(product, {}, 1, { useFallbackPath: false })
   );
+};
+
+const toggleExtraService = (serviceId) => {
+  const next = new Set(selectedExtraServiceIds.value);
+  if (next.has(serviceId)) {
+    next.delete(serviceId);
+  } else {
+    next.add(serviceId);
+  }
+  selectedExtraServiceIds.value = [...next];
 };
 
 const handleEscape = (event) => {
@@ -1178,7 +1274,7 @@ onBeforeUnmount(() => {
           {{ t("productOptions.totalPrice") }}
         </span>
         <strong class="detail-price-sticky-value">
-          {{ formatPrice(selectedPrice) }}
+          {{ currentOrderTotalLabel }}
         </strong>
       </div>
     </transition>
@@ -1232,7 +1328,7 @@ onBeforeUnmount(() => {
               {{ t("productOptions.totalPrice") }}
             </span>
             <span class="detail-price text-3xl font-semibold">
-              {{ formatPrice(selectedPrice) }}
+              {{ currentOrderTotalLabel }}
             </span>
 
             <div
@@ -1439,6 +1535,47 @@ onBeforeUnmount(() => {
               </div>
             </div>
             </template>
+          </div>
+
+          <div
+            v-if="additionalServices.length"
+            class="detail-services detail-section"
+          >
+            <div class="detail-options-head">
+              <p class="detail-options-kicker">
+                {{ t("productOptions.additionalServices") }}
+              </p>
+              <p class="detail-services-copy">
+                {{ t("productOptions.additionalServicesHelp") }}
+              </p>
+            </div>
+
+            <div class="detail-services-list">
+              <label
+                v-for="service in additionalServices"
+                :key="service.id"
+                class="detail-service-option"
+                :class="{
+                  'detail-service-option-active': selectedExtraServiceIds.includes(service.id),
+                }"
+              >
+                <input
+                  type="checkbox"
+                  class="detail-service-checkbox"
+                  :checked="selectedExtraServiceIds.includes(service.id)"
+                  @change="toggleExtraService(service.id)"
+                />
+                <div class="detail-service-copy">
+                  <strong>{{ getServiceName(service) }}</strong>
+                  <span v-if="getServiceCharacteristic(service)">
+                    {{ getServiceCharacteristic(service) }}
+                  </span>
+                </div>
+                <strong class="detail-service-price">
+                  {{ formatPrice(getServicePrice(service) || 0) }}
+                </strong>
+              </label>
+            </div>
           </div>
 
           <div class="detail-order-tools detail-section">
@@ -2568,6 +2705,66 @@ onBeforeUnmount(() => {
 
 .detail-order-tools {
   gap: 1rem;
+}
+
+.detail-services {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.detail-services-copy {
+  color: #64748b;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.detail-services-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.detail-service-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.85rem;
+  border: 1px solid rgba(20, 35, 56, 0.1);
+  border-radius: 18px;
+  background: #fff;
+  padding: 0.95rem 1rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.detail-service-option-active {
+  border-color: rgba(24, 48, 79, 0.35);
+  box-shadow: 0 0 0 3px rgba(24, 48, 79, 0.08);
+  background: #f8fbff;
+}
+
+.detail-service-checkbox {
+  margin-top: 0.2rem;
+  width: 1rem;
+  height: 1rem;
+}
+
+.detail-service-copy {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.detail-service-copy strong {
+  color: #142338;
+}
+
+.detail-service-copy span {
+  color: #5c6b82;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.detail-service-price {
+  color: #18304f;
+  white-space: nowrap;
 }
 
 .detail-order-head {
