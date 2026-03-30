@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
@@ -12,85 +12,10 @@ const identifier = ref("");
 const password = ref("");
 const submitting = ref(false);
 const errorMessage = ref("");
-const telegramLoading = ref(false);
-const telegramBotUsername = ref("");
-const telegramReady = ref(false);
-const telegramError = ref("");
-
-const telegramWidgetCallbackName = "handleCustomerTelegramLogin";
-const telegramWidgetContainerId = "telegram-login-widget";
-let telegramScriptElement = null;
-
-const hasTelegramWidget = computed(() => Boolean(telegramBotUsername.value));
 
 const handleLoginSuccess = (customer) => {
   storeCustomerSession(customer);
   router.push("/");
-};
-
-const loadTelegramWidget = () => {
-  if (typeof window === "undefined" || !telegramBotUsername.value) {
-    return;
-  }
-
-  const container = document.getElementById(telegramWidgetContainerId);
-  if (!container) {
-    return;
-  }
-
-  container.innerHTML = "";
-  telegramReady.value = false;
-
-  window[telegramWidgetCallbackName] = async (telegramUser) => {
-    telegramLoading.value = true;
-    telegramError.value = "";
-    errorMessage.value = "";
-
-    try {
-      const response = await apiClient.post(
-        "/customers/telegram-login",
-        telegramUser,
-        { skipAuth: true }
-      );
-      handleLoginSuccess(response.data?.customer || null);
-    } catch (error) {
-      telegramError.value = getApiErrorMessage(error, t("auth.telegramFailed"));
-    } finally {
-      telegramLoading.value = false;
-    }
-  };
-
-  telegramScriptElement = document.createElement("script");
-  telegramScriptElement.src = "https://telegram.org/js/telegram-widget.js?22";
-  telegramScriptElement.async = true;
-  telegramScriptElement.setAttribute("data-telegram-login", telegramBotUsername.value);
-  telegramScriptElement.setAttribute("data-size", "large");
-  telegramScriptElement.setAttribute("data-radius", "12");
-  telegramScriptElement.setAttribute("data-userpic", "false");
-  telegramScriptElement.setAttribute("data-request-access", "write");
-  telegramScriptElement.setAttribute("data-lang", "en");
-  telegramScriptElement.setAttribute("data-onauth", `${telegramWidgetCallbackName}(user)`);
-  telegramScriptElement.onload = () => {
-    telegramReady.value = true;
-  };
-
-  container.appendChild(telegramScriptElement);
-};
-
-const fetchTelegramConfig = async () => {
-  try {
-    const response = await apiClient.get("/customers/telegram-login/config", {
-      skipAuth: true,
-    });
-    const enabled = Boolean(response.data?.enabled);
-    telegramBotUsername.value = enabled ? String(response.data?.bot_username || "") : "";
-
-    if (telegramBotUsername.value) {
-      loadTelegramWidget();
-    }
-  } catch {
-    telegramBotUsername.value = "";
-  }
 };
 
 const submitLogin = async () => {
@@ -118,20 +43,6 @@ const submitLogin = async () => {
     submitting.value = false;
   }
 };
-
-onMounted(() => {
-  fetchTelegramConfig();
-});
-
-onBeforeUnmount(() => {
-  if (telegramScriptElement?.remove) {
-    telegramScriptElement.remove();
-  }
-
-  if (typeof window !== "undefined") {
-    delete window[telegramWidgetCallbackName];
-  }
-});
 </script>
 
 <template>
@@ -174,23 +85,6 @@ onBeforeUnmount(() => {
           {{ submitting ? t("sending") : t("auth.loginSubmit") }}
         </button>
       </form>
-
-      <div v-if="hasTelegramWidget" class="login-divider">
-        <span>{{ t("auth.orContinueWith") }}</span>
-      </div>
-
-      <section v-if="hasTelegramWidget" class="telegram-login" aria-live="polite">
-        <p class="telegram-title">{{ t("auth.telegramTitle") }}</p>
-        <p class="telegram-lead">{{ t("auth.telegramSubtitle") }}</p>
-        <div
-          :id="telegramWidgetContainerId"
-          class="telegram-widget"
-          :class="{ 'is-loading': telegramLoading }"
-        ></div>
-        <p v-if="telegramLoading" class="telegram-note">{{ t("auth.telegramChecking") }}</p>
-        <p v-else-if="!telegramReady" class="telegram-note">{{ t("auth.telegramLoading") }}</p>
-        <p v-if="telegramError" class="login-error" role="alert">{{ telegramError }}</p>
-      </section>
 
       <nav class="login-nav">
         <button type="button" class="login-link" @click="router.push('/forgot-password')">
@@ -346,67 +240,6 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 1rem;
   text-align: center;
-}
-
-.login-divider {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  margin-top: 1.4rem;
-  color: #7a889d;
-  font-size: 0.82rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.login-divider::before,
-.login-divider::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: rgba(20, 35, 56, 0.1);
-}
-
-.telegram-login {
-  margin-top: 1rem;
-  border-radius: 16px;
-  border: 1px solid rgba(34, 118, 221, 0.14);
-  background: linear-gradient(180deg, rgba(235, 244, 255, 0.8) 0%, rgba(255, 255, 255, 0.98) 100%);
-  padding: 1rem;
-}
-
-.telegram-title {
-  margin: 0;
-  color: #173b67;
-  font-size: 0.96rem;
-  font-weight: 800;
-}
-
-.telegram-lead {
-  margin: 0.35rem 0 0;
-  color: #59708c;
-  font-size: 0.88rem;
-  line-height: 1.5;
-}
-
-.telegram-widget {
-  margin-top: 0.85rem;
-  min-height: 50px;
-  display: flex;
-  justify-content: center;
-}
-
-.telegram-widget.is-loading {
-  opacity: 0.75;
-}
-
-.telegram-note {
-  margin: 0.75rem 0 0;
-  text-align: center;
-  color: #5c6b82;
-  font-size: 0.84rem;
-  font-weight: 600;
 }
 
 .login-switch {
