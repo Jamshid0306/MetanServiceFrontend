@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from "vue";
+import { onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
@@ -12,10 +12,48 @@ const identifier = ref("");
 const password = ref("");
 const submitting = ref(false);
 const errorMessage = ref("");
+const telegramWidgetLoaded = ref(false);
+
+const telegramWidgetContainerId = "telegram-login-widget";
+const telegramWidgetCallbackName = "onTelegramAuth";
+let telegramScriptElement = null;
 
 const handleLoginSuccess = (customer) => {
   storeCustomerSession(customer);
   router.push("/");
+};
+
+const mountTelegramWidget = () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const container = document.getElementById(telegramWidgetContainerId);
+  if (!container) {
+    return;
+  }
+
+  container.innerHTML = "";
+  telegramWidgetLoaded.value = false;
+
+  window[telegramWidgetCallbackName] = (user) => {
+    const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(" ");
+    const username = user?.username ? `, @${user.username}` : "";
+    window.alert(`Logged in as ${fullName} (${user?.id}${username})`);
+  };
+
+  telegramScriptElement = document.createElement("script");
+  telegramScriptElement.async = true;
+  telegramScriptElement.src = "https://telegram.org/js/telegram-widget.js?23";
+  telegramScriptElement.setAttribute("data-telegram-login", "urganch_metan_servis_bot");
+  telegramScriptElement.setAttribute("data-size", "large");
+  telegramScriptElement.setAttribute("data-onauth", `${telegramWidgetCallbackName}(user)`);
+  telegramScriptElement.setAttribute("data-request-access", "write");
+  telegramScriptElement.onload = () => {
+    telegramWidgetLoaded.value = true;
+  };
+
+  container.appendChild(telegramScriptElement);
 };
 
 const submitLogin = async () => {
@@ -43,6 +81,20 @@ const submitLogin = async () => {
     submitting.value = false;
   }
 };
+
+onMounted(() => {
+  mountTelegramWidget();
+});
+
+onBeforeUnmount(() => {
+  if (telegramScriptElement?.remove) {
+    telegramScriptElement.remove();
+  }
+
+  if (typeof window !== "undefined") {
+    delete window[telegramWidgetCallbackName];
+  }
+});
 </script>
 
 <template>
@@ -85,6 +137,17 @@ const submitLogin = async () => {
           {{ submitting ? t("sending") : t("auth.loginSubmit") }}
         </button>
       </form>
+
+      <div class="login-divider">
+        <span>Telegram</span>
+      </div>
+
+      <section class="telegram-box">
+        <div :id="telegramWidgetContainerId" class="telegram-widget"></div>
+        <p v-if="!telegramWidgetLoaded" class="telegram-note">
+          Telegram widget yuklanmoqda...
+        </p>
+      </section>
 
       <nav class="login-nav">
         <button type="button" class="login-link" @click="router.push('/forgot-password')">
@@ -240,6 +303,48 @@ const submitLogin = async () => {
   align-items: center;
   gap: 1rem;
   text-align: center;
+}
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-top: 1.4rem;
+  color: #7a889d;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(20, 35, 56, 0.1);
+}
+
+.telegram-box {
+  margin-top: 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(20, 35, 56, 0.1);
+  background: #fafbfc;
+  padding: 1rem;
+}
+
+.telegram-widget {
+  min-height: 48px;
+  display: flex;
+  justify-content: center;
+}
+
+.telegram-note {
+  margin: 0.75rem 0 0;
+  text-align: center;
+  color: #5c6b82;
+  font-size: 0.84rem;
+  font-weight: 600;
 }
 
 .login-switch {
