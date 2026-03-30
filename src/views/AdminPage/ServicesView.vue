@@ -15,6 +15,7 @@ const currentLang = ref("uz");
 const saving = ref(false);
 const notifShow = ref(false);
 const notifMessage = ref("");
+const notifVariant = ref("success");
 const productSearch = ref("");
 
 const createInitialService = () => ({
@@ -26,8 +27,9 @@ const createInitialService = () => ({
 
 const serviceForm = ref(createInitialService());
 
-const showNotification = (message) => {
+const showNotification = (message, variant = "success") => {
   notifMessage.value = message;
+  notifVariant.value = variant;
   notifShow.value = true;
 };
 
@@ -102,13 +104,13 @@ const submitService = async () => {
 
   if (!payload.name_uz || !payload.name_ru || !payload.name_en) {
     saving.value = false;
-    showNotification("Xizmat nomlarini 3 tilda to‘ldiring.");
+    showNotification("Xizmat nomlarini 3 tilda to‘ldiring.", "error");
     return;
   }
 
   if (!payload.price_uz || !payload.price_ru || !payload.price_en) {
     saving.value = false;
-    showNotification("Xizmat narxlarini 3 tilda kiriting.");
+    showNotification("Xizmat narxlarini 3 tilda kiriting.", "error");
     return;
   }
 
@@ -118,6 +120,7 @@ const submitService = async () => {
 
   saving.value = false;
   if (!success) {
+    showNotification("Xizmatni saqlashda xatolik yuz berdi.", "error");
     return;
   }
 
@@ -129,7 +132,10 @@ const submitService = async () => {
 const confirmDelete = async () => {
   if (!currentServiceId.value) return;
   const success = await store.deleteService(currentServiceId.value);
-  if (!success) return;
+  if (!success) {
+    showNotification("Xizmatni o‘chirishda xatolik yuz berdi.", "error");
+    return;
+  }
   showDeleteModal.value = false;
   showModal.value = false;
   resetForm();
@@ -176,6 +182,7 @@ onMounted(async () => {
     <Notification
       :message="notifMessage"
       :show="notifShow"
+      :variant="notifVariant"
       :show-basket-action="false"
       @close="notifShow = false"
     />
@@ -231,198 +238,213 @@ onMounted(async () => {
         class="editor-overlay service-editor-overlay fixed inset-0 z-50 flex items-center justify-center"
       >
         <Motion class="editor-modal service-editor-modal">
-          <div class="service-modal-hero">
-            <div class="service-modal-hero-copy">
-              <div class="service-modal-topline">
-                <p class="editor-eyebrow">
-                  {{ isUpdate ? "Редактирование" : "Новая услуга" }}
-                </p>
-                <span class="service-modal-chip">
-                  {{ isUpdate ? "Режим обновления" : "Черновик" }}
-                </span>
-              </div>
-              <h2 class="editor-title">
-                {{ isUpdate ? "Обновить услугу" : "Добавить услугу" }}
-              </h2>
-              <p class="service-modal-subtitle">
-                Настройте многоязычное описание услуги, стоимость и список товаров, где она будет доступна клиенту.
-              </p>
-            </div>
-
-            <div class="service-modal-stats">
-              <div class="service-stat-card">
-                <span>Язык</span>
-                <strong>{{ currentLang.toUpperCase() }}</strong>
-                <small>Текущая вкладка</small>
-              </div>
-              <div class="service-stat-card">
-                <span>Товаров</span>
-                <strong>{{ selectedProductsCount }}</strong>
-                <small>Выбрано в услуге</small>
-              </div>
-            </div>
-          </div>
-
-          <div class="editor-header service-modal-header">
-            <div>
-              <p class="service-modal-section-label">Контент и привязка</p>
-            </div>
-            <button
-              v-if="isUpdate"
-              type="button"
-              class="editor-delete-btn"
-              @click="showDeleteModal = true"
-            >
-              <Delete :size="24" />
-            </button>
-          </div>
-
-          <div class="editor-lang-switch">
-            <button
-              v-for="lang in ['uz', 'ru', 'en']"
-              :key="lang"
-              type="button"
-              class="editor-lang-btn"
-              :class="{ 'editor-lang-btn-active': currentLang === lang }"
-              @click="currentLang = lang"
-            >
-              {{ lang.toUpperCase() }}
-            </button>
-          </div>
-
-          <div class="service-editor-grid">
-            <div class="editor-panel service-form-panel">
-              <div class="service-panel-head">
-                <div>
-                  <h3 class="editor-section-title">Текущий язык: {{ currentLang.toUpperCase() }}</h3>
-                  <p class="editor-section-copy">
-                    Все поля ниже редактируются для выбранного языка.
+          <div class="service-modal-scroll">
+            <div class="service-modal-hero">
+              <div class="service-modal-hero-copy">
+                <div class="service-modal-topline">
+                  <p class="editor-eyebrow">
+                    {{ isUpdate ? "Редактирование" : "Новая услуга" }}
                   </p>
+                  <span class="service-modal-chip">
+                    {{ isUpdate ? "Режим обновления" : "Черновик" }}
+                  </span>
                 </div>
-                <div class="service-form-badge">
-                  {{ serviceForm.name[currentLang] ? "Заполнено" : "Нужно название" }}
-                </div>
+                <h2 class="editor-title">
+                  {{ isUpdate ? "Обновить услугу" : "Добавить услугу" }}
+                </h2>
+                <p class="service-modal-subtitle">
+                  Настройте многоязычное описание услуги, стоимость и список товаров, где она будет доступна клиенту.
+                </p>
               </div>
 
-              <label class="editor-label">
-                Название услуги
-                <input
-                  v-model="serviceForm.name[currentLang]"
-                  type="text"
-                  class="editor-field service-editor-field"
-                  :placeholder="`Введите название (${currentLang.toUpperCase()})`"
-                />
-              </label>
+              <div class="service-modal-stats">
+                <div class="service-stat-card">
+                  <span>Язык</span>
+                  <strong>{{ currentLang.toUpperCase() }}</strong>
+                  <small>Текущая вкладка</small>
+                </div>
+                <div class="service-stat-card">
+                  <span>Товаров</span>
+                  <strong>{{ selectedProductsCount }}</strong>
+                  <small>Выбрано в услуге</small>
+                </div>
+              </div>
+            </div>
 
-              <label class="editor-label">
-                Характеристика / описание
-                <textarea
-                  v-model="serviceForm.characteristic[currentLang]"
-                  rows="7"
-                  class="editor-field editor-textarea service-editor-field"
-                  :placeholder="`Кратко опишите услугу (${currentLang.toUpperCase()})`"
-                ></textarea>
-              </label>
+            <div class="editor-header service-modal-header">
+              <div>
+                <p class="service-modal-section-label">Контент и привязка</p>
+              </div>
+              <button
+                v-if="isUpdate"
+                type="button"
+                class="editor-delete-btn"
+                @click="showDeleteModal = true"
+              >
+                <Delete :size="24" />
+              </button>
+            </div>
 
-              <label class="editor-label">
-                Цена
-                <div class="service-price-input-wrap">
+            <div class="service-lang-switch-wrap">
+              <p class="service-lang-switch-label">Языковые версии</p>
+              <div class="editor-lang-switch service-lang-switch">
+                <button
+                  v-for="lang in [
+                    { key: 'uz', title: 'UZ', subtitle: 'O‘zbekcha' },
+                    { key: 'ru', title: 'RU', subtitle: 'Русский' },
+                    { key: 'en', title: 'EN', subtitle: 'English' },
+                  ]"
+                  :key="lang.key"
+                  type="button"
+                  class="editor-lang-btn service-lang-btn"
+                  :class="{ 'editor-lang-btn-active service-lang-btn-active': currentLang === lang.key }"
+                  @click="currentLang = lang.key"
+                >
+                  <span class="service-lang-btn-title">{{ lang.title }}</span>
+                  <span class="service-lang-btn-subtitle">{{ lang.subtitle }}</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="service-editor-grid">
+              <div class="editor-panel service-form-panel">
+                <div class="service-panel-head">
+                  <div>
+                    <h3 class="editor-section-title">Текущий язык: {{ currentLang.toUpperCase() }}</h3>
+                    <p class="editor-section-copy">
+                      Все поля ниже редактируются для выбранного языка.
+                    </p>
+                  </div>
+                  <div class="service-form-badge">
+                    {{ serviceForm.name[currentLang] ? "Заполнено" : "Нужно название" }}
+                  </div>
+                </div>
+
+                <label class="editor-label">
+                  Название услуги
                   <input
-                    :value="serviceForm.price[currentLang]"
+                    v-model="serviceForm.name[currentLang]"
                     type="text"
                     class="editor-field service-editor-field"
-                    placeholder="Например: 250 000"
-                    @input="serviceForm.price[currentLang] = formatNumericInput($event.target.value)"
+                    :placeholder="`Введите название (${currentLang.toUpperCase()})`"
                   />
-                  <span class="service-price-suffix">сум</span>
-                </div>
-              </label>
+                </label>
 
-              <div class="service-language-preview">
-                <div class="service-language-preview-head">
-                  <div>
-                    <h4>Быстрый обзор переводов</h4>
-                    <p>Сразу видно, какие языки уже заполнены.</p>
-                  </div>
-                </div>
+                <label class="editor-label">
+                  Характеристика / описание
+                  <textarea
+                    v-model="serviceForm.characteristic[currentLang]"
+                    rows="7"
+                    class="editor-field editor-textarea service-editor-field"
+                    :placeholder="`Кратко опишите услугу (${currentLang.toUpperCase()})`"
+                  ></textarea>
+                </label>
 
-                <div class="service-language-preview-row">
-                  <span>UZ</span>
-                  <strong>{{ serviceForm.name.uz || "—" }}</strong>
-                  <em>{{ serviceForm.price.uz || "Цена не указана" }}</em>
-                </div>
-                <div class="service-language-preview-row">
-                  <span>RU</span>
-                  <strong>{{ serviceForm.name.ru || "—" }}</strong>
-                  <em>{{ serviceForm.price.ru || "Цена не указана" }}</em>
-                </div>
-                <div class="service-language-preview-row">
-                  <span>EN</span>
-                  <strong>{{ serviceForm.name.en || "—" }}</strong>
-                  <em>{{ serviceForm.price.en || "Цена не указана" }}</em>
-                </div>
-              </div>
-            </div>
-
-            <div class="editor-panel service-products-panel">
-              <div class="editor-section-head service-products-head">
-                <div>
-                  <h3 class="editor-section-title">Связанные товары</h3>
-                  <p class="editor-section-copy">
-                    Отметьте товары, где эта услуга должна отображаться у клиента.
-                  </p>
-                </div>
-              </div>
-
-              <div class="service-products-toolbar">
-                <input
-                  v-model="productSearch"
-                  type="text"
-                  class="editor-field service-editor-field service-search-field"
-                  placeholder="Поиск по ID или названию товара..."
-                />
-                <div class="service-selected-pill">
-                  Выбрано: {{ selectedProductsCount }}
-                </div>
-              </div>
-
-              <div class="service-products-list">
-                <label
-                  v-for="product in filteredProducts"
-                  :key="product.id"
-                  class="service-product-item"
-                  :class="{
-                    'service-product-item-active': serviceForm.product_ids.includes(product.id),
-                  }"
-                >
-                  <input
-                    type="checkbox"
-                    :checked="serviceForm.product_ids.includes(product.id)"
-                    @change="toggleProduct(product.id)"
-                  />
-                  <div class="service-product-copy">
-                    <strong>#{{ product.id }} {{ product.name_ru }}</strong>
-                    <span>{{ product.name_uz || product.name_en || "Название не заполнено" }}</span>
+                <label class="editor-label">
+                  Цена
+                  <div class="service-price-input-wrap">
+                    <input
+                      :value="serviceForm.price[currentLang]"
+                      type="text"
+                      class="editor-field service-editor-field"
+                      placeholder="Например: 250 000"
+                      @input="serviceForm.price[currentLang] = formatNumericInput($event.target.value)"
+                    />
+                    <span class="service-price-suffix">сум</span>
                   </div>
                 </label>
-                <div v-if="!filteredProducts.length" class="service-empty-state">
-                  По вашему поиску товары не найдены.
+
+                <div class="service-language-preview">
+                  <div class="service-language-preview-head">
+                    <div>
+                      <h4>Быстрый обзор переводов</h4>
+                      <p>Сразу видно, какие языки уже заполнены.</p>
+                    </div>
+                  </div>
+
+                  <div class="service-language-preview-row">
+                    <span>UZ</span>
+                    <strong>{{ serviceForm.name.uz || "—" }}</strong>
+                    <em>{{ serviceForm.price.uz || "Цена не указана" }}</em>
+                  </div>
+                  <div class="service-language-preview-row">
+                    <span>RU</span>
+                    <strong>{{ serviceForm.name.ru || "—" }}</strong>
+                    <em>{{ serviceForm.price.ru || "Цена не указана" }}</em>
+                  </div>
+                  <div class="service-language-preview-row">
+                    <span>EN</span>
+                    <strong>{{ serviceForm.name.en || "—" }}</strong>
+                    <em>{{ serviceForm.price.en || "Цена не указана" }}</em>
+                  </div>
                 </div>
               </div>
 
-              <div class="service-selection-note">
-                Отмеченные товары сразу получат эту услугу в клиентской карточке товара.
+              <div class="editor-panel service-products-panel">
+                <div class="editor-section-head service-products-head">
+                  <div>
+                    <h3 class="editor-section-title">Связанные товары</h3>
+                    <p class="editor-section-copy">
+                      Отметьте товары, где эта услуга должна отображаться у клиента.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="service-products-toolbar">
+                  <input
+                    v-model="productSearch"
+                    type="text"
+                    class="editor-field service-editor-field service-search-field"
+                    placeholder="Поиск по ID или названию товара..."
+                  />
+                  <div class="service-selected-pill">
+                    Выбрано: {{ selectedProductsCount }}
+                  </div>
+                </div>
+
+                <div class="service-products-list">
+                  <label
+                    v-for="product in filteredProducts"
+                    :key="product.id"
+                    class="service-product-item"
+                    :class="{
+                      'service-product-item-active': serviceForm.product_ids.includes(product.id),
+                    }"
+                  >
+                    <input
+                      type="checkbox"
+                      :checked="serviceForm.product_ids.includes(product.id)"
+                      @change="toggleProduct(product.id)"
+                    />
+                    <div class="service-product-copy">
+                      <strong>#{{ product.id }} {{ product.name_ru }}</strong>
+                      <span>{{ product.name_uz || product.name_en || "Название не заполнено" }}</span>
+                    </div>
+                  </label>
+                  <div v-if="!filteredProducts.length" class="service-empty-state">
+                    По вашему поиску товары не найдены.
+                  </div>
+                </div>
+
+                <div class="service-selection-note">
+                  Отмеченные товары сразу получат эту услугу в клиентской карточке товара.
+                </div>
               </div>
             </div>
-          </div>
 
-          <div class="editor-actions service-modal-actions">
-            <button type="button" class="editor-secondary-btn" @click="showModal = false">
-              Отмена
-            </button>
-            <button type="button" class="products-create-btn" :disabled="saving" @click="submitService">
-              {{ saving ? "Сохранение..." : isUpdate ? "Сохранить" : "Создать" }}
-            </button>
+            <div class="editor-actions service-modal-actions">
+              <button type="button" class="editor-secondary-btn service-modal-action-btn" @click="showModal = false">
+                Отмена
+              </button>
+              <button
+                type="button"
+                class="products-create-btn service-modal-action-btn"
+                :disabled="saving"
+                @click="submitService"
+              >
+                {{ saving ? "Сохранение..." : isUpdate ? "Сохранить" : "Создать" }}
+              </button>
+            </div>
           </div>
         </Motion>
       </Motion>
@@ -552,6 +574,8 @@ onMounted(async () => {
   width: min(1080px, calc(100vw - 2rem));
   max-height: min(92vh, 980px);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
   border: 1px solid rgba(214, 228, 247, 0.72);
   border-radius: 32px;
   background:
@@ -568,6 +592,18 @@ onMounted(async () => {
     radial-gradient(circle at top, rgba(55, 119, 191, 0.16), transparent 24%),
     rgba(4, 12, 24, 0.7);
   backdrop-filter: blur(14px);
+  padding: 1rem;
+  overflow: hidden;
+}
+
+.service-modal-scroll {
+  flex: 1 1 auto;
+  display: grid;
+  gap: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 1.35rem;
 }
 
 .service-editor-grid {
@@ -575,6 +611,7 @@ onMounted(async () => {
   grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
   gap: 1.1rem;
   align-items: start;
+  padding: 0 1.35rem;
 }
 
 .service-modal-hero {
@@ -657,6 +694,8 @@ onMounted(async () => {
 }
 
 .service-modal-header {
+  padding-left: 1.35rem;
+  padding-right: 1.35rem;
   padding-top: 0.4rem;
 }
 
@@ -673,6 +712,69 @@ onMounted(async () => {
   gap: 0.45rem;
   color: #dbe7fb;
   font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.service-lang-switch-wrap {
+  padding: 0.3rem 1.35rem 0;
+}
+
+.service-lang-switch-label {
+  margin-bottom: 0.6rem;
+  color: #6f84a1;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.service-lang-switch {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.service-lang-btn {
+  display: grid;
+  justify-items: start;
+  gap: 0.15rem;
+  min-height: 72px;
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(20, 49, 95, 0.08);
+  background: linear-gradient(180deg, #fbfdff 0%, #f4f9ff 100%);
+  color: #16315d;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.service-lang-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(20, 79, 149, 0.14);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.service-lang-btn-active {
+  border-color: rgba(31, 99, 177, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(186, 222, 255, 0.46), transparent 42%),
+    linear-gradient(180deg, #e9f4ff 0%, #f5faff 100%);
+  box-shadow: 0 14px 28px rgba(20, 79, 149, 0.1);
+}
+
+.service-lang-btn-title {
+  font-size: 0.96rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.service-lang-btn-subtitle {
+  color: #627a99;
+  font-size: 0.78rem;
   font-weight: 700;
 }
 
@@ -923,8 +1025,13 @@ onMounted(async () => {
   position: sticky;
   bottom: 0;
   margin-top: 1.1rem;
-  padding: 1rem 0 0;
+  padding: 1rem 1.35rem 1.35rem;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.98) 34%);
+  flex-wrap: wrap;
+}
+
+.service-modal-action-btn {
+  min-width: 148px;
 }
 
 @media (max-width: 900px) {
@@ -951,6 +1058,10 @@ onMounted(async () => {
     align-items: stretch;
   }
 
+  .service-lang-switch {
+    grid-template-columns: 1fr;
+  }
+
   .service-language-preview-row {
     grid-template-columns: 44px minmax(0, 1fr);
   }
@@ -969,10 +1080,16 @@ onMounted(async () => {
   }
 
   .service-modal-hero,
-  .service-form-panel,
-  .service-products-panel {
+  .service-modal-header,
+  .service-lang-switch-wrap,
+  .service-modal-actions,
+  .service-editor-grid {
     padding-left: 1rem;
     padding-right: 1rem;
+  }
+
+  .service-modal-scroll {
+    padding-bottom: 1rem;
   }
 
   .service-panel-head,
@@ -985,6 +1102,15 @@ onMounted(async () => {
     width: 100%;
     justify-content: center;
     text-align: center;
+  }
+
+  .service-modal-actions {
+    justify-content: stretch;
+  }
+
+  .service-modal-action-btn {
+    flex: 1 1 100%;
+    width: 100%;
   }
 }
 </style>

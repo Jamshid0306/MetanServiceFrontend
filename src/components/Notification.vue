@@ -1,6 +1,6 @@
 <script setup>
-import { ref, watch, onBeforeUnmount } from "vue";
-import { Check } from "lucide-vue-next";
+import { computed, ref, watch, onBeforeUnmount } from "vue";
+import { Check, CircleAlert } from "lucide-vue-next";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 const {t} = useI18n()
@@ -16,6 +16,10 @@ const props = defineProps({
     type: Number,
     default: 3000,
   },
+  variant: {
+    type: String,
+    default: "success",
+  },
 });
 
 const emit = defineEmits(["close"]);
@@ -23,6 +27,22 @@ const visible = ref(props.show);
 const timer = ref(null);
 const isHovered = ref(false);
 const router = useRouter();
+
+const isError = computed(() => props.variant === "error");
+const toastClass = computed(() =>
+  isError.value
+    ? "border-red-200 bg-white/96 shadow-[0_18px_40px_rgba(127,29,29,0.16)]"
+    : "border-slate-200 bg-white/96 shadow-[0_18px_40px_rgba(15,23,42,0.12)]"
+);
+const iconWrapClass = computed(() =>
+  isError.value ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"
+);
+const titleClass = computed(() => (isError.value ? "text-red-950" : "text-slate-800"));
+const actionClass = computed(() =>
+  isError.value
+    ? "text-red-700 hover:text-red-900"
+    : "text-slate-700 hover:text-slate-950"
+);
 
 const startTimer = () => {
   clearTimeout(timer.value);
@@ -60,21 +80,24 @@ onBeforeUnmount(() => {
   <transition name="toast-slide">
     <div
       v-if="visible"
-      class="fixed top-6 right-6 z-[9999] flex w-full max-w-xs items-start gap-3 rounded-2xl border border-slate-200 bg-white/96 p-4 backdrop-blur-md"
+      class="fixed top-6 right-6 z-[9999] flex w-full max-w-xs items-start gap-3 rounded-2xl border p-4 backdrop-blur-md"
+      :class="toastClass"
       @mouseenter="isHovered = true; clearTimer()"
       @mouseleave="isHovered = false; startTimer()"
     >
-      <div class="rounded-full bg-slate-100 p-2">
-        <Check class="h-6 w-6 text-slate-700" />
+      <div class="rounded-full p-2" :class="iconWrapClass">
+        <Check v-if="!isError" class="h-6 w-6" />
+        <CircleAlert v-else class="h-6 w-6" />
       </div>
       <div>
-        <p class="font-semibold leading-snug text-slate-800">
+        <p class="font-semibold leading-snug" :class="titleClass">
           {{ message }}
         </p>
         <button
           v-if="showBasketAction"
           @click="goToBasket"
-          class="mt-2 text-sm font-medium text-slate-700 transition-colors hover:text-slate-950"
+          class="mt-2 text-sm font-medium transition-colors"
+          :class="actionClass"
         >
           {{ t('go_to_basket') }} →
         </button>
