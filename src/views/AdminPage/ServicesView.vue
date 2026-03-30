@@ -578,10 +578,7 @@ onMounted(async () => {
   flex-direction: column;
   border: 1px solid rgba(214, 228, 247, 0.72);
   border-radius: 32px;
-  background:
-    radial-gradient(circle at top right, rgba(180, 220, 255, 0.52), transparent 30%),
-    radial-gradient(circle at top left, rgba(82, 166, 255, 0.2), transparent 26%),
-    linear-gradient(180deg, #0f2444 0%, #15345d 15%, #f6faff 15.1%, #ffffff 100%);
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
   box-shadow:
     0 34px 90px rgba(15, 23, 42, 0.34),
     0 12px 30px rgba(20, 49, 95, 0.16);
@@ -640,9 +637,9 @@ onMounted(async () => {
   min-height: 30px;
   padding: 0.35rem 0.8rem;
   border-radius: 999px;
-  border: 1px solid rgba(182, 215, 255, 0.22);
-  background: rgba(255, 255, 255, 0.08);
-  color: #f2f7ff;
+  border: 1px solid rgba(20, 49, 95, 0.08);
+  background: #eef5fd;
+  color: #1c4a7b;
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -651,7 +648,7 @@ onMounted(async () => {
 .service-modal-subtitle {
   margin-top: 0.45rem;
   max-width: 660px;
-  color: rgba(230, 239, 253, 0.84);
+  color: #67809e;
   line-height: 1.6;
 }
 
@@ -662,12 +659,11 @@ onMounted(async () => {
 
 .service-stat-card {
   min-width: 132px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(20, 49, 95, 0.08);
   border-radius: 22px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.06));
+  background: linear-gradient(180deg, #ffffff, #f6faff);
   padding: 0.95rem 1rem;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
 }
 
 .service-stat-card span {
@@ -675,20 +671,20 @@ onMounted(async () => {
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(219, 231, 251, 0.72);
+  color: #6c84a2;
 }
 
 .service-stat-card strong {
   display: block;
   margin-top: 0.34rem;
   font-size: 1.2rem;
-  color: #fff;
+  color: #16315d;
 }
 
 .service-stat-card small {
   display: block;
   margin-top: 0.22rem;
-  color: rgba(219, 231, 251, 0.66);
+  color: #7a91ad;
   font-size: 0.72rem;
   line-height: 1.4;
 }
@@ -700,7 +696,7 @@ onMounted(async () => {
 }
 
 .service-modal-section-label {
-  color: rgba(219, 231, 251, 0.72);
+  color: #7890ad;
   font-size: 0.76rem;
   font-weight: 800;
   letter-spacing: 0.1em;
@@ -1032,6 +1028,24 @@ onMounted(async () => {
 
 .service-modal-action-btn {
   min-width: 148px;
+}
+
+.service-modal-actions .editor-secondary-btn {
+  background: #eef3f8;
+  color: #28405c;
+  border: 1px solid rgba(20, 49, 95, 0.08);
+  box-shadow: none;
+}
+
+.service-modal-actions .products-create-btn {
+  min-width: 148px;
+  background: linear-gradient(135deg, #1f8f5f, #157347);
+  color: #ffffff;
+  box-shadow: 0 16px 28px rgba(21, 115, 71, 0.22);
+}
+
+.service-modal-actions .products-create-btn:hover {
+  box-shadow: 0 20px 34px rgba(21, 115, 71, 0.28);
 }
 
 @media (max-width: 900px) {
