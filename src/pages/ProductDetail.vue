@@ -1282,9 +1282,9 @@ onBeforeUnmount(() => {
     </transition>
 
     <div class="detail-layout animate-slide-in-up">
-      <div class="detail-main flex flex-col lg:flex-row gap-12 pb-[20px]">
+      <div class="detail-main">
         <div class="detail-gallery-column">
-          <div class="detail-gallery lg:w-1/2 flex justify-center items-center flex-col gap-4">
+          <div class="detail-gallery">
             <div class="detail-gallery-stage">
               <Swiper
                 ref="swiperRef"
@@ -1354,7 +1354,7 @@ onBeforeUnmount(() => {
           </section>
         </div>
 
-        <div class="detail-info lg:w-1/2 flex flex-col gap-[20px] justify-center">
+        <div class="detail-info">
           <div ref="summaryRef" class="detail-summary detail-section">
             <div class="detail-summary-head">
               <span class="detail-product-id">ID {{ store.product?.id }}</span>
@@ -2247,9 +2247,7 @@ onBeforeUnmount(() => {
 }
 
 .detail-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: clamp(1rem, 3vw, 2rem);
+  display: block;
 }
 
 .detail-gallery-column {
@@ -3519,9 +3517,8 @@ onBeforeUnmount(() => {
 }
 
 @media (min-width: 1025px) {
-  .detail-layout {
+  .detail-main {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: start;
   }
 
   .detail-copy-section-mobile {
