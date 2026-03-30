@@ -228,7 +228,7 @@ onMounted(async () => {
     <AnimatePresence>
       <Motion
         v-if="showModal"
-        class="editor-overlay fixed inset-0 z-50 flex items-center justify-center"
+        class="editor-overlay service-editor-overlay fixed inset-0 z-50 flex items-center justify-center"
       >
         <Motion class="editor-modal service-editor-modal">
           <div class="service-modal-hero">
@@ -528,6 +528,18 @@ onMounted(async () => {
   width: min(1080px, calc(100vw - 2rem));
   max-height: min(92vh, 980px);
   overflow: hidden;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(223, 236, 255, 0.9), transparent 32%),
+    linear-gradient(180deg, #163055 0%, #10233f 18%, #ffffff 18.1%, #ffffff 100%);
+  box-shadow:
+    0 30px 80px rgba(15, 23, 42, 0.32),
+    0 8px 24px rgba(20, 49, 95, 0.18);
+}
+
+.service-editor-overlay {
+  background: rgba(4, 12, 24, 0.58);
+  backdrop-filter: blur(10px);
 }
 
 .service-editor-grid {
@@ -607,6 +619,11 @@ onMounted(async () => {
 .service-products-panel {
   display: grid;
   gap: 1rem;
+  border-radius: 24px;
+  background: #ffffff;
+  border: 1px solid rgba(20, 49, 95, 0.08);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+  padding: 1.1rem;
 }
 
 .service-panel-head,
@@ -616,13 +633,13 @@ onMounted(async () => {
 
 .service-editor-field {
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: #f8fbff;
+  border: 1px solid rgba(20, 49, 95, 0.12);
+  color: #142338;
 }
 
 .service-editor-field::placeholder {
-  color: rgba(219, 231, 251, 0.45);
+  color: #8aa0bc;
 }
 
 .service-price-input-wrap {
@@ -634,7 +651,7 @@ onMounted(async () => {
   top: 50%;
   right: 1rem;
   transform: translateY(-50%);
-  color: rgba(219, 231, 251, 0.72);
+  color: #607188;
   font-size: 0.82rem;
   font-weight: 700;
   pointer-events: none;
@@ -644,8 +661,8 @@ onMounted(async () => {
   display: grid;
   gap: 0.55rem;
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  border: 1px solid rgba(20, 49, 95, 0.08);
   padding: 0.9rem 1rem;
 }
 
@@ -658,14 +675,14 @@ onMounted(async () => {
 
 .service-language-preview-row span {
   min-width: 2rem;
-  color: rgba(219, 231, 251, 0.72);
+  color: #607188;
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.08em;
 }
 
 .service-language-preview-row strong {
-  color: #fff;
+  color: #14315f;
   font-size: 0.92rem;
   text-align: right;
 }
@@ -683,9 +700,9 @@ onMounted(async () => {
 .service-selected-pill {
   flex-shrink: 0;
   border-radius: 999px;
-  background: rgba(94, 234, 212, 0.1);
-  color: #ccfbf1;
-  border: 1px solid rgba(94, 234, 212, 0.22);
+  background: #eef7ff;
+  color: #14315f;
+  border: 1px solid rgba(20, 49, 95, 0.12);
   padding: 0.65rem 0.85rem;
   font-size: 0.84rem;
   font-weight: 700;
@@ -704,21 +721,21 @@ onMounted(async () => {
   align-items: flex-start;
   gap: 0.75rem;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.06);
+  background: #f8fbff;
   border: 1px solid transparent;
   padding: 0.9rem 0.95rem;
-  color: #ecf3ff;
+  color: #14315f;
   transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
 }
 
 .service-product-item:hover {
   transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.09);
+  background: #f1f7ff;
 }
 
 .service-product-item-active {
   border-color: rgba(125, 211, 252, 0.4);
-  background: rgba(56, 189, 248, 0.12);
+  background: #eaf4ff;
 }
 
 .service-product-copy {
@@ -727,22 +744,22 @@ onMounted(async () => {
 }
 
 .service-product-copy strong {
-  color: #fff;
+  color: #14315f;
   font-size: 0.92rem;
 }
 
 .service-product-copy span {
-  color: rgba(219, 231, 251, 0.72);
+  color: #607188;
   font-size: 0.84rem;
   line-height: 1.45;
 }
 
 .service-empty-state {
   border-radius: 16px;
-  border: 1px dashed rgba(219, 231, 251, 0.2);
+  border: 1px dashed rgba(20, 49, 95, 0.16);
   padding: 1rem;
   text-align: center;
-  color: rgba(219, 231, 251, 0.72);
+  color: #607188;
 }
 
 .delete-modal {
@@ -777,7 +794,7 @@ onMounted(async () => {
   bottom: 0;
   margin-top: 1.1rem;
   padding: 1rem 0 0;
-  background: linear-gradient(180deg, rgba(11, 25, 49, 0) 0%, rgba(11, 25, 49, 0.96) 32%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.96) 32%);
 }
 
 @media (max-width: 900px) {
