@@ -6,6 +6,11 @@ import { useProductsStore } from "../store/productsStore";
 import { useBasketStore } from "../store/basketStore";
 import { useLoaderStore } from "@/store/loaderStore";
 import { resolveAssetUrl } from "@/lib/api";
+import {
+  CUSTOMER_SESSION_EVENT,
+  clearCustomerSession,
+  getStoredCustomerSession,
+} from "@/lib/customerSession";
 import { matchesProductSearch, scoreProductSearch } from "@/lib/productSearch";
 import { CONTACT_PHONE_HREF } from "@/constants/contact";
 import Basket from "./icons/Basket.vue";
@@ -24,6 +29,7 @@ const loaderStore = useLoaderStore();
 const langOpen = ref(false);
 const isSticky = ref(false);
 const searchQuery = ref("");
+const customerProfile = ref(null);
 
 const languages = [
   { code: "uz", label: "O'zbekcha", flag: uzFlag },
@@ -33,6 +39,29 @@ const languages = [
 const activeLanguage = computed(
   () => languages.find((lang) => lang.code === locale.value) || languages[0]
 );
+const customerInitial = computed(
+  () => String(customerProfile.value?.name || "U").trim().charAt(0).toUpperCase() || "U"
+);
+const customerDisplayName = computed(() => {
+  const name = String(customerProfile.value?.name || "").trim();
+  if (!name) {
+    return t("nav.login");
+  }
+
+  return name;
+});
+const customerSecondaryText = computed(() => {
+  const username = String(customerProfile.value?.telegramUsername || "").trim();
+  if (username) {
+    return `@${username.replace(/^@+/, "")}`;
+  }
+
+  const phone = String(customerProfile.value?.phone || "").trim();
+  return phone ? `+${phone}` : t("auth.userAccess");
+});
+const syncCustomerProfile = () => {
+  customerProfile.value = getStoredCustomerSession();
+};
 
 const getProductOrder = (product) => {
   const raw =
@@ -86,17 +115,31 @@ const handleScroll = () => {
 onMounted(async () => {
   const savedLang = localStorage.getItem("lang");
   if (savedLang) locale.value = savedLang;
+  syncCustomerProfile();
 
   if (!productsStore.products.length) {
     await productsStore.fetchProducts(1000, 0);
   }
 
   window.addEventListener("scroll", handleScroll);
+  window.addEventListener("storage", syncCustomerProfile);
+  window.addEventListener(CUSTOMER_SESSION_EVENT, syncCustomerProfile);
 });
 
 onUnmounted(() => {
   window.removeEventListener("scroll", handleScroll);
+  window.removeEventListener("storage", syncCustomerProfile);
+  window.removeEventListener(CUSTOMER_SESSION_EVENT, syncCustomerProfile);
 });
+
+const logoutCustomer = () => {
+  clearCustomerSession();
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem("customer_access_token");
+  }
+  syncCustomerProfile();
+  router.push("/login");
+};
 
 watch(
   () => route.fullPath,
@@ -125,9 +168,24 @@ watch(
           </RouterLink>
 
           <div class="mobile-actions lg:hidden">
-            <RouterLink to="/login" class="mobile-login-chip">
+            <RouterLink v-if="!customerProfile" to="/login" class="mobile-login-chip">
               {{ t("nav.login") }}
             </RouterLink>
+            <div v-else class="mobile-profile-chip">
+              <div class="profile-chip-avatar">
+                <img
+                  v-if="customerProfile.photoUrl"
+                  :src="customerProfile.photoUrl"
+                  :alt="customerDisplayName"
+                  class="profile-chip-avatar-image"
+                />
+                <span v-else>{{ customerInitial }}</span>
+              </div>
+              <div class="profile-chip-copy">
+                <strong>{{ customerDisplayName }}</strong>
+                <small>{{ customerSecondaryText }}</small>
+              </div>
+            </div>
 
             <div class="mobile-search-inline relative z-40">
               <input
@@ -321,9 +379,27 @@ watch(
                 <Basket :size="22" />
               </RouterLink>
 
-              <RouterLink to="/login" class="login-chip ml-1 sm:ml-2">
+              <RouterLink v-if="!customerProfile" to="/login" class="login-chip ml-1 sm:ml-2">
                 {{ t("nav.login") }}
               </RouterLink>
+              <div v-else class="profile-chip ml-1 sm:ml-2">
+                <div class="profile-chip-avatar">
+                  <img
+                    v-if="customerProfile.photoUrl"
+                    :src="customerProfile.photoUrl"
+                    :alt="customerDisplayName"
+                    class="profile-chip-avatar-image"
+                  />
+                  <span v-else>{{ customerInitial }}</span>
+                </div>
+                <div class="profile-chip-copy">
+                  <strong>{{ customerDisplayName }}</strong>
+                  <small>{{ customerSecondaryText }}</small>
+                </div>
+                <button type="button" class="profile-chip-logout" @click="logoutCustomer">
+                  {{ t("nav.logout") }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -492,19 +568,25 @@ watch(
 }
 
 .login-chip,
-.mobile-login-chip {
+.mobile-login-chip,
+.profile-chip,
+.mobile-profile-chip {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   border-radius: 999px;
   border: 1px solid rgba(20, 35, 56, 0.12);
-  background: #18304f;
-  color: #ffffff;
-  font-weight: 700;
   transition:
     transform 0.2s ease,
     border-color 0.2s ease,
     background-color 0.2s ease;
+}
+
+.login-chip,
+.mobile-login-chip {
+  justify-content: center;
+  background: #18304f;
+  color: #ffffff;
+  font-weight: 700;
 }
 
 .login-chip {
@@ -517,11 +599,94 @@ watch(
   white-space: nowrap;
 }
 
+.profile-chip,
+.mobile-profile-chip {
+  gap: 0.7rem;
+  background: rgba(255, 255, 255, 0.94);
+  color: #18304f;
+  padding: 6px 8px 6px 6px;
+}
+
+.mobile-profile-chip {
+  max-width: 190px;
+}
+
 .login-chip:hover,
 .mobile-login-chip:hover {
   transform: translateY(-1px);
   border-color: #18304f;
   background: #142338;
+}
+
+.profile-chip:hover,
+.mobile-profile-chip:hover {
+  border-color: rgba(20, 35, 56, 0.24);
+  background: rgba(255, 255, 255, 1);
+}
+
+.profile-chip-avatar {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #18304f 0%, #2f5f98 100%);
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 800;
+  overflow: hidden;
+}
+
+.profile-chip-avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-chip-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.profile-chip-copy strong,
+.profile-chip-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-chip-copy strong {
+  max-width: 126px;
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: #142338;
+}
+
+.profile-chip-copy small {
+  margin-top: 0.18rem;
+  font-size: 0.7rem;
+  color: #64748b;
+}
+
+.profile-chip-logout {
+  margin-left: 0.15rem;
+  border: 0;
+  background: transparent;
+  color: #18304f;
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 0.45rem 0.55rem;
+  border-radius: 999px;
+  transition: background-color 0.2s ease;
+}
+
+.profile-chip-logout:hover {
+  background: rgba(20, 35, 56, 0.08);
 }
 
 .lang-button {

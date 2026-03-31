@@ -1,4 +1,5 @@
 const CUSTOMER_SESSION_STORAGE_KEY = "customer_profile";
+export const CUSTOMER_SESSION_EVENT = "customer-session-updated";
 
 export const normalizeCustomerPhone = (value = "") => {
   const digits = String(value || "").replace(/\D/g, "");
@@ -40,6 +41,10 @@ export const toCustomerSession = (customer = {}) => {
     id: customer?.id ?? null,
     name,
     phone,
+    telegramUsername: String(
+      customer?.telegram_username ?? customer?.telegramUsername ?? ""
+    ).trim(),
+    photoUrl: String(customer?.photo_url ?? customer?.photoUrl ?? "").trim(),
   };
 };
 
@@ -74,12 +79,17 @@ export const storeCustomerSession = (customer = null) => {
 
   if (!session) {
     storage.removeItem(CUSTOMER_SESSION_STORAGE_KEY);
+    window.dispatchEvent(new CustomEvent(CUSTOMER_SESSION_EVENT));
     return;
   }
 
   storage.setItem(CUSTOMER_SESSION_STORAGE_KEY, JSON.stringify(session));
+  window.dispatchEvent(new CustomEvent(CUSTOMER_SESSION_EVENT, { detail: session }));
 };
 
 export const clearCustomerSession = () => {
   getCustomerStorage()?.removeItem(CUSTOMER_SESSION_STORAGE_KEY);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(CUSTOMER_SESSION_EVENT));
+  }
 };
