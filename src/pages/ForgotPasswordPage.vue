@@ -3,7 +3,11 @@ import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
-import { normalizeCustomerPhone } from "@/lib/customerSession";
+import {
+  ensureUzbekistanPhoneInput,
+  formatUzbekistanPhoneInput,
+  normalizeCustomerPhone,
+} from "@/lib/customerSession";
 
 const router = useRouter();
 const { t } = useI18n();
@@ -14,6 +18,14 @@ const confirmPassword = ref("");
 const submitting = ref(false);
 const errorMessage = ref("");
 const successMessage = ref("");
+
+const handlePhoneFocus = () => {
+  phone.value = ensureUzbekistanPhoneInput(phone.value);
+};
+
+const handlePhoneInput = (event) => {
+  phone.value = formatUzbekistanPhoneInput(event.target.value);
+};
 
 const submitReset = async () => {
   const normalizedPhone = normalizeCustomerPhone(phone.value);
@@ -77,6 +89,8 @@ const submitReset = async () => {
               autocomplete="tel"
               :placeholder="t('auth.phonePlaceholder')"
               class="auth-input"
+              @focus="handlePhoneFocus"
+              @input="handlePhoneInput"
             />
           </label>
 

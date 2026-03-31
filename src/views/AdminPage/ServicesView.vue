@@ -19,8 +19,8 @@ const notifVariant = ref("success");
 const productSearch = ref("");
 
 const createInitialService = () => ({
-  name: { uz: "", ru: "", en: "" },
-  characteristic: { uz: "", ru: "", en: "" },
+  name: { uz: "", ru: "" },
+  characteristic: { uz: "", ru: "" },
   price: "",
   product_ids: [],
 });
@@ -59,12 +59,10 @@ const openUpdateModal = (service) => {
     name: {
       uz: service.name_uz || "",
       ru: service.name_ru || "",
-      en: service.name_en || "",
     },
     characteristic: {
       uz: service.characteristic_uz || "",
       ru: service.characteristic_ru || "",
-      en: service.characteristic_en || "",
     },
     price: formatNumericInput(service.price_uz || service.price_ru || service.price_en),
     product_ids: Array.isArray(service.product_ids) ? [...service.product_ids] : [],
@@ -88,19 +86,20 @@ const submitService = async () => {
   const payload = {
     name_uz: serviceForm.value.name.uz.trim(),
     name_ru: serviceForm.value.name.ru.trim(),
-    name_en: serviceForm.value.name.en.trim(),
+    name_en: serviceForm.value.name.ru.trim() || serviceForm.value.name.uz.trim(),
     characteristic_uz: serviceForm.value.characteristic.uz.trim(),
     characteristic_ru: serviceForm.value.characteristic.ru.trim(),
-    characteristic_en: serviceForm.value.characteristic.en.trim(),
+    characteristic_en:
+      serviceForm.value.characteristic.ru.trim() || serviceForm.value.characteristic.uz.trim(),
     price_uz: serviceForm.value.price.trim(),
     price_ru: serviceForm.value.price.trim(),
     price_en: serviceForm.value.price.trim(),
     product_ids: [...serviceForm.value.product_ids],
   };
 
-  if (!payload.name_uz || !payload.name_ru || !payload.name_en) {
+  if (!payload.name_uz || !payload.name_ru) {
     saving.value = false;
-    showNotification("Xizmat nomlarini 3 tilda to‘ldiring.", "error");
+    showNotification("Xizmat nomlarini 2 tilda to‘ldiring.", "error");
     return;
   }
 
@@ -155,12 +154,10 @@ const filteredProducts = computed(() => {
     const id = String(product.id || "");
     const nameRu = String(product.name_ru || "").toLowerCase();
     const nameUz = String(product.name_uz || "").toLowerCase();
-    const nameEn = String(product.name_en || "").toLowerCase();
     return (
       id.includes(query) ||
       nameRu.includes(query) ||
-      nameUz.includes(query) ||
-      nameEn.includes(query)
+      nameUz.includes(query)
     );
   });
 });
@@ -288,7 +285,6 @@ onMounted(async () => {
                   v-for="lang in [
                     { key: 'uz', title: 'UZ', subtitle: 'O‘zbekcha' },
                     { key: 'ru', title: 'RU', subtitle: 'Русский' },
-                    { key: 'en', title: 'EN', subtitle: 'English' },
                   ]"
                   :key="lang.key"
                   type="button"
@@ -389,7 +385,7 @@ onMounted(async () => {
                     />
                     <div class="service-product-copy">
                       <strong>#{{ product.id }} {{ product.name_ru }}</strong>
-                      <span>{{ product.name_uz || product.name_en || "Название не заполнено" }}</span>
+                  <span>{{ product.name_uz || product.name_ru || "Название не заполнено" }}</span>
                     </div>
                   </label>
                 <div v-if="!filteredProducts.length" class="service-empty-state">

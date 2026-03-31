@@ -24,7 +24,7 @@ const telegramWidgetCallbackName = "onTelegramAuth";
 let telegramScriptElement = null;
 
 const telegramWidgetLanguage = computed(() =>
-  String(locale.value || "").toLowerCase().startsWith("ru") ? "ru" : "en"
+  String(locale.value || "").toLowerCase().startsWith("ru") ? "ru" : "uz"
 );
 
 const telegramStatusMessage = computed(() => {

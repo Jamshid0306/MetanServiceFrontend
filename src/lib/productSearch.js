@@ -56,10 +56,8 @@ const getProductSearchFields = (product = {}) =>
     String(product?.id || ""),
     String(product?.name_uz || ""),
     String(product?.name_ru || ""),
-    String(product?.name_en || ""),
     String(product?.characteristic_uz || ""),
     String(product?.characteristic_ru || ""),
-    String(product?.characteristic_en || ""),
   ].filter(Boolean);
 
 export const matchesProductSearch = (product, rawQuery) => {
@@ -116,10 +114,8 @@ export const scoreProductSearch = (product, rawQuery, locale = "uz") => {
     scoreField(preferredName, 2.2) +
     scoreField(product?.name_ru, 1.9) +
     scoreField(product?.name_uz, 1.8) +
-    scoreField(product?.name_en, 1.6) +
     scoreField(product?.characteristic_ru, 0.7) +
-    scoreField(product?.characteristic_uz, 0.7) +
-    scoreField(product?.characteristic_en, 0.6);
+    scoreField(product?.characteristic_uz, 0.7);
 
   if (String(product?.id || "") === query) total += 200;
   else if (String(product?.id || "").includes(query)) total += 80;

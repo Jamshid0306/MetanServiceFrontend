@@ -12,7 +12,9 @@ import { useLoaderStore } from "@/store/loaderStore";
 import Notification from "@/components/Notification.vue";
 import { apiClient, getApiErrorMessage, resolveAssetUrls } from "@/lib/api";
 import {
+  ensureUzbekistanPhoneInput,
   formatCustomerPhone,
+  formatUzbekistanPhoneInput,
   getStoredCustomerSession,
   normalizeCustomerPhone,
 } from "@/lib/customerSession";
@@ -139,6 +141,14 @@ const applyCustomerProfileToOrderForm = (profile = customerProfile.value) => {
     orderForm.value.phones = customerFields.phones;
   }
 };
+
+const handleOrderPhoneFocus = () => {
+  orderForm.value.phone = ensureUzbekistanPhoneInput(orderForm.value.phone);
+};
+
+const handleOrderPhoneInput = (event) => {
+  orderForm.value.phone = formatUzbekistanPhoneInput(event.target.value);
+};
 const formatCylinderOptionMeta = (option) => {
   const parts = [];
 
@@ -182,10 +192,6 @@ const buildSelectedExtraServiceOption = (service) => ({
 const getOptionSelectPlaceholder = (groupKey) => {
   if (locale.value === "ru") {
     return "Выберите размер баллона";
-  }
-
-  if (locale.value === "en") {
-    return "Select cylinder size";
   }
 
   return "Balon razmerini tanlang";
@@ -2074,8 +2080,10 @@ onBeforeUnmount(() => {
             <input
               v-model="orderForm.phone"
               type="tel"
-              placeholder="+998"
+              :placeholder="t('auth.phonePlaceholder')"
               class="order-input"
+              @focus="handleOrderPhoneFocus"
+              @input="handleOrderPhoneInput"
             />
           </label>
         </div>

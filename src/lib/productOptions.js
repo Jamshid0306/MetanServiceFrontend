@@ -21,7 +21,6 @@ const DEFAULT_TRANSMISSION_LABEL = "Standart";
 const ASK_PRICE_BY_LOCALE = {
   uz: "Narxni so’rang",
   ru: "Цену уточняйте",
-  en: "Request price",
 };
 
 const createOptionId = () => {

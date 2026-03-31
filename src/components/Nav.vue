@@ -16,7 +16,6 @@ import { CONTACT_PHONE_HREF } from "@/constants/contact";
 import Basket from "./icons/Basket.vue";
 import uzFlag from "@/assets/images/uz.png";
 import ruFlag from "@/assets/images/ru.png";
-import enFlag from "@/assets/images/en.png";
 import brandLogo from "@/assets/images/logo.jpg";
 
 const router = useRouter();
@@ -34,7 +33,6 @@ const customerProfile = ref(null);
 const languages = [
   { code: "uz", label: "O'zbekcha", flag: uzFlag },
   { code: "ru", label: "Русский", flag: ruFlag },
-  { code: "en", label: "English", flag: enFlag },
 ];
 const activeLanguage = computed(
   () => languages.find((lang) => lang.code === locale.value) || languages[0]

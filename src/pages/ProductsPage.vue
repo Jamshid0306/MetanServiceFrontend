@@ -555,9 +555,9 @@ onMounted(async () => {
 }
 
 .catalog-media {
-  flex: 0 0 78px;
-  width: 78px;
-  height: 78px;
+  flex: 0 0 156px;
+  width: 156px;
+  aspect-ratio: 16 / 9;
   border-radius: 16px;
   border: 1px solid rgba(20, 35, 56, 0.08);
   background: #f3f5f7;
@@ -668,9 +668,8 @@ onMounted(async () => {
   }
 
   .catalog-media {
-    width: 72px;
-    height: 72px;
-    flex-basis: 72px;
+    width: 112px;
+    flex-basis: 112px;
     border-radius: 14px;
     background: #f7f7f7;
   }

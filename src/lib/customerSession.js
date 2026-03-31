@@ -24,6 +24,29 @@ export const formatCustomerPhone = (value = "") => {
   return normalizedPhone ? `+${normalizedPhone}` : "";
 };
 
+export const formatUzbekistanPhoneInput = (value = "") => {
+  const digits = String(value || "").replace(/\D/g, "");
+  const subscriberDigits = digits.startsWith("998") ? digits.slice(3) : digits;
+  const trimmedDigits = subscriberDigits.slice(0, 9);
+
+  if (!trimmedDigits) {
+    return "+998";
+  }
+
+  const parts = [];
+  if (trimmedDigits.slice(0, 2)) parts.push(trimmedDigits.slice(0, 2));
+  if (trimmedDigits.slice(2, 5)) parts.push(trimmedDigits.slice(2, 5));
+  if (trimmedDigits.slice(5, 7)) parts.push(trimmedDigits.slice(5, 7));
+  if (trimmedDigits.slice(7, 9)) parts.push(trimmedDigits.slice(7, 9));
+
+  return `+998 ${parts.join(" ")}`.trim();
+};
+
+export const ensureUzbekistanPhoneInput = (value = "") => {
+  const formatted = formatUzbekistanPhoneInput(value);
+  return formatted || "+998";
+};
+
 export const toCustomerSession = (customer = {}) => {
   const name = String(
     customer?.name ??

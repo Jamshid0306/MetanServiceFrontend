@@ -2,7 +2,8 @@ import { createI18n } from "vue-i18n";
 
 import uz from "./locales/uz.json";
 import ru from "./locales/ru.json";
-import en from "./locales/en.json";
+
+const SUPPORTED_LOCALES = new Set(["uz", "ru"]);
 
 const getSavedLocale = () => {
   if (typeof window === "undefined") {
@@ -10,7 +11,8 @@ const getSavedLocale = () => {
   }
 
   try {
-    return window.localStorage.getItem("lang") || "ru";
+    const savedLocale = String(window.localStorage.getItem("lang") || "ru").trim().toLowerCase();
+    return SUPPORTED_LOCALES.has(savedLocale) ? savedLocale : "ru";
   } catch {
     return "ru";
   }
@@ -25,6 +27,5 @@ export const i18n = createI18n({
   messages: {
     uz,
     ru,
-    en,
   },
 });

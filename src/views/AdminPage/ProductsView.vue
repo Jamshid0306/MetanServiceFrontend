@@ -73,9 +73,9 @@ const CREDIT_MONTH_CHOICES = [3, 6, 9, 12];
 const createInitialProduct = () => ({
   credit_enabled: false,
   credit_plans: [createEmptyCreditPlan()],
-  name: { uz: "", ru: "", en: "" },
-  description: { uz: "", ru: "", en: "" },
-  characteristic: { uz: "", ru: "", en: "" },
+  name: { uz: "", ru: "" },
+  description: { uz: "", ru: "" },
+  characteristic: { uz: "", ru: "" },
   default_price: "",
   // Display order for frontend listing.
   // Same order numbers will be ordered by `id` as a tie-breaker.
@@ -346,17 +346,14 @@ const openUpdateModal = (product) => {
     name: {
       uz: product.name_uz || "",
       ru: product.name_ru || "",
-      en: product.name_en || "",
     },
     description: {
       uz: product.description_uz || "",
       ru: product.description_ru || "",
-      en: product.description_en || "",
     },
     characteristic: {
       uz: product.characteristic_uz || "",
       ru: product.characteristic_ru || "",
-      en: product.characteristic_en || "",
     },
     default_price: formatOptionPriceInput(product.default_price),
     images: [],
@@ -502,14 +499,19 @@ const addOrUpdateProduct = async () => {
   const formData = new FormData();
   const serializedOptions = serializeProductOptions(newProduct.value.options);
   const minimumOptionPrice = getMinimumOptionPrice(serializedOptions);
+  const fallbackNameEn = newProduct.value.name.ru || newProduct.value.name.uz || "";
+  const fallbackDescriptionEn =
+    newProduct.value.description?.ru || newProduct.value.description?.uz || "";
+  const fallbackCharacteristicEn =
+    newProduct.value.characteristic?.ru || newProduct.value.characteristic?.uz || "";
 
   formData.append("name_uz", newProduct.value.name.uz || "");
   formData.append("name_ru", newProduct.value.name.ru || "");
-  formData.append("name_en", newProduct.value.name.en || "");
+  formData.append("name_en", fallbackNameEn);
 
   formData.append("description_uz", newProduct.value.description?.uz || "");
   formData.append("description_ru", newProduct.value.description?.ru || "");
-  formData.append("description_en", newProduct.value.description?.en || "");
+  formData.append("description_en", fallbackDescriptionEn);
 
   formData.append(
     "characteristic_uz",
@@ -521,7 +523,7 @@ const addOrUpdateProduct = async () => {
   );
   formData.append(
     "characteristic_en",
-    newProduct.value.characteristic?.en || ""
+    fallbackCharacteristicEn
   );
   formData.append("default_price", newProduct.value.default_price || "");
   const order = Number(newProduct.value.order);
@@ -531,7 +533,7 @@ const addOrUpdateProduct = async () => {
   if (minimumOptionPrice === null) {
     formData.append("price_uz", "Narxni so’rang");
     formData.append("price_ru", "Цену уточняйте");
-    formData.append("price_en", "Request price");
+    formData.append("price_en", "Цену уточняйте");
   } else {
     const normalizedPrice = formatNumericInput(minimumOptionPrice);
     formData.append("price_uz", normalizedPrice);
@@ -632,8 +634,7 @@ const filteredProducts = computed(() => {
   return products.filter((p) => {
     const nameRu = String(p.name_ru || "").toLowerCase();
     const nameUz = String(p.name_uz || "").toLowerCase();
-    const nameEn = String(p.name_en || "").toLowerCase();
-    return nameRu.includes(q) || nameUz.includes(q) || nameEn.includes(q);
+    return nameRu.includes(q) || nameUz.includes(q);
   });
 });
 const totalPages = computed(() => {
@@ -1189,15 +1190,6 @@ const toggleProductActive = async (product) => {
                   class="language-btn"
                 >
                   RU
-                </button>
-                <button
-                  @click="changeLanguage('en')"
-                  :class="{
-                    'language-btn-active': currentLang === 'en',
-                  }"
-                  class="language-btn"
-                >
-                  EN
                 </button>
               </div>
 

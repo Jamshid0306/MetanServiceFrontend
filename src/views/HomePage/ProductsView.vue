@@ -197,6 +197,8 @@ const sortedProducts = computed(() => {
 
 .product-card {
   position: relative;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   border-radius: 20px;
   border: 1px solid rgba(20, 35, 56, 0.1);
@@ -270,7 +272,7 @@ const sortedProducts = computed(() => {
 }
 
 .card-footer {
-  margin-top: 10px;
+  margin-top: auto;
   padding-top: 10px;
   border-top: 1px solid rgba(20, 35, 56, 0.08);
 }
@@ -348,6 +350,21 @@ const sortedProducts = computed(() => {
 
   .cart-icon {
     left: 9px;
+  }
+}
+
+@media (max-width: 640px) {
+  .product-card {
+    padding: 12px 12px 14px;
+    min-height: 100%;
+  }
+
+  .card-footer {
+    padding-top: 12px;
+  }
+
+  .add-btn {
+    margin-top: 0.25rem;
   }
 }
 </style>
