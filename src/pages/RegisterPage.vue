@@ -1,11 +1,10 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
 import { storeCustomerSession } from "@/lib/customerSession";
 
-const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
 
@@ -15,25 +14,16 @@ const submitting = ref(false);
 const telegramEnabled = ref(false);
 const telegramConfigLoading = ref(true);
 const errorMessage = ref("");
-
-const getQueryParam = (key) => {
-  const value = route.query[key];
-  return Array.isArray(value) ? String(value[0] || "") : String(value || "");
-};
-
-const isTelegramCallback = computed(
-  () => Boolean(getQueryParam("code") && getQueryParam("state")) || Boolean(getQueryParam("error"))
-);
+const statusMessage = ref("");
+const registrationState = ref("");
+const botUrl = ref("");
+let pollingTimer = null;
 
 const isRegisterFormReady = computed(
   () => Boolean(name.value.trim()) && password.value.trim().length >= 8
 );
 
 const submitLabel = computed(() => {
-  if (submitting.value && isTelegramCallback.value) {
-    return t("auth.telegramCompleting");
-  }
-
   if (submitting.value) {
     return t("auth.telegramRedirecting");
   }
@@ -41,8 +31,16 @@ const submitLabel = computed(() => {
   return t("auth.telegramRegisterSubmit");
 });
 
-const clearQueryParams = async () => {
-  await router.replace({ path: route.path, query: {} });
+const stopPolling = () => {
+  if (pollingTimer) {
+    window.clearInterval(pollingTimer);
+    pollingTimer = null;
+  }
+};
+
+const resetStatus = () => {
+  errorMessage.value = "";
+  statusMessage.value = "";
 };
 
 const loadTelegramConfig = async () => {
@@ -60,43 +58,60 @@ const loadTelegramConfig = async () => {
   }
 };
 
-const completeTelegramRegistration = async () => {
-  const authError = getQueryParam("error").trim();
-  const authErrorDescription = getQueryParam("error_description").trim();
-  const code = getQueryParam("code").trim();
-  const state = getQueryParam("state").trim();
-
-  if (authError) {
-    errorMessage.value = authErrorDescription || authError;
-    await clearQueryParams();
+const pollRegistrationStatus = async () => {
+  if (!registrationState.value) {
     return;
   }
-
-  if (!code || !state) {
-    return;
-  }
-
-  submitting.value = true;
-  errorMessage.value = "";
 
   try {
-    const response = await apiClient.post(
-      "/customers/register/telegram/complete",
-      {
-        code,
-        state,
-      },
+    const response = await apiClient.get(
+      `/customers/register/telegram/status/${registrationState.value}`,
       { skipAuth: true }
     );
+    const payload = response.data || {};
+    const status = String(payload.status || "").trim();
 
-    storeCustomerSession(response.data?.customer || null);
-    await router.replace("/");
+    if (status === "pending") {
+      statusMessage.value = t("auth.telegramAwaitingBotStart");
+      return;
+    }
+
+    if (status === "awaiting_contact") {
+      statusMessage.value = t("auth.telegramAwaitingContact");
+      return;
+    }
+
+    if (status === "completed") {
+      stopPolling();
+      statusMessage.value = t("auth.telegramVerificationComplete");
+      storeCustomerSession(payload.customer || null);
+      await router.replace("/");
+      return;
+    }
+
+    if (status === "failed") {
+      stopPolling();
+      submitting.value = false;
+      errorMessage.value = payload.error || t("auth.telegramRegisterFailed");
+      statusMessage.value = "";
+    }
   } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, t("auth.telegramRegisterFailed"));
-    await clearQueryParams();
-  } finally {
-    submitting.value = false;
+    const detail = getApiErrorMessage(error, t("auth.telegramRegisterFailed"));
+    if (detail === "Telegram registration session expired") {
+      stopPolling();
+      submitting.value = false;
+      errorMessage.value = t("auth.telegramSessionExpired");
+      statusMessage.value = "";
+      return;
+    }
   }
+};
+
+const startPolling = () => {
+  stopPolling();
+  pollingTimer = window.setInterval(() => {
+    pollRegistrationStatus();
+  }, 3000);
 };
 
 const submitRegister = async () => {
@@ -116,42 +131,45 @@ const submitRegister = async () => {
   }
 
   submitting.value = true;
-  errorMessage.value = "";
+  resetStatus();
 
   try {
-    const redirectUri =
-      typeof window === "undefined"
-        ? ""
-        : new URL(route.path, window.location.origin).toString();
-
     const response = await apiClient.post(
       "/customers/register/telegram/start",
       {
         name: name.value.trim(),
         password: password.value,
-        redirect_uri: redirectUri,
       },
       { skipAuth: true }
     );
 
-    const authUrl = String(response.data?.auth_url || "").trim();
-    if (!authUrl || typeof window === "undefined") {
-      throw new Error("Telegram auth URL is missing");
+    registrationState.value = String(response.data?.state || "").trim();
+    botUrl.value = String(response.data?.bot_url || "").trim();
+
+    if (!registrationState.value || !botUrl.value) {
+      throw new Error("Telegram bot URL is missing");
     }
 
-    window.location.assign(authUrl);
+    statusMessage.value = t("auth.telegramAwaitingBotStart");
+    pollRegistrationStatus();
+    startPolling();
+
+    const popup = window.open(botUrl.value, "_blank", "noopener,noreferrer");
+    if (!popup) {
+      statusMessage.value = t("auth.telegramPopupBlocked");
+    }
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error, t("auth.telegramRegisterFailed"));
     submitting.value = false;
   }
 };
 
-onMounted(async () => {
-  await loadTelegramConfig();
+onMounted(() => {
+  loadTelegramConfig();
+});
 
-  if (isTelegramCallback.value) {
-    await completeTelegramRegistration();
-  }
+onBeforeUnmount(() => {
+  stopPolling();
 });
 </script>
 
@@ -188,8 +206,12 @@ onMounted(async () => {
           <section class="telegram-panel">
             <p class="telegram-panel-title">{{ t("auth.telegramVerifyTitle") }}</p>
             <p class="auth-note">{{ t("auth.telegramPhoneNote") }}</p>
+            <a v-if="botUrl" :href="botUrl" target="_blank" rel="noopener noreferrer" class="telegram-link">
+              {{ t("auth.telegramOpenBot") }}
+            </a>
           </section>
 
+          <p v-if="statusMessage" class="auth-status">{{ statusMessage }}</p>
           <p v-if="errorMessage" class="auth-error">{{ errorMessage }}</p>
 
           <button
@@ -298,13 +320,6 @@ onMounted(async () => {
   box-shadow: 0 0 0 4px rgba(24, 48, 79, 0.08);
 }
 
-.auth-note {
-  margin: 0;
-  color: #607188;
-  font-size: 0.92rem;
-  line-height: 1.6;
-}
-
 .telegram-panel {
   display: grid;
   gap: 0.35rem;
@@ -319,6 +334,28 @@ onMounted(async () => {
   color: #0f3d59;
   font-size: 0.92rem;
   font-weight: 800;
+}
+
+.auth-note {
+  margin: 0;
+  color: #607188;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.telegram-link {
+  color: #167bb4;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.auth-status {
+  margin: 0;
+  color: #167bb4;
+  font-size: 0.92rem;
+  font-weight: 600;
 }
 
 .auth-error {
