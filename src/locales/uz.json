@@ -87,6 +87,7 @@
     "telegramChecking": "Telegram ma'lumotlari tekshirilmoqda...",
     "telegramFailed": "Telegram orqali kirish amalga oshmadi.",
     "telegramUnavailable": "Telegram orqali kirish hozircha mavjud emas.",
+    "telegramVerifyTitle": "Telefon raqamini Telegram orqali tasdiqlang",
     "telegramPhoneNote": "Telefon raqamingiz Telegram'dan verified holatda olinadi, qo'lda kiritilmaydi.",
     "telegramRegisterSubmit": "Telegram orqali tasdiqlab ro'yxatdan o'tish",
     "telegramRedirecting": "Telegram'ga yo'naltirilmoqda...",

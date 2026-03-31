@@ -87,6 +87,7 @@
     "telegramChecking": "Checking Telegram account...",
     "telegramFailed": "Telegram sign-in failed.",
     "telegramUnavailable": "Telegram sign-in is currently unavailable.",
+    "telegramVerifyTitle": "Verify your phone number with Telegram",
     "telegramPhoneNote": "Your phone number will be taken from your verified Telegram account, not entered manually.",
     "telegramRegisterSubmit": "Verify with Telegram and register",
     "telegramRedirecting": "Redirecting to Telegram...",

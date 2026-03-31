@@ -25,6 +25,10 @@ const isTelegramCallback = computed(
   () => Boolean(getQueryParam("code") && getQueryParam("state")) || Boolean(getQueryParam("error"))
 );
 
+const isRegisterFormReady = computed(
+  () => Boolean(name.value.trim()) && password.value.trim().length >= 8
+);
+
 const submitLabel = computed(() => {
   if (submitting.value && isTelegramCallback.value) {
     return t("auth.telegramCompleting");
@@ -181,14 +185,28 @@ onMounted(async () => {
             />
           </label>
 
-          <p class="auth-note">{{ t("auth.telegramPhoneNote") }}</p>
+          <section class="telegram-panel">
+            <p class="telegram-panel-title">{{ t("auth.telegramVerifyTitle") }}</p>
+            <p class="auth-note">{{ t("auth.telegramPhoneNote") }}</p>
+          </section>
+
           <p v-if="errorMessage" class="auth-error">{{ errorMessage }}</p>
 
           <button
             type="submit"
-            class="auth-submit"
-            :disabled="submitting || telegramConfigLoading || !telegramEnabled"
+            class="telegram-submit"
+            :disabled="
+              submitting || telegramConfigLoading || !telegramEnabled || !isRegisterFormReady
+            "
           >
+            <span class="telegram-submit-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path
+                  d="M21.2 4.35a1.44 1.44 0 0 0-1.52-.2L3.48 10.9c-.73.31-.7 1.36.05 1.62l3.97 1.38 1.54 4.95c.22.7 1.1.87 1.56.29l2.2-2.77 4.31 3.17c.65.47 1.57.1 1.72-.68l2.85-13.1a1.44 1.44 0 0 0-.48-1.41ZM9.33 13.42l8.92-5.47-6.93 6.99a.75.75 0 0 0-.2.38l-.56 2.98-.93-2.99a.75.75 0 0 0-.47-.49l-2.53-.88 2.7-.52Z"
+                  fill="currentColor"
+                />
+              </svg>
+            </span>
             {{ submitLabel }}
           </button>
         </form>
@@ -287,24 +305,59 @@ onMounted(async () => {
   line-height: 1.6;
 }
 
+.telegram-panel {
+  display: grid;
+  gap: 0.35rem;
+  border-radius: 16px;
+  padding: 0.95rem 1rem;
+  background: linear-gradient(180deg, rgba(34, 158, 217, 0.08), rgba(34, 158, 217, 0.02));
+  border: 1px solid rgba(34, 158, 217, 0.18);
+}
+
+.telegram-panel-title {
+  margin: 0;
+  color: #0f3d59;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
 .auth-error {
   color: #b42318;
   font-size: 0.92rem;
   font-weight: 600;
 }
 
-.auth-submit {
-  border: 1px solid #18304f;
+.telegram-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  border: 1px solid #229ed9;
   border-radius: 16px;
-  background: #18304f;
+  background: linear-gradient(135deg, #229ed9 0%, #167bb4 100%);
   color: #ffffff;
   padding: 0.95rem 1rem;
   font-weight: 800;
+  box-shadow: 0 14px 30px rgba(34, 158, 217, 0.22);
 }
 
-.auth-submit:disabled {
+.telegram-submit-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.telegram-submit-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.telegram-submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .auth-switch {

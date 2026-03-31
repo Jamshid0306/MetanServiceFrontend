@@ -87,6 +87,7 @@
     "telegramChecking": "Проверяем аккаунт Telegram...",
     "telegramFailed": "Не удалось войти через Telegram.",
     "telegramUnavailable": "Вход через Telegram сейчас недоступен.",
+    "telegramVerifyTitle": "Подтвердите номер телефона через Telegram",
     "telegramPhoneNote": "Номер телефона будет получен из подтвержденного аккаунта Telegram, вручную вводить его не нужно.",
     "telegramRegisterSubmit": "Подтвердить через Telegram и зарегистрироваться",
     "telegramRedirecting": "Переходим в Telegram...",
