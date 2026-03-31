@@ -1,23 +1,107 @@
 <script setup>
-import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
-import { normalizeCustomerPhone, storeCustomerSession } from "@/lib/customerSession";
+import { storeCustomerSession } from "@/lib/customerSession";
 
+const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
 
 const name = ref("");
-const phone = ref("");
 const password = ref("");
 const submitting = ref(false);
+const telegramEnabled = ref(false);
+const telegramConfigLoading = ref(true);
 const errorMessage = ref("");
 
-const submitRegister = async () => {
-  const normalizedPhone = normalizeCustomerPhone(phone.value);
+const getQueryParam = (key) => {
+  const value = route.query[key];
+  return Array.isArray(value) ? String(value[0] || "") : String(value || "");
+};
 
-  if (!name.value.trim() || !normalizedPhone || !password.value.trim()) {
+const isTelegramCallback = computed(
+  () => Boolean(getQueryParam("code") && getQueryParam("state")) || Boolean(getQueryParam("error"))
+);
+
+const submitLabel = computed(() => {
+  if (submitting.value && isTelegramCallback.value) {
+    return t("auth.telegramCompleting");
+  }
+
+  if (submitting.value) {
+    return t("auth.telegramRedirecting");
+  }
+
+  return t("auth.telegramRegisterSubmit");
+});
+
+const clearQueryParams = async () => {
+  await router.replace({ path: route.path, query: {} });
+};
+
+const loadTelegramConfig = async () => {
+  telegramConfigLoading.value = true;
+
+  try {
+    const response = await apiClient.get("/customers/register/telegram/config", {
+      skipAuth: true,
+    });
+    telegramEnabled.value = Boolean(response.data?.enabled);
+  } catch {
+    telegramEnabled.value = false;
+  } finally {
+    telegramConfigLoading.value = false;
+  }
+};
+
+const completeTelegramRegistration = async () => {
+  const authError = getQueryParam("error").trim();
+  const authErrorDescription = getQueryParam("error_description").trim();
+  const code = getQueryParam("code").trim();
+  const state = getQueryParam("state").trim();
+
+  if (authError) {
+    errorMessage.value = authErrorDescription || authError;
+    await clearQueryParams();
+    return;
+  }
+
+  if (!code || !state) {
+    return;
+  }
+
+  submitting.value = true;
+  errorMessage.value = "";
+
+  try {
+    const response = await apiClient.post(
+      "/customers/register/telegram/complete",
+      {
+        code,
+        state,
+      },
+      { skipAuth: true }
+    );
+
+    storeCustomerSession(response.data?.customer || null);
+    await router.replace("/");
+  } catch (error) {
+    errorMessage.value = getApiErrorMessage(error, t("auth.telegramRegisterFailed"));
+    await clearQueryParams();
+  } finally {
+    submitting.value = false;
+  }
+};
+
+const submitRegister = async () => {
+  if (!telegramEnabled.value) {
+    errorMessage.value = t("auth.telegramRegisterUnavailable");
+    return;
+  }
+
+  if (!name.value.trim() || !password.value.trim()) {
     errorMessage.value = t("auth.fillRequired");
     return;
   }
@@ -31,24 +115,40 @@ const submitRegister = async () => {
   errorMessage.value = "";
 
   try {
+    const redirectUri =
+      typeof window === "undefined"
+        ? ""
+        : new URL(route.path, window.location.origin).toString();
+
     const response = await apiClient.post(
-      "/customers/register",
+      "/customers/register/telegram/start",
       {
         name: name.value.trim(),
-        phone: normalizedPhone,
         password: password.value,
+        redirect_uri: redirectUri,
       },
       { skipAuth: true }
     );
 
-    storeCustomerSession(response.data?.customer || null);
-    router.push("/");
+    const authUrl = String(response.data?.auth_url || "").trim();
+    if (!authUrl || typeof window === "undefined") {
+      throw new Error("Telegram auth URL is missing");
+    }
+
+    window.location.assign(authUrl);
   } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, t("auth.registerFailed"));
-  } finally {
+    errorMessage.value = getApiErrorMessage(error, t("auth.telegramRegisterFailed"));
     submitting.value = false;
   }
 };
+
+onMounted(async () => {
+  await loadTelegramConfig();
+
+  if (isTelegramCallback.value) {
+    await completeTelegramRegistration();
+  }
+});
 </script>
 
 <template>
@@ -71,17 +171,6 @@ const submitRegister = async () => {
           </label>
 
           <label class="auth-field">
-            <span>{{ t("phone") }}</span>
-            <input
-              v-model="phone"
-              type="tel"
-              autocomplete="tel"
-              :placeholder="t('auth.phonePlaceholder')"
-              class="auth-input"
-            />
-          </label>
-
-          <label class="auth-field">
             <span>{{ t("auth.password") }}</span>
             <input
               v-model="password"
@@ -92,10 +181,15 @@ const submitRegister = async () => {
             />
           </label>
 
+          <p class="auth-note">{{ t("auth.telegramPhoneNote") }}</p>
           <p v-if="errorMessage" class="auth-error">{{ errorMessage }}</p>
 
-          <button type="submit" class="auth-submit" :disabled="submitting">
-            {{ submitting ? t("sending") : t("auth.registerSubmit") }}
+          <button
+            type="submit"
+            class="auth-submit"
+            :disabled="submitting || telegramConfigLoading || !telegramEnabled"
+          >
+            {{ submitLabel }}
           </button>
         </form>
 
@@ -184,6 +278,13 @@ const submitRegister = async () => {
 .auth-input:focus {
   border-color: #18304f;
   box-shadow: 0 0 0 4px rgba(24, 48, 79, 0.08);
+}
+
+.auth-note {
+  margin: 0;
+  color: #607188;
+  font-size: 0.92rem;
+  line-height: 1.6;
 }
 
 .auth-error {
