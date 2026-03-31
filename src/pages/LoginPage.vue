@@ -1,30 +1,80 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
 import { storeCustomerSession } from "@/lib/customerSession";
 
 const router = useRouter();
-const { t } = useI18n();
+const { locale, t } = useI18n();
 
 const identifier = ref("");
 const password = ref("");
 const submitting = ref(false);
 const errorMessage = ref("");
 const telegramWidgetLoaded = ref(false);
+const telegramEnabled = ref(false);
+const telegramAuthenticating = ref(false);
+const telegramConfigLoading = ref(true);
+const telegramErrorMessage = ref("");
+const telegramBotUsername = ref("");
 
 const telegramWidgetContainerId = "telegram-login-widget";
 const telegramWidgetCallbackName = "onTelegramAuth";
 let telegramScriptElement = null;
+
+const telegramWidgetLanguage = computed(() =>
+  String(locale.value || "").toLowerCase().startsWith("ru") ? "ru" : "en"
+);
+
+const telegramStatusMessage = computed(() => {
+  if (telegramAuthenticating.value) {
+    return t("auth.telegramChecking");
+  }
+
+  if (telegramErrorMessage.value) {
+    return telegramErrorMessage.value;
+  }
+
+  if (telegramConfigLoading.value) {
+    return t("auth.telegramLoading");
+  }
+
+  if (!telegramEnabled.value) {
+    return t("auth.telegramUnavailable");
+  }
+
+  if (!telegramWidgetLoaded.value) {
+    return t("auth.telegramLoading");
+  }
+
+  return "";
+});
 
 const handleLoginSuccess = (customer) => {
   storeCustomerSession(customer);
   router.push("/");
 };
 
+const loginWithTelegram = async (user = {}) => {
+  telegramAuthenticating.value = true;
+  telegramErrorMessage.value = "";
+  errorMessage.value = "";
+
+  try {
+    const response = await apiClient.post("/customers/telegram-login", user, {
+      skipAuth: true,
+    });
+    handleLoginSuccess(response.data?.customer || null);
+  } catch (error) {
+    telegramErrorMessage.value = getApiErrorMessage(error, t("auth.telegramFailed"));
+  } finally {
+    telegramAuthenticating.value = false;
+  }
+};
+
 const mountTelegramWidget = () => {
-  if (typeof window === "undefined") {
+  if (typeof window === "undefined" || !telegramBotUsername.value) {
     return;
   }
 
@@ -35,25 +85,53 @@ const mountTelegramWidget = () => {
 
   container.innerHTML = "";
   telegramWidgetLoaded.value = false;
+  telegramErrorMessage.value = "";
 
-  window[telegramWidgetCallbackName] = (user) => {
-    const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(" ");
-    const username = user?.username ? `, @${user.username}` : "";
-    window.alert(`Logged in as ${fullName} (${user?.id}${username})`);
+  window[telegramWidgetCallbackName] = async (user) => {
+    await loginWithTelegram(user);
   };
 
   telegramScriptElement = document.createElement("script");
   telegramScriptElement.async = true;
   telegramScriptElement.src = "https://telegram.org/js/telegram-widget.js?23";
-  telegramScriptElement.setAttribute("data-telegram-login", "urganch_metan_servis_bot");
+  telegramScriptElement.setAttribute("data-telegram-login", telegramBotUsername.value);
   telegramScriptElement.setAttribute("data-size", "large");
+  telegramScriptElement.setAttribute("data-lang", telegramWidgetLanguage.value);
   telegramScriptElement.setAttribute("data-onauth", `${telegramWidgetCallbackName}(user)`);
   telegramScriptElement.setAttribute("data-request-access", "write");
   telegramScriptElement.onload = () => {
     telegramWidgetLoaded.value = true;
   };
+  telegramScriptElement.onerror = () => {
+    telegramErrorMessage.value = t("auth.telegramFailed");
+  };
 
   container.appendChild(telegramScriptElement);
+};
+
+const loadTelegramLoginConfig = async () => {
+  telegramEnabled.value = false;
+  telegramConfigLoading.value = true;
+  telegramBotUsername.value = "";
+  telegramErrorMessage.value = "";
+
+  try {
+    const response = await apiClient.get("/customers/telegram-login/config", {
+      skipAuth: true,
+    });
+    const botUsername = String(response.data?.bot_username || "").trim().replace(/^@+/, "");
+
+    telegramEnabled.value = Boolean(response.data?.enabled && botUsername);
+    telegramBotUsername.value = telegramEnabled.value ? botUsername : "";
+
+    if (telegramEnabled.value) {
+      mountTelegramWidget();
+    }
+  } catch {
+    telegramErrorMessage.value = t("auth.telegramFailed");
+  } finally {
+    telegramConfigLoading.value = false;
+  }
 };
 
 const submitLogin = async () => {
@@ -83,7 +161,13 @@ const submitLogin = async () => {
 };
 
 onMounted(() => {
-  mountTelegramWidget();
+  loadTelegramLoginConfig();
+});
+
+watch(locale, () => {
+  if (telegramEnabled.value) {
+    mountTelegramWidget();
+  }
 });
 
 onBeforeUnmount(() => {
@@ -139,13 +223,22 @@ onBeforeUnmount(() => {
       </form>
 
       <div class="login-divider">
-        <span>Telegram</span>
+        <span>{{ t("auth.orContinueWith") }}</span>
       </div>
 
       <section class="telegram-box">
-        <div :id="telegramWidgetContainerId" class="telegram-widget"></div>
-        <p v-if="!telegramWidgetLoaded" class="telegram-note">
-          Telegram widget yuklanmoqda...
+        <div class="telegram-copy">
+          <h2 class="telegram-title">{{ t("auth.telegramTitle") }}</h2>
+          <p class="telegram-subtitle">{{ t("auth.telegramSubtitle") }}</p>
+        </div>
+
+        <div v-if="telegramEnabled" :id="telegramWidgetContainerId" class="telegram-widget"></div>
+        <p
+          v-if="telegramStatusMessage"
+          class="telegram-note"
+          :class="{ 'telegram-note-error': telegramErrorMessage }"
+        >
+          {{ telegramStatusMessage }}
         </p>
       </section>
 
@@ -333,7 +426,26 @@ onBeforeUnmount(() => {
   padding: 1rem;
 }
 
+.telegram-copy {
+  text-align: center;
+}
+
+.telegram-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #142338;
+}
+
+.telegram-subtitle {
+  margin: 0.45rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #5c6b82;
+}
+
 .telegram-widget {
+  margin-top: 1rem;
   min-height: 48px;
   display: flex;
   justify-content: center;
@@ -345,6 +457,10 @@ onBeforeUnmount(() => {
   color: #5c6b82;
   font-size: 0.84rem;
   font-weight: 600;
+}
+
+.telegram-note-error {
+  color: #b42318;
 }
 
 .login-switch {

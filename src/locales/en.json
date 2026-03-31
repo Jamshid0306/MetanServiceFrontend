@@ -86,6 +86,7 @@
     "telegramLoading": "Loading Telegram button...",
     "telegramChecking": "Checking Telegram account...",
     "telegramFailed": "Telegram sign-in failed.",
+    "telegramUnavailable": "Telegram sign-in is currently unavailable.",
     "forgotPassword": "Forgot password?",
     "resetTitle": "Reset password",
     "resetSubtitle": "Enter the phone number linked to your account and choose a new password.",

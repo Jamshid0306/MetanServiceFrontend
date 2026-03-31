@@ -86,6 +86,7 @@
     "telegramLoading": "Кнопка Telegram загружается...",
     "telegramChecking": "Проверяем аккаунт Telegram...",
     "telegramFailed": "Не удалось войти через Telegram.",
+    "telegramUnavailable": "Вход через Telegram сейчас недоступен.",
     "forgotPassword": "Забыли пароль?",
     "resetTitle": "Восстановление пароля",
     "resetSubtitle": "Введите номер телефона, привязанный к аккаунту, и новый пароль.",

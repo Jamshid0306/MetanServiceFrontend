@@ -86,6 +86,7 @@
     "telegramLoading": "Telegram tugmasi yuklanmoqda...",
     "telegramChecking": "Telegram ma'lumotlari tekshirilmoqda...",
     "telegramFailed": "Telegram orqali kirish amalga oshmadi.",
+    "telegramUnavailable": "Telegram orqali kirish hozircha mavjud emas.",
     "forgotPassword": "Parolni unutdingizmi?",
     "resetTitle": "Parolni tiklash",
     "resetSubtitle": "Hisobingizga bog'langan telefon raqamini kiriting va yangi parol tanlang.",
