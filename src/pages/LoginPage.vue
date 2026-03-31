@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
@@ -125,6 +125,7 @@ const loadTelegramLoginConfig = async () => {
     telegramBotUsername.value = telegramEnabled.value ? botUsername : "";
 
     if (telegramEnabled.value) {
+      await nextTick();
       mountTelegramWidget();
     }
   } catch {
@@ -164,8 +165,9 @@ onMounted(() => {
   loadTelegramLoginConfig();
 });
 
-watch(locale, () => {
+watch(locale, async () => {
   if (telegramEnabled.value) {
+    await nextTick();
     mountTelegramWidget();
   }
 });
