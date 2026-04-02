@@ -10,7 +10,7 @@ import "swiper/css";
 import LeftArrow from "@/components/icons/LeftArrow.vue";
 import { useLoaderStore } from "@/store/loaderStore";
 import Notification from "@/components/Notification.vue";
-import { apiClient, getApiErrorMessage, resolveAssetUrls } from "@/lib/api";
+import { apiClient, getApiErrorMessage, resolveAssetUrl, resolveAssetUrls } from "@/lib/api";
 import {
   ensureUzbekistanPhoneInput,
   formatCustomerPhone,
@@ -182,6 +182,7 @@ const getServiceCharacteristic = (service, targetLocale = locale.value) =>
   ).trim();
 const getServicePrice = (service, targetLocale = locale.value) =>
   parseNumericPrice(service?.[`price_${targetLocale}`] ?? service?.price_uz);
+const getServiceImageUrl = (service) => resolveAssetUrl(service?.image_path);
 const buildSelectedExtraServiceOption = (service) => ({
   title_key: "productOptions.additionalService",
   group_key: "extra_service",
@@ -239,6 +240,45 @@ const dedupeCylinderVolumesBySignature = (options = []) => {
     seen.add(signature);
     return true;
   });
+};
+const getCylinderOptionSignature = (option = null) => {
+  const label = String(option?.label || "").trim();
+  const count = Number(option?.count ?? 0);
+  const priceDelta = Number(option?.price_delta ?? 0);
+
+  return label ? `${label}|${count}|${priceDelta}` : "";
+};
+const findCylinderOptionById = (paths = [], cylinderId = "") => {
+  const targetId = String(cylinderId || "").trim();
+  if (!targetId) {
+    return null;
+  }
+
+  for (const path of Array.isArray(paths) ? paths : []) {
+    if (String(path?.cylinder_volume?.id || "").trim() === targetId) {
+      return path.cylinder_volume;
+    }
+  }
+
+  return null;
+};
+const getTransmissionOptionsForCylinder = (paths = [], cylinderId = "") => {
+  const selectedCylinder = findCylinderOptionById(paths, cylinderId);
+  const selectedSignature = getCylinderOptionSignature(selectedCylinder);
+
+  if (!selectedSignature) {
+    return [];
+  }
+
+  return dedupeOptionsById(
+    (Array.isArray(paths) ? paths : [])
+      .filter(
+        (path) =>
+          getCylinderOptionSignature(path?.cylinder_volume) === selectedSignature
+      )
+      .map((path) => path?.transmission)
+      .filter((transmission) => transmission && !transmission.hidden)
+  );
 };
 
 const buildOptionPaths = (config = {}) => {
@@ -483,8 +523,33 @@ const effectiveSelectionPath = computed(() => {
   const cylinderVolume =
     nextPath.cylinder_volume || resolveSingleVisibleOption(mergedCylinderVolumes);
 
+  if (!transmission && cylinderVolume) {
+    const matchingTransmissions = getTransmissionOptionsForCylinder(
+      optionPaths.value,
+      cylinderVolume.id
+    );
+    if (matchingTransmissions.length === 1) {
+      transmission = matchingTransmissions[0];
+    }
+  }
+
   if (cylinderVolume) {
     nextPath.cylinder_volume = cylinderVolume;
+  }
+
+  if (transmission) {
+    nextPath.transmission = transmission;
+    const matched = findPathByOptionId(
+      optionPaths.value,
+      "transmission",
+      transmission.id,
+      {
+        cylinderVolumeId: cylinderVolume?.id || nextPath.cylinder_volume?.id,
+      }
+    );
+    if (matched?.fuel_type) {
+      nextPath.fuel_type = matched.fuel_type;
+    }
   }
 
   if (!Object.keys(nextPath).length) {
@@ -496,6 +561,19 @@ const resolvedSelectedOptions = computed(() =>
   effectiveSelectionPath.value
     ? mapPathToSelections(effectiveSelectionPath.value)
     : { ...selectedOptions.value }
+);
+const selectedCylinderOptionId = computed(() =>
+  String(
+    selectedOptions.value?.cylinder_volume ||
+      resolvedSelectedOptions.value?.cylinder_volume ||
+      ""
+  ).trim()
+);
+const transmissionOptionsForSelectedCylinder = computed(() =>
+  getTransmissionOptionsForCylinder(optionPaths.value, selectedCylinderOptionId.value)
+);
+const hasTransmissionGroup = computed(() =>
+  shouldShowTransmissionOptions(transmissionOptionsForSelectedCylinder.value)
 );
 const optionGroups = computed(() => {
   const groups = [];
@@ -530,11 +608,14 @@ const optionGroups = computed(() => {
 });
 
 const orderedOptionGroups = computed(() => optionGroups.value);
-const hasTransmissionGroup = computed(() =>
-  orderedOptionGroups.value.some((group) => group.key === "transmission")
-);
 const transmissionGroup = computed(() =>
-  orderedOptionGroups.value.find((group) => group.key === "transmission") || null
+  hasTransmissionGroup.value
+    ? {
+        key: "transmission",
+        titleKey: "productOptions.transmission",
+        options: transmissionOptionsForSelectedCylinder.value.map(mapOptionForDisplay),
+      }
+    : null
 );
 
 /** Ko‘rinadigan barcha variant guruhlari tanlangan bo‘lsa true (yoki tanlash shart bo‘lmasa). */
@@ -548,34 +629,35 @@ const selectionHasValue = (bag, key) => {
 const isProductOptionSelectionComplete = computed(() => {
   const resolved = resolvedSelectedOptions.value;
   const raw = selectedOptions.value;
-  // Transmission faqat "Ha" tanlanganda majburiy.
-  const keys = requiredOptionGroupKeys.value.filter((key) => {
-    if (key !== "transmission") {
-      return true;
-    }
-    return balloonProgramEnabled.value === true;
-  });
+  const keys = requiredOptionGroupKeys.value.filter((key) => key !== "transmission");
 
   if (!keys.length) {
-    return true;
+    return !hasTransmissionGroup.value || balloonProgramEnabled.value !== null;
   }
 
-  // "Ha" + balon tanlash (bir nechta variant) bor: avtomat/mexanika tanlansa ham,
-  // foydalanuvchi balonni alohida tanlamaguncha savatga ruxsat yo‘q (resolved auto-fill hisoblanmaydi).
   if (
-    balloonProgramEnabled.value === true &&
-    keys.includes("cylinder_volume") &&
-    !selectionHasValue(raw, "cylinder_volume")
+    !keys.every(
+      (key) => selectionHasValue(resolved, key) || selectionHasValue(raw, key)
+    )
   ) {
     return false;
   }
 
-  if (hasTransmissionGroup && balloonProgramEnabled.value === null) {
+  if (!hasTransmissionGroup.value) {
+    return true;
+  }
+
+  if (balloonProgramEnabled.value === null) {
     return false;
   }
 
-  return keys.every(
-    (key) => selectionHasValue(resolved, key) || selectionHasValue(raw, key)
+  if (balloonProgramEnabled.value !== true) {
+    return true;
+  }
+
+  return (
+    selectionHasValue(resolved, "transmission") ||
+    selectionHasValue(raw, "transmission")
   );
 });
 const selectedPrice = computed(() =>
@@ -1660,15 +1742,24 @@ onBeforeUnmount(() => {
                   :checked="selectedExtraServiceIds.includes(service.id)"
                   @change="toggleExtraService(service.id)"
                 />
-                <div class="detail-service-copy">
-                  <strong>{{ getServiceName(service) }}</strong>
-                  <span v-if="getServiceCharacteristic(service)">
-                    {{ getServiceCharacteristic(service) }}
-                  </span>
+                <div class="detail-service-main">
+                  <div class="detail-service-copy">
+                    <strong>{{ getServiceName(service) }}</strong>
+                    <span v-if="getServiceCharacteristic(service)">
+                      {{ getServiceCharacteristic(service) }}
+                    </span>
+                  </div>
                 </div>
                 <strong class="detail-service-price">
                   {{ formatPrice(getServicePrice(service) || 0) }}
                 </strong>
+                <div v-if="getServiceImageUrl(service)" class="detail-service-media">
+                  <img
+                    :src="getServiceImageUrl(service)"
+                    :alt="getServiceName(service)"
+                    class="detail-service-image"
+                  />
+                </div>
               </label>
             </div>
           </div>
@@ -2839,7 +2930,7 @@ onBeforeUnmount(() => {
 
 .detail-service-option {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: start;
   gap: 0.85rem;
   border: 1px solid rgba(20, 35, 56, 0.1);
@@ -2861,9 +2952,32 @@ onBeforeUnmount(() => {
   height: 1rem;
 }
 
+.detail-service-main {
+  min-width: 0;
+}
+
 .detail-service-copy {
+  min-width: 0;
+  flex: 1 1 auto;
   display: grid;
   gap: 0.25rem;
+}
+
+.detail-service-media {
+  width: 76px;
+  flex: 0 0 76px;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid rgba(20, 35, 56, 0.08);
+  background: #f4f8fc;
+  aspect-ratio: 1 / 1;
+}
+
+.detail-service-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 .detail-service-copy strong {
@@ -2879,6 +2993,7 @@ onBeforeUnmount(() => {
 .detail-service-price {
   color: #18304f;
   white-space: nowrap;
+  align-self: center;
 }
 
 .detail-order-head {
@@ -3539,6 +3654,16 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
+  .detail-service-option {
+    gap: 0.7rem;
+  }
+
+  .detail-service-media {
+    width: 60px;
+    flex-basis: 60px;
+    border-radius: 12px;
+  }
+
   .detail-page {
     padding-left: 0.8rem;
     padding-right: 0.8rem;

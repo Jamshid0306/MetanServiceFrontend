@@ -1,9 +1,10 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { Motion, AnimatePresence } from "motion-v";
 import Notification from "@/components/Notification.vue";
 import Delete from "@/components/icons/Delete.vue";
 import Pencil from "@/components/icons/Pencil.vue";
+import { resolveAssetUrl } from "@/lib/api";
 import { useAdminStore } from "@/store/adminStore";
 
 const store = useAdminStore();
@@ -17,12 +18,15 @@ const notifShow = ref(false);
 const notifMessage = ref("");
 const notifVariant = ref("success");
 const productSearch = ref("");
+const serviceImagePreview = ref("");
 
 const createInitialService = () => ({
   name: { uz: "", ru: "" },
   characteristic: { uz: "", ru: "" },
   price: "",
   product_ids: [],
+  file: null,
+  image_path: "",
 });
 
 const serviceForm = ref(createInitialService());
@@ -38,13 +42,31 @@ const formatNumericInput = (value) => {
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 };
 
+const revokeServiceImagePreview = (preview = serviceImagePreview.value) => {
+  if (preview && preview.startsWith("blob:")) {
+    URL.revokeObjectURL(preview);
+  }
+};
+
+const setServiceImagePreview = (file = null, fallback = "") => {
+  revokeServiceImagePreview();
+  serviceImagePreview.value = file ? URL.createObjectURL(file) : fallback;
+};
+
 const resetForm = () => {
+  revokeServiceImagePreview();
   serviceForm.value = createInitialService();
+  serviceImagePreview.value = "";
   isUpdate.value = false;
   currentServiceId.value = null;
   currentLang.value = "uz";
   saving.value = false;
   productSearch.value = "";
+};
+
+const closeModal = () => {
+  showModal.value = false;
+  resetForm();
 };
 
 const openCreateModal = () => {
@@ -53,6 +75,7 @@ const openCreateModal = () => {
 };
 
 const openUpdateModal = (service) => {
+  resetForm();
   isUpdate.value = true;
   currentServiceId.value = service.id;
   serviceForm.value = {
@@ -66,8 +89,20 @@ const openUpdateModal = (service) => {
     },
     price: formatNumericInput(service.price_uz || service.price_ru || service.price_en),
     product_ids: Array.isArray(service.product_ids) ? [...service.product_ids] : [],
+    file: null,
+    image_path: service.image_path || "",
   };
+  setServiceImagePreview(null, resolveAssetUrl(service.image_path));
   showModal.value = true;
+};
+
+const handleServiceFileChange = (event) => {
+  const file = event.target.files?.[0] || null;
+  serviceForm.value.file = file;
+  setServiceImagePreview(
+    file,
+    serviceForm.value.image_path ? resolveAssetUrl(serviceForm.value.image_path) : ""
+  );
 };
 
 const toggleProduct = (productId) => {
@@ -97,6 +132,21 @@ const submitService = async () => {
     product_ids: [...serviceForm.value.product_ids],
   };
 
+  const formData = new FormData();
+  formData.append("name_uz", payload.name_uz);
+  formData.append("name_ru", payload.name_ru);
+  formData.append("name_en", payload.name_en);
+  formData.append("characteristic_uz", payload.characteristic_uz);
+  formData.append("characteristic_ru", payload.characteristic_ru);
+  formData.append("characteristic_en", payload.characteristic_en);
+  formData.append("price_uz", payload.price_uz);
+  formData.append("price_ru", payload.price_ru);
+  formData.append("price_en", payload.price_en);
+  formData.append("product_ids", JSON.stringify(payload.product_ids));
+  if (serviceForm.value.file) {
+    formData.append("file", serviceForm.value.file);
+  }
+
   if (!payload.name_uz || !payload.name_ru) {
     saving.value = false;
     showNotification("Xizmat nomlarini 2 tilda to‘ldiring.", "error");
@@ -110,8 +160,8 @@ const submitService = async () => {
   }
 
   const success = isUpdate.value
-    ? await store.updateService(currentServiceId.value, payload)
-    : await store.createService(payload);
+    ? await store.updateService(currentServiceId.value, formData)
+    : await store.createService(formData);
 
   saving.value = false;
   if (!success) {
@@ -143,6 +193,7 @@ const services = computed(() =>
 const products = computed(() =>
   Array.isArray(store.products) ? store.products : []
 );
+const getServiceImageUrl = (service) => resolveAssetUrl(service?.image_path);
 const selectedProductsCount = computed(() => serviceForm.value.product_ids.length);
 const filteredProducts = computed(() => {
   const query = String(productSearch.value || "").trim().toLowerCase();
@@ -167,6 +218,10 @@ onMounted(async () => {
     await store.getProducts();
   }
   await store.getServices();
+});
+
+onBeforeUnmount(() => {
+  revokeServiceImagePreview();
 });
 </script>
 
@@ -209,11 +264,23 @@ onMounted(async () => {
             <Pencil :size="18" />
           </button>
 
-          <span class="service-id-chip">#{{ service.id }}</span>
-          <h3 class="service-name">{{ service.name_ru }}</h3>
-          <p class="service-characteristic">
-            {{ service.characteristic_ru || "Характеристика не заполнена" }}
-          </p>
+          <div class="service-card-head">
+            <div class="service-card-copy">
+              <span class="service-id-chip">#{{ service.id }}</span>
+              <h3 class="service-name">{{ service.name_ru }}</h3>
+              <p class="service-characteristic">
+                {{ service.characteristic_ru || "Характеристика не заполнена" }}
+              </p>
+            </div>
+
+            <div v-if="getServiceImageUrl(service)" class="service-card-media">
+              <img
+                :src="getServiceImageUrl(service)"
+                :alt="service.name_ru || service.name_uz || 'Service image'"
+                class="service-card-image"
+              />
+            </div>
+          </div>
           <div class="service-price-row">
             <strong>{{ service.price_ru }}</strong>
             <span>сум</span>
@@ -345,6 +412,27 @@ onMounted(async () => {
                     <span class="service-price-suffix">сум</span>
                   </div>
                 </label>
+
+                <label class="editor-label">
+                  Изображение услуги
+                  <input
+                    type="file"
+                    accept="image/*"
+                    class="service-image-upload"
+                    @change="handleServiceFileChange"
+                  />
+                </label>
+
+                <div v-if="serviceImagePreview" class="service-image-preview-card">
+                  <img
+                    :src="serviceImagePreview"
+                    alt="Предпросмотр услуги"
+                    class="service-image-preview"
+                  />
+                </div>
+                <div v-else class="service-image-empty">
+                  Изображение пока не выбрано.
+                </div>
               </div>
 
               <div class="editor-panel service-products-panel">
@@ -396,7 +484,7 @@ onMounted(async () => {
           </div>
 
             <div class="editor-actions service-modal-actions">
-              <button type="button" class="editor-secondary-btn service-modal-action-btn" @click="showModal = false">
+              <button type="button" class="editor-secondary-btn service-modal-action-btn" @click="closeModal">
                 Отмена
               </button>
               <button
@@ -480,11 +568,43 @@ onMounted(async () => {
 
 .service-card {
   position: relative;
+  display: grid;
+  gap: 0.8rem;
   border-radius: 24px;
   border: 1px solid rgba(20, 49, 95, 0.08);
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 16px 30px rgba(20, 49, 95, 0.07);
   padding: 1.2rem;
+}
+
+.service-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.9rem;
+  padding-right: 2rem;
+}
+
+.service-card-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.service-card-media {
+  width: 92px;
+  flex: 0 0 92px;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid rgba(20, 49, 95, 0.08);
+  background: linear-gradient(180deg, #f6f9fd 0%, #edf4fb 100%);
+  aspect-ratio: 1 / 1;
+}
+
+.service-card-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 .service-edit-btn {
@@ -507,7 +627,7 @@ onMounted(async () => {
 }
 
 .service-name {
-  margin-top: 0.9rem;
+  margin-top: 0.7rem;
   font-size: 1.12rem;
   font-weight: 800;
   color: #14315f;
@@ -818,6 +938,41 @@ onMounted(async () => {
   pointer-events: none;
 }
 
+.service-image-upload {
+  width: 100%;
+  min-height: 50px;
+  padding: 0.8rem 1rem;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fbfdff 0%, #f4f9ff 100%);
+  border: 1px dashed rgba(20, 49, 95, 0.18);
+  color: #14315f;
+  cursor: pointer;
+}
+
+.service-image-preview-card {
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid rgba(20, 49, 95, 0.08);
+  background: linear-gradient(180deg, #f8fbff 0%, #edf4fb 100%);
+  aspect-ratio: 16 / 10;
+}
+
+.service-image-preview {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.service-image-empty {
+  border-radius: 18px;
+  border: 1px dashed rgba(20, 49, 95, 0.16);
+  padding: 1rem;
+  text-align: center;
+  color: #607188;
+  background: #f9fbfe;
+}
+
 .service-products-toolbar {
   display: flex;
   align-items: center;
@@ -1008,6 +1163,11 @@ onMounted(async () => {
 }
 
 @media (max-width: 900px) {
+  .service-card-media {
+    width: 82px;
+    flex-basis: 82px;
+  }
+
   .service-editor-grid {
     grid-template-columns: 1fr;
   }
@@ -1038,6 +1198,10 @@ onMounted(async () => {
 }
 
 @media (max-width: 640px) {
+  .service-card-head {
+    padding-right: 1.8rem;
+  }
+
   .service-editor-modal {
     width: min(100vw - 1rem, 1080px);
     max-height: 94vh;
