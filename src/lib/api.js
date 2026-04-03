@@ -41,6 +41,26 @@ const shouldSendNgrokHeader = (baseUrl) => {
   }
 };
 
+const resolveProductionApiBaseUrl = (hostname) => {
+  const normalizedHostname = String(hostname || "").trim().toLowerCase();
+
+  if (
+    normalizedHostname === "urganch-metan-servis.uz" ||
+    normalizedHostname === "www.urganch-metan-servis.uz"
+  ) {
+    return "https://api.urganch-metan-servis.uz";
+  }
+
+  if (
+    normalizedHostname === "urganchmetanservice.uz" ||
+    normalizedHostname === "www.urganchmetanservice.uz"
+  ) {
+    return "https://api.urganchmetanservice.uz";
+  }
+
+  return "";
+};
+
 const resolveApiBaseUrl = () => {
   const envValue = trimTrailingSlash(import.meta.env.VITE_API_URL || "");
   if (envValue) {
@@ -54,6 +74,11 @@ const resolveApiBaseUrl = () => {
   const { hostname, origin } = window.location;
   if (hostname === "localhost" || hostname === "127.0.0.1") {
     return "http://127.0.0.1:8000";
+  }
+
+  const productionApiBaseUrl = resolveProductionApiBaseUrl(hostname);
+  if (productionApiBaseUrl) {
+    return productionApiBaseUrl;
   }
 
   return trimTrailingSlash(origin);
