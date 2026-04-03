@@ -99,6 +99,15 @@ const routes = [
     },
   },
   {
+    path: "/checkout",
+    name: "Checkout",
+    component: () => import("@/pages/CheckoutPage.vue"),
+    meta: {
+      title: "Urganch Metan Service - Buyurtmani rasmiylashtirish",
+      robots: "noindex,nofollow",
+    },
+  },
+  {
     path: "/:pathMatch(.*)*",
     name: "NotFound",
     component: () => import("@/pages/NotFoundPage.vue"),

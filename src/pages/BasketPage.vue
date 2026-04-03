@@ -170,8 +170,8 @@ const goToProduct = (id) =>
         <div class="basket-checkout-card">
           <button
             type="button"
-            disabled
             class="basket-submit-btn"
+            @click="router.push('/checkout')"
           >
             {{ t("checkout") }}
           </button>
