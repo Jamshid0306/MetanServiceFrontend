@@ -360,6 +360,47 @@ const openMyIdBlankTab = () => {
   const popup = window.open("about:blank", "_blank");
   if (popup) {
     popup.opener = null;
+    popup.document.write(`
+      <!doctype html>
+      <html lang="uz">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>MyID</title>
+          <style>
+            body {
+              margin: 0;
+              min-height: 100vh;
+              display: grid;
+              place-items: center;
+              font-family: Arial, sans-serif;
+              background: #f8fafc;
+              color: #0f172a;
+            }
+            .myid-loading {
+              text-align: center;
+              padding: 24px;
+            }
+            .myid-loading strong {
+              display: block;
+              margin-bottom: 8px;
+              font-size: 18px;
+            }
+            .myid-loading span {
+              color: #475569;
+              font-size: 14px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="myid-loading">
+            <strong>MyID yuklanmoqda...</strong>
+            <span>Sahifa tayyor bo‘lgach avtomatik ochiladi.</span>
+          </div>
+        </body>
+      </html>
+    `);
+    popup.document.close();
   }
   return popup;
 };
@@ -424,7 +465,6 @@ const submitCheckout = async () => {
         pinfl: pinfl || null,
         pass_data: passData || null,
         birth_date: birthDate,
-        redirect_uri: `${window.location.origin}/checkout`,
         lang: locale.value,
       });
       const redirectUrl = String(response.data?.redirect_url || "").trim();
