@@ -166,25 +166,6 @@ watch(
           </RouterLink>
 
           <div class="mobile-actions lg:hidden">
-            <RouterLink v-if="!customerProfile" to="/login" class="mobile-login-chip">
-              {{ t("nav.login") }}
-            </RouterLink>
-            <div v-else class="mobile-profile-chip">
-              <div class="profile-chip-avatar">
-                <img
-                  v-if="customerProfile.photoUrl"
-                  :src="customerProfile.photoUrl"
-                  :alt="customerDisplayName"
-                  class="profile-chip-avatar-image"
-                />
-                <span v-else>{{ customerInitial }}</span>
-              </div>
-              <div class="profile-chip-copy">
-                <strong>{{ customerDisplayName }}</strong>
-                <small>{{ customerSecondaryText }}</small>
-              </div>
-            </div>
-
             <div class="mobile-search-inline relative z-40">
               <input
                 v-model="searchQuery"

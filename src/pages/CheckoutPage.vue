@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { Banknote, CircleCheckBig, Clock3, CreditCard, RefreshCw, ShoppingCart } from "lucide-vue-next";
+import { CircleCheckBig, Clock3, CreditCard, RefreshCw, ShoppingCart } from "lucide-vue-next";
 
 import LeftArrow from "@/components/icons/LeftArrow.vue";
 import { apiClient, getApiErrorMessage, resolveAssetUrl, resolveAssetUrls } from "@/lib/api";
@@ -11,6 +11,7 @@ import {
   formatCylinderOptionLabel,
   formatPriceValue,
   getBasketPrice,
+  hasCreditPricing,
   parseNumericPrice,
 } from "@/lib/productOptions";
 import {
@@ -26,31 +27,56 @@ const route = useRoute();
 const basketStore = useBasketStore();
 
 basketStore.normalizeBasket();
+const customerSession = ref(null);
 
 const checkoutForm = ref({
   name: "",
   phone: "+998",
-  paymentMethod: "cash",
+  paymentMethod: "click",
+  myIdPinfl: "",
+  myIdPassport: "",
+  myIdBirthDate: "",
 });
 const pageError = ref("");
 const submitting = ref(false);
 const clickMeta = ref({
   enabled: false,
 });
+const myIdMeta = ref({
+  enabled: false,
+});
 const orderStatus = ref(null);
 const orderStatusError = ref("");
 const orderStatusLoading = ref(false);
-const cashOrderCompleted = ref(false);
-
+const myIdFinalizeLoading = ref(false);
+const myIdSessionResultLoading = ref(false);
+const myIdReturnProcessedKey = ref("");
+const myIdResolvedAuthCode = ref("");
+const myIdProfileResult = ref(null);
+const myIdResultNote = ref("");
+const myIdJobId = ref("");
 let statusPollTimeoutId = null;
 
 const basketItems = computed(() => basketStore.basket);
+const readSingleQueryValue = (value) => (Array.isArray(value) ? value[0] : value);
 const currentOrderId = computed(() => {
   const rawValue = route.query.order_id;
-  const normalized = Array.isArray(rawValue) ? rawValue[0] : rawValue;
+  const normalized = readSingleQueryValue(rawValue);
   const numeric = Number(normalized);
   return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
 });
+const myIdReturnAuthCode = computed(() => String(readSingleQueryValue(route.query.auth_code) || "").trim());
+const myIdReturnSessionId = computed(() => String(readSingleQueryValue(route.query.session_id) || "").trim());
+const myIdReturnReasonCode = computed(() => {
+  const rawValue = readSingleQueryValue(route.query.reason_code ?? route.query.result_code);
+  const numeric = Number(rawValue);
+  return Number.isFinite(numeric) ? numeric : null;
+});
+const effectiveMyIdAuthCode = computed(() => myIdReturnAuthCode.value || myIdResolvedAuthCode.value);
+const showMyIdResultCard = computed(() => Boolean(myIdProfileResult.value));
+const formattedMyIdProfile = computed(() =>
+  myIdProfileResult.value ? JSON.stringify(myIdProfileResult.value, null, 2) : ""
+);
 
 const normalizeImages = (images) => {
   if (!images) return [];
@@ -97,6 +123,9 @@ const totalAmount = computed(() =>
 
 const totalAmountFormatted = computed(() => formatPriceValue(totalAmount.value));
 const canShowCheckoutForm = computed(() => basketItems.value.length > 0);
+const basketSupportsInstallment = computed(() =>
+  basketItems.value.every((item) => hasCreditPricing(item))
+);
 const canSubmitOrder = computed(
   () =>
     canShowCheckoutForm.value &&
@@ -105,6 +134,35 @@ const canSubmitOrder = computed(
     !submitting.value
 );
 const showStatusCard = computed(() => Boolean(currentOrderId.value && orderStatus.value));
+const showMyIdConfirmCard = computed(
+  () => Boolean(myIdReturnSessionId.value && effectiveMyIdAuthCode.value)
+);
+const isCustomerLocked = computed(
+  () =>
+    Boolean(customerSession.value?.name) &&
+    normalizeCustomerPhone(customerSession.value?.phone).length === 12
+);
+const myIdDisabledReason = computed(() => {
+  if (!myIdMeta.value.enabled) {
+    return t("checkoutPage.myidUnavailable");
+  }
+
+  if (!basketSupportsInstallment.value) {
+    return t("checkoutPage.installmentUnavailable");
+  }
+
+  return "";
+});
+const submitButtonLabel = computed(() =>
+  checkoutForm.value.paymentMethod === "myid"
+    ? t("checkoutPage.submitMyId")
+    : t("checkoutPage.submitClick")
+);
+const currentStatusPaymentMethod = computed(() =>
+  String(orderStatus.value?.payment_method || checkoutForm.value.paymentMethod || "click")
+    .trim()
+    .toLowerCase()
+);
 
 const currentStatusVariant = computed(() => {
   const status = String(orderStatus.value?.status || "").trim().toLowerCase();
@@ -115,6 +173,13 @@ const currentStatusVariant = computed(() => {
 
 const currentStatusTitle = computed(() => {
   const status = String(orderStatus.value?.status || "").trim().toLowerCase();
+  if (currentStatusPaymentMethod.value === "myid") {
+    if (status === "completed") return t("checkoutPage.myidStatusCompleted");
+    if (status === "cancelled") return t("checkoutPage.myidStatusCancelled");
+    if (status === "pending") return t("checkoutPage.myidStatusPending");
+    return t("checkoutPage.myidStatusUnknown");
+  }
+
   if (status === "prepared") return t("checkoutPage.statusPrepared");
   if (status === "completed") return t("checkoutPage.statusCompleted");
   if (status === "cancelled") return t("checkoutPage.statusCancelled");
@@ -124,9 +189,17 @@ const currentStatusTitle = computed(() => {
 
 const currentStatusHint = computed(() => {
   const status = String(orderStatus.value?.status || "").trim().toLowerCase();
+  const statusNote = String(orderStatus.value?.status_note || orderStatus.value?.click_error_note || "").trim();
+
+  if (currentStatusPaymentMethod.value === "myid") {
+    if (status === "completed") return statusNote || t("checkoutPage.myidHintCompleted");
+    if (status === "cancelled") return statusNote || t("checkoutPage.myidHintCancelled");
+    return statusNote || t("checkoutPage.myidHintPending");
+  }
+
   if (status === "prepared") return t("checkoutPage.statusHintPrepared");
   if (status === "completed") return t("checkoutPage.statusHintCompleted");
-  if (status === "cancelled") return orderStatus.value?.click_error_note || t("checkoutPage.statusHintCancelled");
+  if (status === "cancelled") return statusNote || t("checkoutPage.statusHintCancelled");
   return t("checkoutPage.statusHintPending");
 });
 
@@ -151,17 +224,14 @@ const scheduleStatusPolling = () => {
 
 const applyStoredCustomerSession = () => {
   const session = getStoredCustomerSession();
+  customerSession.value = session;
+
   if (!session) {
     return;
   }
 
-  if (!checkoutForm.value.name.trim()) {
-    checkoutForm.value.name = session.name || "";
-  }
-
-  if (normalizeCustomerPhone(checkoutForm.value.phone).length !== 12) {
-    checkoutForm.value.phone = formatUzbekistanPhoneInput(session.phone || "");
-  }
+  checkoutForm.value.name = session.name || "";
+  checkoutForm.value.phone = formatUzbekistanPhoneInput(session.phone || "");
 };
 
 const fetchClickMeta = async () => {
@@ -172,6 +242,19 @@ const fetchClickMeta = async () => {
     };
   } catch {
     clickMeta.value = {
+      enabled: false,
+    };
+  }
+};
+
+const fetchMyIdMeta = async () => {
+  try {
+    const response = await apiClient.get("/payments/myid/meta");
+    myIdMeta.value = {
+      enabled: Boolean(response.data?.enabled),
+    };
+  } catch {
+    myIdMeta.value = {
       enabled: false,
     };
   }
@@ -203,8 +286,87 @@ const fetchOrderStatus = async () => {
   }
 };
 
+const normalizeMyIdPinflInput = (value) =>
+  String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 14);
+
+const normalizeMyIdPassportInput = (value) =>
+  String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 10);
+
+const replaceCheckoutQuery = async (nextQuery = {}) => {
+  await router.replace({
+    path: route.path,
+    query: nextQuery,
+  });
+};
+
+const resetTransientMyIdState = () => {
+  myIdResolvedAuthCode.value = "";
+  myIdProfileResult.value = null;
+  myIdResultNote.value = "";
+  myIdJobId.value = "";
+};
+
+const finalizeMyIdReturn = async () => {
+  const sessionId = myIdReturnSessionId.value;
+  const authCode = effectiveMyIdAuthCode.value;
+
+  if (!sessionId || !authCode) {
+    return;
+  }
+
+  pageError.value = "";
+  myIdFinalizeLoading.value = true;
+
+  try {
+    const response = await apiClient.post("/payments/myid/finalize", {
+      session_id: sessionId,
+      auth_code: authCode,
+    });
+    myIdProfileResult.value = response.data?.profile || null;
+    myIdResultNote.value = String(response.data?.result_note || "").trim();
+    myIdJobId.value = String(response.data?.job_id || "").trim();
+    await replaceCheckoutQuery({});
+  } catch (error) {
+    pageError.value = getApiErrorMessage(error, t("send"));
+  } finally {
+    myIdFinalizeLoading.value = false;
+  }
+};
+
+const fetchMyIdSessionResult = async () => {
+  const sessionId = myIdReturnSessionId.value;
+  if (!sessionId || myIdReturnReasonCode.value !== null || effectiveMyIdAuthCode.value) {
+    return;
+  }
+
+  myIdSessionResultLoading.value = true;
+
+  try {
+    const response = await apiClient.post(`/payments/myid/sessions/${sessionId}/result`);
+    myIdResolvedAuthCode.value = String(response.data?.auth_code || "").trim();
+  } catch (error) {
+    pageError.value = getApiErrorMessage(error, t("send"));
+  } finally {
+    myIdSessionResultLoading.value = false;
+  }
+};
+
+const openMyIdBlankTab = () => {
+  const popup = window.open("about:blank", "_blank");
+  if (popup) {
+    popup.opener = null;
+  }
+  return popup;
+};
+
 const submitCheckout = async () => {
   pageError.value = "";
+  resetTransientMyIdState();
 
   if (!canShowCheckoutForm.value) {
     pageError.value = t("checkoutPage.emptyAction");
@@ -238,37 +400,67 @@ const submitCheckout = async () => {
   };
 
   submitting.value = true;
+  let myIdTab = null;
 
   try {
-    if (checkoutForm.value.paymentMethod === "click") {
-      if (!clickMeta.value.enabled) {
-        pageError.value = t("checkoutPage.clickUnavailable");
+    if (checkoutForm.value.paymentMethod === "myid") {
+      if (myIdDisabledReason.value) {
+        pageError.value = myIdDisabledReason.value;
         return;
       }
 
-      const response = await apiClient.post("/payments/click/initiate", {
-        ...payload,
-        return_url: `${window.location.origin}/checkout`,
-      });
-      const paymentUrl = String(response.data?.payment_url || "").trim();
+      const pinfl = normalizeMyIdPinflInput(checkoutForm.value.myIdPinfl);
+      const passData = normalizeMyIdPassportInput(checkoutForm.value.myIdPassport);
+      const birthDate = String(checkoutForm.value.myIdBirthDate || "").trim();
 
-      if (!paymentUrl) {
-        throw new Error("Payment URL was not returned");
+      if ((!pinfl && !passData) || !birthDate) {
+        pageError.value = t("checkoutPage.myidMissingIdentity");
+        return;
       }
 
-      window.location.href = paymentUrl;
+      myIdTab = openMyIdBlankTab();
+      const response = await apiClient.post("/payments/myid/initiate", {
+        ...payload,
+        pinfl: pinfl || null,
+        pass_data: passData || null,
+        birth_date: birthDate,
+        redirect_uri: `${window.location.origin}/checkout`,
+        lang: locale.value,
+      });
+      const redirectUrl = String(response.data?.redirect_url || "").trim();
+
+      if (!redirectUrl) {
+        throw new Error("MyID redirect URL was not returned");
+      }
+
+      if (myIdTab && !myIdTab.closed) {
+        myIdTab.location.replace(redirectUrl);
+      } else {
+        window.open(redirectUrl, "_blank") || (window.location.href = redirectUrl);
+      }
       return;
     }
 
-    await apiClient.post("/products/order", {
-      ...payload,
-      order_type: "standard",
-      payment_method: "cash",
-    });
+    if (!clickMeta.value.enabled) {
+      pageError.value = t("checkoutPage.clickUnavailable");
+      return;
+    }
 
-    basketStore.clearBasket();
-    cashOrderCompleted.value = true;
+    const response = await apiClient.post("/payments/click/initiate", {
+      ...payload,
+      return_url: `${window.location.origin}/checkout`,
+    });
+    const paymentUrl = String(response.data?.payment_url || "").trim();
+
+    if (!paymentUrl) {
+      throw new Error("Payment URL was not returned");
+    }
+
+    window.location.href = paymentUrl;
   } catch (error) {
+    if (myIdTab && !myIdTab.closed) {
+      myIdTab.close();
+    }
     pageError.value = getApiErrorMessage(error, t("send"));
   } finally {
     submitting.value = false;
@@ -289,9 +481,73 @@ watch(
   { immediate: true }
 );
 
+watch(
+  () => myIdDisabledReason.value,
+  (reason) => {
+    if (reason && checkoutForm.value.paymentMethod === "myid") {
+      checkoutForm.value.paymentMethod = "click";
+    }
+  }
+);
+
+watch(
+  () => [myIdReturnReasonCode.value, myIdReturnSessionId.value, myIdReturnAuthCode.value],
+  async ([reasonCode, sessionId, authCode]) => {
+    if (!sessionId || reasonCode === null || authCode) {
+      return;
+    }
+
+    const key = `${sessionId}:${reasonCode}`;
+    if (myIdReturnProcessedKey.value === key) {
+      return;
+    }
+
+    myIdReturnProcessedKey.value = key;
+    pageError.value = "";
+    myIdFinalizeLoading.value = true;
+
+    try {
+      const response = await apiClient.post("/payments/myid/finalize", {
+        session_id: sessionId,
+        reason_code: reasonCode,
+      });
+      pageError.value = String(response.data?.result_note || "").trim() || t("checkoutPage.myidHintCancelled");
+      await replaceCheckoutQuery({});
+    } catch (error) {
+      pageError.value = getApiErrorMessage(error, t("send"));
+    } finally {
+      myIdFinalizeLoading.value = false;
+    }
+  },
+  { immediate: true }
+);
+
+watch(
+  () => [myIdReturnSessionId.value, myIdReturnAuthCode.value, myIdReturnReasonCode.value],
+  async ([sessionId, authCode, reasonCode]) => {
+    if (!sessionId || authCode || reasonCode !== null) {
+      return;
+    }
+
+    await fetchMyIdSessionResult();
+  },
+  { immediate: true }
+);
+
+watch(
+  () => [myIdReturnSessionId.value, myIdReturnAuthCode.value],
+  ([, authCode]) => {
+    if (authCode) {
+      myIdResolvedAuthCode.value = "";
+    }
+  },
+  { immediate: true }
+);
+
 onMounted(() => {
   applyStoredCustomerSession();
   fetchClickMeta();
+  fetchMyIdMeta();
 });
 
 onBeforeUnmount(() => {
@@ -346,12 +602,48 @@ onBeforeUnmount(() => {
       {{ orderStatusError }}
     </div>
 
-    <div v-if="cashOrderCompleted" class="checkout-alert is-success">
-      {{ t("checkoutPage.cashSuccess") }}
-    </div>
-
     <div v-if="pageError" class="checkout-alert is-error">
       {{ pageError }}
+    </div>
+
+    <div
+      v-if="myIdReturnSessionId && !showMyIdConfirmCard && myIdReturnReasonCode === null"
+      class="checkout-alert is-success"
+    >
+      {{
+        myIdSessionResultLoading
+          ? t("checkoutPage.myidCheckingResult")
+          : t("checkoutPage.myidAwaitingResult")
+      }}
+    </div>
+
+    <div v-if="showMyIdConfirmCard" class="checkout-return-card">
+      <div class="checkout-return-copy">
+        <p class="checkout-status-kicker">{{ t("checkoutPage.myidReturnTitle") }}</p>
+        <p>{{ t("checkoutPage.myidReturnHelp") }}</p>
+      </div>
+
+      <button
+        type="button"
+        class="checkout-refresh-btn"
+        :disabled="myIdFinalizeLoading"
+        @click="finalizeMyIdReturn"
+      >
+        {{ myIdFinalizeLoading ? t("checkoutPage.myidConfirming") : t("checkoutPage.myidConfirm") }}
+      </button>
+    </div>
+
+    <div v-if="showMyIdResultCard" class="checkout-result-card">
+      <div class="checkout-section-head compact">
+        <h2>{{ t("checkoutPage.myidResultTitle") }}</h2>
+        <p>{{ myIdResultNote || t("checkoutPage.myidResultHelp") }}</p>
+      </div>
+
+      <p v-if="myIdJobId" class="checkout-result-job">
+        Job ID: {{ myIdJobId }}
+      </p>
+
+      <pre class="checkout-result-json">{{ formattedMyIdProfile }}</pre>
     </div>
 
     <div v-if="canShowCheckoutForm" class="checkout-grid">
@@ -367,11 +659,13 @@ onBeforeUnmount(() => {
             :key="item.basket_key || `${item.id}:checkout`"
             class="checkout-product-row"
           >
-            <img
-              :src="normalizeImages(item.images)[0]"
-              :alt="item[`name_${locale}`]"
-              class="checkout-product-image"
-            />
+            <div class="checkout-product-media">
+              <img
+                :src="normalizeImages(item.images)[0]"
+                :alt="item[`name_${locale}`]"
+                class="checkout-product-image"
+              />
+            </div>
 
             <div class="checkout-product-copy">
               <h3>{{ item[`name_${locale}`] }}</h3>
@@ -408,6 +702,7 @@ onBeforeUnmount(() => {
             autocomplete="name"
             class="checkout-input"
             :placeholder="t('checkoutPage.nameHint')"
+            :readonly="isCustomerLocked"
           />
         </label>
 
@@ -419,7 +714,8 @@ onBeforeUnmount(() => {
             autocomplete="tel"
             class="checkout-input"
             :placeholder="t('checkoutPage.phoneHint')"
-            @input="checkoutForm.phone = formatUzbekistanPhoneInput($event.target.value)"
+            :readonly="isCustomerLocked"
+            @input="!isCustomerLocked && (checkoutForm.phone = formatUzbekistanPhoneInput($event.target.value))"
           />
         </label>
 
@@ -428,23 +724,6 @@ onBeforeUnmount(() => {
             <h2>{{ t("checkoutPage.paymentTitle") }}</h2>
             <p>{{ t("checkoutPage.paymentHelp") }}</p>
           </div>
-
-          <button
-            type="button"
-            :class="[
-              'checkout-payment-option',
-              { active: checkoutForm.paymentMethod === 'cash' },
-            ]"
-            @click="checkoutForm.paymentMethod = 'cash'"
-          >
-            <div class="checkout-payment-copy">
-              <Banknote class="h-5 w-5" />
-              <div>
-                <strong>{{ t("checkoutPage.cash") }}</strong>
-                <p>{{ t("checkoutPage.cashDescription") }}</p>
-              </div>
-            </div>
-          </button>
 
           <button
             type="button"
@@ -472,6 +751,73 @@ onBeforeUnmount(() => {
               </div>
             </div>
           </button>
+
+          <button
+            type="button"
+            :class="[
+              'checkout-payment-option',
+              {
+                active: checkoutForm.paymentMethod === 'myid',
+                disabled: Boolean(myIdDisabledReason),
+              },
+            ]"
+            :disabled="Boolean(myIdDisabledReason)"
+            @click="checkoutForm.paymentMethod = 'myid'"
+          >
+            <div class="checkout-payment-copy">
+              <CreditCard class="h-5 w-5" />
+              <div>
+                <strong>{{ t("checkoutPage.installmentOption") }}</strong>
+                <p>
+                  {{
+                    myIdDisabledReason
+                      ? myIdDisabledReason
+                      : t("checkoutPage.myidDescription")
+                  }}
+                </p>
+              </div>
+            </div>
+          </button>
+
+          <div v-if="checkoutForm.paymentMethod === 'myid'" class="checkout-myid-fields">
+            <div class="checkout-section-head compact">
+              <h2>{{ t("checkoutPage.myidTitle") }}</h2>
+              <p>{{ t("checkoutPage.myidIdentityHelp") }}</p>
+            </div>
+
+            <label class="checkout-field">
+              <span>{{ t("orderModal.pinfl") }}</span>
+              <input
+                :value="checkoutForm.myIdPinfl"
+                type="text"
+                inputmode="numeric"
+                class="checkout-input"
+                :placeholder="t('checkoutPage.myidPinflHint')"
+                @input="checkoutForm.myIdPinfl = normalizeMyIdPinflInput($event.target.value)"
+              />
+            </label>
+
+            <label class="checkout-field">
+              <span>{{ t("orderModal.passport") }}</span>
+              <input
+                :value="checkoutForm.myIdPassport"
+                type="text"
+                autocapitalize="characters"
+                class="checkout-input"
+                :placeholder="t('checkoutPage.myidPassportHint')"
+                @input="checkoutForm.myIdPassport = normalizeMyIdPassportInput($event.target.value)"
+              />
+            </label>
+
+            <label class="checkout-field">
+              <span>{{ t("orderModal.birthDate") }}</span>
+              <input
+                v-model="checkoutForm.myIdBirthDate"
+                type="date"
+                class="checkout-input"
+              />
+            </label>
+          </div>
         </div>
 
         <div class="checkout-summary">
@@ -486,11 +832,7 @@ onBeforeUnmount(() => {
             :disabled="!canSubmitOrder"
             @click="submitCheckout"
           >
-            {{
-              checkoutForm.paymentMethod === "click"
-                ? t("checkoutPage.submitClick")
-                : t("checkoutPage.submitCash")
-            }}
+            {{ submitButtonLabel }}
           </button>
         </div>
       </section>
@@ -594,33 +936,50 @@ onBeforeUnmount(() => {
 
 .checkout-products {
   display: grid;
-  gap: 14px;
+  gap: 18px;
 }
 
 .checkout-product-row {
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr) auto;
-  gap: 16px;
-  align-items: center;
-  padding: 14px;
-  border-radius: 20px;
+  grid-template-columns: 1fr;
+  gap: 18px;
+  align-items: start;
+  padding: 18px;
+  border-radius: 24px;
   background: #f7f9fb;
   border: 1px solid rgba(20, 35, 56, 0.06);
 }
 
+.checkout-product-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(240, 245, 250, 0.92)),
+    #ffffff;
+  border: 1px solid rgba(20, 35, 56, 0.06);
+}
+
 .checkout-product-image {
-  width: 88px;
-  height: 88px;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
-  border-radius: 16px;
-  background: #ffffff;
 }
 
 .checkout-product-copy h3 {
   margin: 0;
   color: #18304f;
-  font-size: 1rem;
+  font-size: 1.08rem;
   font-weight: 700;
+  line-height: 1.4;
+}
+
+.checkout-product-copy {
+  width: 100%;
 }
 
 .checkout-product-options {
@@ -644,8 +1003,11 @@ onBeforeUnmount(() => {
 
 .checkout-product-price {
   color: #142338;
-  font-size: 1rem;
+  font-size: 1.08rem;
   white-space: nowrap;
+  display: block;
+  width: 100%;
+  text-align: right;
 }
 
 .checkout-field {
@@ -677,6 +1039,14 @@ onBeforeUnmount(() => {
 
 .checkout-payment-block {
   margin-top: 8px;
+}
+
+.checkout-myid-fields {
+  margin-top: 12px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(20, 35, 56, 0.08);
+  background: #f7f9fb;
 }
 
 .checkout-payment-option {
@@ -795,6 +1165,58 @@ onBeforeUnmount(() => {
   margin-bottom: 22px;
 }
 
+.checkout-return-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 22px;
+  margin-bottom: 22px;
+  border-radius: 24px;
+  border: 1px solid rgba(34, 197, 94, 0.18);
+  background: linear-gradient(135deg, rgba(236, 253, 245, 0.98), rgba(255, 255, 255, 0.98));
+}
+
+.checkout-return-copy {
+  flex: 1;
+}
+
+.checkout-return-copy p:last-child {
+  margin: 0;
+  color: #43607c;
+  line-height: 1.55;
+}
+
+.checkout-result-card {
+  margin-bottom: 22px;
+  padding: 22px;
+  border-radius: 24px;
+  border: 1px solid rgba(20, 35, 56, 0.1);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 20px 50px rgba(20, 35, 56, 0.08);
+}
+
+.checkout-result-job {
+  margin: 0 0 12px;
+  color: #51647e;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.checkout-result-json {
+  margin: 0;
+  overflow: auto;
+  border-radius: 18px;
+  border: 1px solid rgba(20, 35, 56, 0.08);
+  background: #f7f9fb;
+  padding: 16px;
+  color: #18304f;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .checkout-status-card.is-success {
   border-color: rgba(21, 128, 61, 0.2);
   background: linear-gradient(135deg, rgba(236, 253, 245, 0.98), rgba(255, 255, 255, 0.98));
@@ -890,6 +1312,7 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 
+  .checkout-return-card,
   .checkout-status-card {
     flex-direction: column;
     align-items: flex-start;
@@ -920,13 +1343,8 @@ onBeforeUnmount(() => {
     padding: 18px;
   }
 
-  .checkout-product-row {
-    grid-template-columns: 72px minmax(0, 1fr);
-  }
-
-  .checkout-product-image {
-    width: 72px;
-    height: 72px;
+  .checkout-product-media {
+    max-width: 100%;
   }
 
   .checkout-product-price {

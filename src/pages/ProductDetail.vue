@@ -575,6 +575,11 @@ const transmissionOptionsForSelectedCylinder = computed(() =>
 const hasTransmissionGroup = computed(() =>
   shouldShowTransmissionOptions(transmissionOptionsForSelectedCylinder.value)
 );
+const productOptionSelectionErrorMessage = computed(() =>
+  hasTransmissionGroup.value
+    ? t("productOptions.selectBalloonAndProgram")
+    : t("productOptions.selectBalloonType")
+);
 const optionGroups = computed(() => {
   const groups = [];
   const visibleTransmissions = dedupeOptionsById(
@@ -922,7 +927,7 @@ const openOrderModal = () => {
   if (!isProductOptionSelectionComplete.value) {
     notification.value = {
       show: true,
-      message: t("productOptions.selectAllRequired"),
+      message: productOptionSelectionErrorMessage.value,
     };
     return;
   }
@@ -949,7 +954,7 @@ const handleAddToBasket = () => {
   if (!isProductOptionSelectionComplete.value) {
     notification.value = {
       show: true,
-      message: t("productOptions.selectAllRequired"),
+      message: productOptionSelectionErrorMessage.value,
     };
     return;
   }
@@ -987,7 +992,7 @@ const buildCreditCustomerName = () =>
 
 const submitProductOrder = async () => {
   if (!isProductOptionSelectionComplete.value) {
-    orderError.value = t("productOptions.selectAllRequired");
+    orderError.value = productOptionSelectionErrorMessage.value;
     return;
   }
   if (!orderProductsPayload.value.length) {
@@ -1774,7 +1779,7 @@ onBeforeUnmount(() => {
               v-if="orderedOptionGroups.length && !isProductOptionSelectionComplete"
               class="detail-options-required-hint"
             >
-              {{ t("productOptions.selectAllRequired") }}
+              {{ productOptionSelectionErrorMessage }}
             </p>
 
             <div class="detail-primary-actions">
@@ -3502,8 +3507,8 @@ onBeforeUnmount(() => {
 
 .related-media {
   position: relative;
-  min-height: 188px;
-  height: 188px;
+  width: 100%;
+  aspect-ratio: 16 / 9;
   border-radius: 20px;
   border: 1px solid rgba(20, 35, 56, 0.08);
   background: var(--detail-surface-muted);
@@ -3524,11 +3529,12 @@ onBeforeUnmount(() => {
 }
 
 .related-image {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;
   object-fit: contain;
-  padding: 1rem;
   transition: transform 0.45s ease;
 }
 
