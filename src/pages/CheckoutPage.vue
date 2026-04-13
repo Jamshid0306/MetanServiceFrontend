@@ -771,12 +771,6 @@ const replaceCheckoutQuery = async (nextQuery = {}) => {
   });
 };
 
-const buildMyIdRedirectUri = () => {
-  const url = new URL(`${window.location.origin}/checkout`);
-  url.searchParams.set(MYID_POPUP_QUERY_KEY, "1");
-  return url.toString();
-};
-
 const getPersistentCheckoutQuery = ({
   orderId = currentOrderId.value,
   paymentMethod = selectedPaymentQuery.value || checkoutForm.value.paymentMethod,
@@ -1087,7 +1081,6 @@ const startInstallmentVerification = async () => {
       pass_data: passData || null,
       birth_date: birthDate,
       lang: locale.value,
-      redirect_uri: buildMyIdRedirectUri(),
     });
 
     const redirectUrl = String(response.data?.redirect_url || "").trim();
@@ -1107,7 +1100,11 @@ const startInstallmentVerification = async () => {
     }
 
     if (myIdTab && !myIdTab.closed) {
-      myIdTab.location.replace(redirectUrl);
+      try {
+        myIdTab.location.href = redirectUrl;
+      } catch {
+        myIdTab.location.replace(redirectUrl);
+      }
     } else {
       window.open(redirectUrl, "_blank") || (window.location.href = redirectUrl);
     }
