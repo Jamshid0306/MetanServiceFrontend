@@ -271,6 +271,24 @@ export const getApiErrorMessage = (error, fallback = "So'rov bajarilmadi.") => {
     return responseMessage;
   }
 
+  if (Array.isArray(responseMessage) && responseMessage.length) {
+    return responseMessage
+      .map((item) => (typeof item === "string" ? item : JSON.stringify(item)))
+      .join("; ");
+  }
+
+  if (responseMessage && typeof responseMessage === "object") {
+    return JSON.stringify(responseMessage);
+  }
+
+  if (error?.response?.data && typeof error.response.data === "object") {
+    return JSON.stringify(error.response.data);
+  }
+
+  if (typeof error?.message === "string" && error.message.trim()) {
+    return error.message;
+  }
+
   if (error?.code === "ECONNABORTED") {
     return "Server javobi juda sekin bo'ldi. Qaytadan urinib ko'ring.";
   }
