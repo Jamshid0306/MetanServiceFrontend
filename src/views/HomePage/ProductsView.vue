@@ -5,6 +5,7 @@ import { ArrowRight } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useLoaderStore } from "@/store/loaderStore";
+import { useCreditTariffsStore } from "@/store/creditTariffsStore";
 import { resolveAssetUrls } from "@/lib/api";
 import {
   formatPriceValue,
@@ -15,6 +16,8 @@ import {
 const router = useRouter();
 const { t, locale } = useI18n();
 const productsStore = useProductsStore();
+const creditTariffsStore = useCreditTariffsStore();
+const loaderStore = useLoaderStore();
 const productRefs = ref([]);
 const normalizeImages = (images) => resolveAssetUrls(images);
 const formatPrice = (price) => formatPriceValue(price);
@@ -22,7 +25,12 @@ const getProductDisplayPrice = (product) =>
   getProductDefaultPrice(product, locale.value);
 const INSTALLMENT_MONTHS = 12;
 const getProductInstallment = (product) =>
-  getInstallmentPlan(product, locale.value, INSTALLMENT_MONTHS);
+  getInstallmentPlan(
+    product,
+    locale.value,
+    INSTALLMENT_MONTHS,
+    creditTariffsStore.tariffs
+  );
 const formatInstallmentLabel = (product) => {
   const installment = getProductInstallment(product);
   if (!installment) {
@@ -33,9 +41,18 @@ const formatInstallmentLabel = (product) => {
 };
 
 onMounted(async () => {
-  if (!productsStore.products.length) {
-    useLoaderStore().loader = true;
-    await productsStore.fetchProducts(200, 0);
+  const shouldShowLoader = !productsStore.products.length;
+  if (shouldShowLoader) {
+    loaderStore.loader = true;
+  }
+
+  await Promise.all([
+    productsStore.products.length ? Promise.resolve() : productsStore.fetchProducts(200, 0),
+    creditTariffsStore.fetchTariffs(),
+  ]);
+
+  if (shouldShowLoader) {
+    loaderStore.loader = false;
   }
 
   await nextTick();

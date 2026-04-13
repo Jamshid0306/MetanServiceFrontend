@@ -7,6 +7,7 @@ import DualRangeSlider from "@/components/DualSlider.vue";
 import { useFilterStore } from "@/store/filterStore";
 import { useProductsStore } from "@/store/productsStore";
 import { useLoaderStore } from "@/store/loaderStore";
+import { useCreditTariffsStore } from "@/store/creditTariffsStore";
 import { resolveAssetUrl, resolveAssetUrls } from "@/lib/api";
 import { formatPriceValue, getProductDefaultPrice, getInstallmentPlan } from "@/lib/productOptions";
 import { matchesProductSearch, scoreProductSearch } from "@/lib/productSearch";
@@ -16,6 +17,7 @@ const { t, locale } = useI18n();
 const filterStore = useFilterStore();
 const productsStore = useProductsStore();
 const loaderStore = useLoaderStore();
+const creditTariffsStore = useCreditTariffsStore();
 
 const minValue = ref(0);
 const maxValue = ref(0);
@@ -181,7 +183,12 @@ const goToDetail = (id) => {
 const formatPrice = (price) => formatPriceValue(price);
 const INSTALLMENT_MONTHS = 12;
 const getProductInstallment = (product) =>
-  getInstallmentPlan(product, locale.value, INSTALLMENT_MONTHS);
+  getInstallmentPlan(
+    product,
+    locale.value,
+    INSTALLMENT_MONTHS,
+    creditTariffsStore.tariffs
+  );
 const formatInstallmentLabel = (product) => {
   const installment = getProductInstallment(product);
   if (!installment) {
@@ -225,7 +232,7 @@ watch([minValue, maxValue], () => {
 
 onMounted(async () => {
   loaderStore.loader = true;
-  await fetchProducts();
+  await Promise.all([fetchProducts(), creditTariffsStore.fetchTariffs()]);
   loaderStore.loader = false;
 });
 </script>

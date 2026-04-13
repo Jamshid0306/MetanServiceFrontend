@@ -9,6 +9,7 @@ import { useRoute, useRouter } from "vue-router";
 import "swiper/css";
 import LeftArrow from "@/components/icons/LeftArrow.vue";
 import { useLoaderStore } from "@/store/loaderStore";
+import { useCreditTariffsStore } from "@/store/creditTariffsStore";
 import Notification from "@/components/Notification.vue";
 import { apiClient, getApiErrorMessage, resolveAssetUrl, resolveAssetUrls } from "@/lib/api";
 import {
@@ -34,6 +35,7 @@ import {
 
 const router = useRouter();
 const store = useProductsStore();
+const creditTariffsStore = useCreditTariffsStore();
 const getOptionFlow = () => {
   const cfg = normalizeProductOptions(store.product?.config_options);
   const ft = cfg?.fuel_types?.[0];
@@ -65,6 +67,7 @@ const notification = ref({ show: false, message: "" });
 const selectedOptions = ref({});
 const selectedExtraServiceIds = ref([]);
 const selectedCreditMonths = ref(null);
+const lastAutoFilledCreditAmount = ref("");
 /**
  * Programma xizmati: null = hali tanlanmagan, true = Ha, false = Yo'q.
  * - null / false: transmission narxi qo‘shilmaydi (null = savol javobsiz).
@@ -115,6 +118,17 @@ const normalizeImages = (images) => resolveAssetUrls(images);
 const formatPrice = (price) => formatPriceValue(price);
 const getProductDisplayPrice = (product) =>
   getProductDefaultPrice(product, locale.value);
+const toCreditAmountInputValue = (value) => {
+  const numeric = parseNumericPrice(value);
+  return numeric === null ? "" : String(numeric);
+};
+const formatCreditPlanOptionLabel = (plan) => {
+  if (!plan) {
+    return "";
+  }
+
+  return `${plan.months} ${t("credit.months")}`;
+};
 const fuelGuideSections = computed(() => {
   const sections = tm("productOptions.fuelGuide.sections");
   return Array.isArray(sections) ? sections : [];
@@ -695,11 +709,19 @@ const combinedSelectedPrice = computed(() => {
 
   return numericBasePrice + additionalServicesTotal.value;
 });
-const creditPlans = computed(() => getCreditPlans(store.product));
+const creditPlans = computed(() =>
+  getCreditPlans(store.product, creditTariffsStore.tariffs, {
+    amount: combinedSelectedPrice.value,
+    locale: locale.value,
+  })
+);
 
 /** Kredit mavjud bo‘lsa: 12 oylik reja bo‘lsa default shu, aks holda birinchi reja. */
 const setDefaultCreditMonthsForProduct = () => {
-  const plans = getCreditPlans(store.product);
+  const plans = getCreditPlans(store.product, creditTariffsStore.tariffs, {
+    amount: combinedSelectedPrice.value,
+    locale: locale.value,
+  });
   if (!plans.length) {
     selectedCreditMonths.value = null;
     return;
@@ -723,7 +745,13 @@ const selectedCreditConfig = computed(() => {
   return plans.find((plan) => plan.months === 12) ?? plans[0] ?? null;
 });
 const selectedCreditPlan = computed(() => {
-  if (!hasCreditPricing(store.product) || !selectedCreditConfig.value) {
+  if (
+    !hasCreditPricing(store.product, creditTariffsStore.tariffs, {
+      amount: combinedSelectedPrice.value,
+      locale: locale.value,
+    }) ||
+    !selectedCreditConfig.value
+  ) {
     return null;
   }
 
@@ -767,6 +795,15 @@ const configuredBasketItem = computed(() =>
         return {
           ...baseItem,
           selected_options: [...baseItem.selected_options, ...serviceOptions],
+          credit_plan: selectedCreditConfig.value
+            ? {
+                tariff_id: selectedCreditConfig.value.id || null,
+                months: selectedCreditConfig.value.months,
+                percent: selectedCreditConfig.value.percent,
+                monthly_payment: selectedCreditPlan.value?.monthlyPayment || null,
+                total: selectedCreditPlan.value?.total || null,
+              }
+            : null,
           selected_price_uz:
             numericPriceUz === null ? baseItem.selected_price_uz : numericPriceUz + extraPriceUz,
           selected_price_ru:
@@ -799,7 +836,12 @@ const currentOrderTotalLabel = computed(() => {
   return formatPrice(combinedSelectedPrice.value);
 });
 const canUseCreditOrder = computed(
-  () => hasCreditPricing(store.product) && Boolean(selectedCreditConfig.value)
+  () =>
+    hasCreditPricing(store.product, creditTariffsStore.tariffs, {
+      amount: combinedSelectedPrice.value,
+      locale: locale.value,
+    }) &&
+    Boolean(selectedCreditConfig.value)
 );
 const selectedOptionsSummary = computed(
   () => configuredBasketItem.value?.selected_options || []
@@ -1114,7 +1156,10 @@ const fetchProductData = async (id) => {
     return;
   }
 
-  const productExists = await store.fetchProductDetail(productId);
+  const [productExists] = await Promise.all([
+    store.fetchProductDetail(productId),
+    creditTariffsStore.fetchTariffs(),
+  ]);
   if (!productExists) {
     router.replace({ name: "NotFound" });
     return;
@@ -1288,6 +1333,44 @@ watch(
   { immediate: true }
 );
 
+watch(
+  selectedCreditConfig,
+  (plan) => {
+    if (!plan) {
+      orderForm.value.tariffId = "";
+      orderForm.value.period = "";
+      return;
+    }
+
+    orderForm.value.tariffId = plan.id ? String(plan.id) : "";
+    orderForm.value.period = String(plan.months);
+  },
+  { immediate: true }
+);
+
+watch(
+  combinedSelectedPrice,
+  (nextPrice, prevPrice) => {
+    if (orderForm.value.orderType !== "credit") {
+      return;
+    }
+
+    const nextAmount = toCreditAmountInputValue(nextPrice);
+    const prevAmount = toCreditAmountInputValue(prevPrice);
+    const currentAmount = String(orderForm.value.amount || "").trim();
+
+    if (
+      !currentAmount ||
+      currentAmount === prevAmount ||
+      currentAmount === lastAutoFilledCreditAmount.value
+    ) {
+      orderForm.value.amount = nextAmount;
+      lastAutoFilledCreditAmount.value = nextAmount;
+    }
+  },
+  { immediate: true }
+);
+
 watch(isAnyModalOpen, (isOpen) => {
   if (typeof document !== "undefined") {
     document.body.style.overflow = isOpen ? "hidden" : "";
@@ -1298,10 +1381,20 @@ watch(
   () => orderForm.value.orderType,
   (nextType) => {
     if (nextType === "credit") {
-      if (!orderForm.value.amount && currentOrderTotal.value > 0) {
-        orderForm.value.amount = String(currentOrderTotal.value);
+      if (currentOrderTotal.value > 0) {
+        const nextAmount = String(currentOrderTotal.value);
+        if (
+          !orderForm.value.amount ||
+          orderForm.value.amount === lastAutoFilledCreditAmount.value
+        ) {
+          orderForm.value.amount = nextAmount;
+        }
+        lastAutoFilledCreditAmount.value = nextAmount;
       }
-      if (!orderForm.value.period && selectedCreditConfig.value?.months) {
+      if (selectedCreditConfig.value?.id) {
+        orderForm.value.tariffId = String(selectedCreditConfig.value.id);
+      }
+      if (selectedCreditConfig.value?.months) {
         orderForm.value.period = String(selectedCreditConfig.value.months);
       }
       if (!orderForm.value.startDate) {
@@ -1477,12 +1570,18 @@ onBeforeUnmount(() => {
                   v-if="creditPlans.length"
                   class="detail-credit-inline-block"
                 >
-                  <div class="credit-plan-switcher detail-credit-plan-switcher">
+                  <div
+                    class="credit-plan-switcher detail-credit-plan-switcher"
+                    :style="{
+                      gridTemplateColumns: `repeat(${Math.max(creditPlans.length, 1)}, minmax(0, 1fr))`,
+                    }"
+                  >
                     <button
                       v-for="plan in creditPlans"
                       :key="`${plan.months}-${plan.percent}`"
                       type="button"
                       class="credit-plan-btn"
+                      :aria-label="`${plan.months} ${t('credit.months')}`"
                       :class="
                         selectedCreditConfig?.months === plan.months
                           ? 'credit-plan-btn-active'
@@ -1490,9 +1589,7 @@ onBeforeUnmount(() => {
                       "
                       @click="selectedCreditMonths = plan.months"
                     >
-                      <span>
-                        {{ plan.months }} {{ t("credit.months") }}
-                      </span>
+                      <span>{{ plan.months }} {{ t("credit.months") }}</span>
                     </button>
                   </div>
                 </div>
@@ -2014,14 +2111,19 @@ onBeforeUnmount(() => {
           class="order-modal-form-grid"
         >
           <label class="order-field">
-            <span>{{ t("orderModal.tariffId") }}</span>
-            <input
-              v-model="orderForm.tariffId"
-              type="number"
-              inputmode="numeric"
-              :placeholder="t('orderModal.tariffHelp')"
+            <span>{{ t("orderModal.tariff") }}</span>
+            <select
+              v-model="selectedCreditMonths"
               class="order-input"
-            />
+            >
+              <option
+                v-for="plan in creditPlans"
+                :key="plan.id || plan.months"
+                :value="String(plan.months)"
+              >
+                {{ formatCreditPlanOptionLabel(plan) }}
+              </option>
+            </select>
           </label>
 
           <label class="order-field">
@@ -2050,8 +2152,8 @@ onBeforeUnmount(() => {
               v-model="orderForm.period"
               type="number"
               inputmode="numeric"
-              :placeholder="t('orderModal.periodHelp')"
               class="order-input"
+              readonly
             />
           </label>
 
@@ -2495,26 +2597,18 @@ onBeforeUnmount(() => {
 }
 
 .detail-credit-plan-switcher {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 0.45rem;
-  overflow-x: auto;
-  padding-bottom: 0.1rem;
-  scroll-snap-type: x proximity;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.detail-credit-plan-switcher::-webkit-scrollbar {
-  display: none;
+  display: grid;
+  gap: 0.35rem;
+  width: 100%;
 }
 
 .detail-credit-plan-switcher .credit-plan-btn {
-  flex: 0 0 auto;
-  min-width: 76px;
-  padding: 0.55rem 0.72rem;
+  min-width: 0;
+  width: 100%;
+  padding: 0.52rem 0.2rem;
   border-radius: 14px;
-  scroll-snap-align: start;
+  justify-content: center;
+  text-align: center;
 }
 
 .detail-credit-payment {
@@ -3721,11 +3815,16 @@ onBeforeUnmount(() => {
     font-size: 0.88rem;
   }
 
+  .detail-credit-plan-switcher {
+    gap: 0.4rem;
+  }
+
   .detail-credit-plan-switcher .credit-plan-btn,
   .credit-plan-btn {
-    min-width: 72px;
-    width: auto;
-    font-size: 0.76rem;
+    min-width: 0;
+    width: 100%;
+    padding: 0.46rem 0.08rem;
+    font-size: 0.72rem;
   }
 
   .detail-option-grid-transmission .detail-option {

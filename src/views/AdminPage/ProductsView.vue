@@ -73,6 +73,8 @@ const CREDIT_MONTH_CHOICES = [3, 6, 9, 12];
 const createInitialProduct = () => ({
   credit_enabled: false,
   credit_plans: [createEmptyCreditPlan()],
+  initial_payment_enabled: false,
+  initial_payment_amount: "",
   name: { uz: "", ru: "" },
   description: { uz: "", ru: "" },
   characteristic: { uz: "", ru: "" },
@@ -202,9 +204,7 @@ const mapCreditPlansForForm = (product) => {
 const getProductCreditPlans = (product) => getCreditPlans(product);
 
 const getProductCreditBadge = (product) =>
-  getProductCreditPlans(product)
-    .map((plan) => `${plan.months} мес. / ${plan.percent}%`)
-    .join(", ");
+  product?.credit_enabled ? "Тарифы ICAN" : "";
 
 const normalizeLegacyFuelLabel = (label = "") => {
   const s = String(label || "").trim();
@@ -341,6 +341,8 @@ const openUpdateModal = (product) => {
   newProduct.value = {
     credit_enabled: Boolean(product.credit_enabled),
     credit_plans: mapCreditPlansForForm(product),
+    initial_payment_enabled: Boolean(product.initial_payment_enabled),
+    initial_payment_amount: formatOptionPriceInput(product.initial_payment_amount),
     order: Number(product.order ?? product.display_order ?? 999999),
     is_active: isProductActive(product),
     name: {
@@ -438,6 +440,10 @@ const onCreditPercentInput = (event) => {
 
 const onDefaultPriceInput = (event) => {
   newProduct.value.default_price = formatNumericInput(event.target.value);
+};
+
+const onInitialPaymentInput = (event) => {
+  newProduct.value.initial_payment_amount = formatNumericInput(event.target.value);
 };
 
 const getNextCreditMonths = () => {
@@ -541,27 +547,20 @@ const addOrUpdateProduct = async () => {
     formData.append("price_en", normalizedPrice);
   }
 
-  const serializedCreditPlans = newProduct.value.credit_plans
-    .map((plan) => ({
-      months: plan.months,
-      percent: plan.percent,
-    }))
-    .filter((plan) => String(plan.months || "").trim() || String(plan.percent || "").trim());
-  const primaryCreditPlan = serializedCreditPlans[0] || null;
-
   formData.append("credit_enabled", String(Boolean(newProduct.value.credit_enabled)));
   formData.append(
-    "credit_plans",
-    newProduct.value.credit_enabled ? JSON.stringify(serializedCreditPlans) : ""
+    "initial_payment_enabled",
+    String(Boolean(newProduct.value.credit_enabled && newProduct.value.initial_payment_enabled))
   );
   formData.append(
-    "credit_months",
-    newProduct.value.credit_enabled ? primaryCreditPlan?.months || "" : ""
+    "initial_payment_amount",
+    newProduct.value.credit_enabled && newProduct.value.initial_payment_enabled
+      ? newProduct.value.initial_payment_amount || ""
+      : ""
   );
-  formData.append(
-    "credit_percent",
-    newProduct.value.credit_enabled ? primaryCreditPlan?.percent || "" : ""
-  );
+  formData.append("credit_plans", "");
+  formData.append("credit_months", "");
+  formData.append("credit_percent", "");
 
   formData.append(
     "config_options",
@@ -617,6 +616,10 @@ watch(
   (enabled) => {
     if (enabled && !newProduct.value.credit_plans.length) {
       newProduct.value.credit_plans = [createEmptyCreditPlan()];
+    }
+    if (!enabled) {
+      newProduct.value.initial_payment_enabled = false;
+      newProduct.value.initial_payment_amount = "";
     }
   }
 );
@@ -686,8 +689,7 @@ const getProductOptionBadges = (product) => {
 };
 
 const hasCreditBadge = (product) =>
-  Boolean(product.credit_enabled) &&
-  getProductCreditPlans(product).length > 0;
+  Boolean(product.credit_enabled);
 
 const isProductActive = (product) =>
   product &&
@@ -899,7 +901,7 @@ const toggleProductActive = async (product) => {
                 <div>
                   <h3 class="editor-section-title">Кредит</h3>
                   <p class="editor-section-copy">
-                    Включите кредит и добавьте несколько сроков с отдельной ставкой для каждого.
+                    Здесь только включается доступность кредита для товара. Сроки и проценты приходят из ICAN автоматически.
                   </p>
                 </div>
               </div>
@@ -927,63 +929,42 @@ const toggleProductActive = async (product) => {
                 v-if="newProduct.credit_enabled"
                 class="space-y-3"
               >
-                <div class="editor-option-head">
-                  <div>
-                    <h4 class="editor-option-title">Планы кредита</h4>
-                    <p class="editor-option-copy">
-                      Например: 3 месяца с одной ставкой и 6 месяцев с другой.
-                    </p>
-                  </div>
+                <div class="credit-toggle">
                   <button
                     type="button"
-                    @click="addCreditPlan"
-                    class="editor-secondary-btn"
+                    class="credit-toggle-btn"
+                    :class="{ 'credit-toggle-btn-active': newProduct.initial_payment_enabled }"
+                    @click="newProduct.initial_payment_enabled = true"
                   >
-                    Добавить срок
+                    Есть первоначальный взнос
+                  </button>
+                  <button
+                    type="button"
+                    class="credit-toggle-btn"
+                    :class="{ 'credit-toggle-btn-active': !newProduct.initial_payment_enabled }"
+                    @click="
+                      newProduct.initial_payment_enabled = false;
+                      newProduct.initial_payment_amount = '';
+                    "
+                  >
+                    Без первоначального взноса
                   </button>
                 </div>
 
-                <div
-                  v-if="!newProduct.credit_plans.length"
-                  class="editor-empty-state"
-                >
-                  Пока не добавлен ни один кредитный срок.
-                </div>
-
-                <div
-                  v-for="(creditPlan, creditPlanIndex) in newProduct.credit_plans"
-                  :key="creditPlan.id"
-                  class="editor-option-row"
-                >
-                  <select
-                    v-model="creditPlan.months"
-                    class="editor-field editor-select"
-                  >
-                    <option value="" disabled>Выберите срок</option>
-                    <option
-                      v-for="months in getCreditMonthChoices(creditPlan.months)"
-                      :key="months"
-                      :value="String(months)"
-                      :disabled="isCreditMonthChoiceDisabled(months, creditPlanIndex)"
-                    >
-                      {{ months }} мес.
-                    </option>
-                  </select>
-
+                <label v-if="newProduct.initial_payment_enabled" class="block space-y-2">
+                  <span class="block text-xs text-white/70">Сумма первоначального взноса</span>
                   <input
-                    :value="creditPlan.percent"
-                    @input="onCreditPlanPercentInput($event, creditPlan)"
-                    placeholder="Процент"
+                    :value="newProduct.initial_payment_amount"
+                    type="text"
+                    inputmode="numeric"
+                    placeholder="0 UZS"
                     class="editor-field"
+                    @input="onInitialPaymentInput"
                   />
+                </label>
 
-                  <button
-                    type="button"
-                    @click="removeCreditPlan(creditPlanIndex)"
-                    class="editor-remove-btn"
-                  >
-                    ×
-                  </button>
+                <div class="editor-empty-state">
+                  Фронтенд сам подтянет тарифы `company-tariff` и покажет доступные месяцы для всех товаров, у которых кредит включён.
                 </div>
               </div>
             </div>

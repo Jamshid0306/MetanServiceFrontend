@@ -511,9 +511,28 @@ export const parseNumericPrice = (value) => {
   return Number.isNaN(numeric) ? null : numeric;
 };
 
+export const parseDecimalNumber = (value) => {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  const normalized = String(value).replace(",", ".");
+  const match = normalized.match(/-?\d+(?:\.\d+)?/);
+  if (!match) {
+    return null;
+  }
+
+  const numeric = Number(match[0]);
+  return Number.isNaN(numeric) ? null : numeric;
+};
+
 export const parsePercentValue = (value) => {
-  const numeric = parseNumericPrice(value);
-  return numeric === null ? null : numeric;
+  const numeric = parseDecimalNumber(value);
+  return numeric === null || Number.isNaN(numeric) ? null : numeric;
 };
 
 export const formatPriceValue = (value) => {
@@ -898,39 +917,90 @@ const normalizeCreditPlan = (plan) => {
   }
 
   return {
+    id: parseNumericPrice(plan.id),
+    name: String(plan.name || "").trim(),
     months,
     percent,
+    monthlyPercent: parsePercentValue(plan.monthly_percent),
+    minAmount: parseNumericPrice(plan.min_amount),
+    maxAmount: parseNumericPrice(plan.max_amount),
   };
 };
 
-export const getCreditPlans = (product) => {
+const parseCreditSourcePlans = (sourcePlans) => {
+  if (typeof sourcePlans === "string") {
+    try {
+      return JSON.parse(sourcePlans);
+    } catch {
+      return [];
+    }
+  }
+
+  return Array.isArray(sourcePlans) ? sourcePlans : [];
+};
+
+const resolveCreditPlanAmount = (product, options = {}) => {
+  const explicitAmount = parseNumericPrice(options?.amount);
+  if (explicitAmount !== null) {
+    return explicitAmount;
+  }
+
+  const locale = String(options?.locale || "uz").trim() || "uz";
+  return parseNumericPrice(getProductDefaultPrice(product, locale));
+};
+
+const isCreditPlanAvailableForAmount = (plan, amount) => {
+  if (!plan) {
+    return false;
+  }
+
+  if (amount === null) {
+    return true;
+  }
+
+  if (plan.minAmount !== null && Number.isFinite(plan.minAmount) && amount < plan.minAmount) {
+    return false;
+  }
+
+  if (plan.maxAmount !== null && Number.isFinite(plan.maxAmount) && amount > plan.maxAmount) {
+    return false;
+  }
+
+  return true;
+};
+
+export const getCreditPlans = (product, sharedPlans = null, options = {}) => {
   if (!product?.credit_enabled) {
     return [];
   }
 
-  let sourcePlans = product?.credit_plans;
-  if (typeof sourcePlans === "string") {
-    try {
-      sourcePlans = JSON.parse(sourcePlans);
-    } catch {
-      sourcePlans = [];
+  const normalizedPlans = [];
+  const seenMonths = new Set();
+  const amount = resolveCreditPlanAmount(product, options);
+  const registerPlan = (plan) => {
+    const normalizedPlan = normalizeCreditPlan(plan);
+    if (
+      !normalizedPlan ||
+      seenMonths.has(normalizedPlan.months) ||
+      !isCreditPlanAvailableForAmount(normalizedPlan, amount)
+    ) {
+      return;
+    }
+
+    normalizedPlans.push(normalizedPlan);
+    seenMonths.add(normalizedPlan.months);
+  };
+
+  const externalPlans = Array.isArray(sharedPlans) ? sharedPlans : [];
+  if (externalPlans.length) {
+    externalPlans.forEach(registerPlan);
+    if (normalizedPlans.length) {
+      return normalizedPlans.sort((a, b) => a.months - b.months);
     }
   }
 
-  const normalizedPlans = [];
-  const seenMonths = new Set();
-
-  if (Array.isArray(sourcePlans)) {
-    sourcePlans.forEach((plan) => {
-      const normalizedPlan = normalizeCreditPlan(plan);
-      if (!normalizedPlan || seenMonths.has(normalizedPlan.months)) {
-        return;
-      }
-
-      normalizedPlans.push(normalizedPlan);
-      seenMonths.add(normalizedPlan.months);
-    });
-  }
+  const sourcePlans = parseCreditSourcePlans(product?.credit_plans);
+  sourcePlans.forEach(registerPlan);
 
   const appendLegacyPlan = (monthsValue, percentValue) => {
     const normalizedPlan = normalizeCreditPlan({
@@ -952,25 +1022,39 @@ export const getCreditPlans = (product) => {
   return normalizedPlans.sort((a, b) => a.months - b.months);
 };
 
-export const hasCreditPricing = (product) =>
-  getCreditPlans(product).length > 0;
+export const hasCreditPricing = (product, sharedPlans = null, options = {}) =>
+  getCreditPlans(product, sharedPlans, options).length > 0;
 
-export const getCreditConfig = (product) => {
-  return getCreditPlans(product)[0] || null;
+export const getCreditConfig = (product, sharedPlans = null, options = {}) => {
+  return getCreditPlans(product, sharedPlans, options)[0] || null;
 };
 
-export const getInstallmentPlan = (product, locale = "uz", months = 12) => {
+export const getInstallmentPlan = (
+  product,
+  locale = "uz",
+  months = 12,
+  sharedPlans = null,
+  options = {}
+) => {
   const targetMonths = Number(months);
   if (!Number.isFinite(targetMonths) || targetMonths <= 0) {
     return null;
   }
 
-  const basePrice = parseNumericPrice(getProductDefaultPrice(product, locale));
+  const basePrice = resolveCreditPlanAmount(product, {
+    ...options,
+    locale,
+  });
   if (basePrice === null) {
     return null;
   }
 
-  const creditPlan = getCreditPlans(product).find((plan) => plan.months === targetMonths);
+  const creditPlan = getCreditPlans(product, sharedPlans, {
+    ...options,
+    locale,
+  }).find(
+    (plan) => plan.months === targetMonths
+  );
   if (!creditPlan) {
     return null;
   }

@@ -40,13 +40,27 @@ export const useBasketStore = defineStore("basket", {
       const basketKey = resolveBasketKey(product);
       const existing = this.basket.find((p) => resolveBasketKey(p) === basketKey);
       if (existing) {
-        existing.quantity = 1;
+        Object.assign(existing, {
+          ...product,
+          basket_key: basketKey,
+          quantity: 1,
+        });
       } else {
         this.basket.push({
           ...product,
           basket_key: basketKey,
           quantity: 1,
         });
+      }
+    },
+    updateCreditPlan(key, creditPlan) {
+      const item = this.basket.find((p) => resolveBasketKey(p) === key);
+      if (!item) return;
+
+      if (creditPlan) {
+        item.credit_plan = { ...creditPlan };
+      } else {
+        delete item.credit_plan;
       }
     },
     replaceBasketItem(oldKey, product) {
