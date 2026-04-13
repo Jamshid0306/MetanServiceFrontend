@@ -996,71 +996,6 @@ const fetchMyIdSessionResult = async () => {
   }
 };
 
-const openMyIdBlankTab = () => {
-  return window.open("about:blank", "_blank");
-};
-
-const escapeHtml = (value) =>
-  String(value || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-
-const renderMyIdTabError = (popup, message) => {
-  if (!popup || popup.closed) {
-    return;
-  }
-
-  popup.document.open();
-  popup.document.write(`
-    <!doctype html>
-    <html lang="uz">
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>MyID xatosi</title>
-        <style>
-          body {
-            margin: 0;
-            min-height: 100vh;
-            display: grid;
-            place-items: center;
-            font-family: Arial, sans-serif;
-            background: #f6f7f4;
-            color: #171717;
-          }
-          .myid-error {
-            max-width: 520px;
-            padding: 24px;
-            line-height: 1.5;
-          }
-          .myid-error strong {
-            display: block;
-            margin-bottom: 8px;
-            font-size: 18px;
-          }
-          .myid-error pre {
-            white-space: pre-wrap;
-            overflow-wrap: anywhere;
-            color: #b91c1c;
-            font-family: Arial, sans-serif;
-            font-size: 14px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="myid-error">
-          <strong>MyID ochilmadi</strong>
-          <pre>${escapeHtml(message)}</pre>
-        </div>
-      </body>
-    </html>
-  `);
-  popup.document.close();
-};
-
 const startInstallmentVerification = async () => {
   pageError.value = "";
   resetTransientMyIdState();
@@ -1090,10 +1025,8 @@ const startInstallmentVerification = async () => {
   }
 
   myIdStartLoading.value = true;
-  let myIdTab = null;
 
   try {
-    myIdTab = openMyIdBlankTab();
     const response = await apiClient.post(
       "/payments/myid/initiate",
       {
@@ -1125,19 +1058,9 @@ const startInstallmentVerification = async () => {
       );
     }
 
-    if (myIdTab && !myIdTab.closed) {
-      try {
-        myIdTab.location.href = redirectUrl;
-      } catch {
-        myIdTab.location.replace(redirectUrl);
-      }
-    } else {
-      window.open(redirectUrl, "_blank") || (window.location.href = redirectUrl);
-    }
+    window.location.href = redirectUrl;
   } catch (error) {
-    const errorMessage = getApiErrorMessage(error, t("send"));
-    renderMyIdTabError(myIdTab, errorMessage);
-    pageError.value = errorMessage;
+    pageError.value = getApiErrorMessage(error, t("send"));
   } finally {
     myIdStartLoading.value = false;
   }
