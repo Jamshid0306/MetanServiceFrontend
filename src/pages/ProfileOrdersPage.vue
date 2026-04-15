@@ -219,14 +219,19 @@ const getOrderRemainingAmount = (order = {}) => {
 const getOrderTotalLabel = (order = {}) =>
   orderIsInstallment(order) ? t("profile.totalWithPercent") : t("profile.totalAmount");
 
-const shouldShowMonthlyPaymentButton = (order = {}) =>
+const hasMonthlyPaymentBalance = (order = {}) =>
   orderIsInstallment(order) &&
   getOrderMonthlyPaymentAmount(order) > 0 &&
   getOrderRemainingAmount(order) > 0;
 
+const shouldShowMonthlyPaymentButton = (order = {}) =>
+  hasMonthlyPaymentBalance(order) && Boolean(order?.can_pay_monthly);
+
+const shouldShowMonthlyPaymentNotice = (order = {}) =>
+  hasMonthlyPaymentBalance(order) && !order?.can_pay_monthly;
+
 const canPayMonthly = (order = {}) =>
   shouldShowMonthlyPaymentButton(order) &&
-  Boolean(order?.can_pay_monthly) &&
   !isMonthlyPaymentLoading(order.id);
 
 const getMonthlyPaymentButtonLabel = (order = {}) => {
@@ -234,11 +239,16 @@ const getMonthlyPaymentButtonLabel = (order = {}) => {
     return t("profile.monthlyPaymentOpening");
   }
 
-  if (!order?.can_pay_monthly) {
-    return t("profile.monthlyPaymentUnavailable");
+  return `${t("profile.payMonthly")} - ${formatMoney(getOrderMonthlyPaymentAmount(order))} ${t("uzs")}`;
+};
+
+const getMonthlyPaymentNotice = (order = {}) => {
+  const status = String(order?.status || "").trim().toLowerCase();
+  if (status === "completed") {
+    return t("profile.monthlyPaymentCreditIdMissing");
   }
 
-  return `${t("profile.payMonthly")} - ${formatMoney(getOrderMonthlyPaymentAmount(order))} ${t("uzs")}`;
+  return t("profile.monthlyPaymentPendingCredit");
 };
 
 const isMonthlyPaymentLoading = (orderId) =>
@@ -459,6 +469,9 @@ onMounted(() => {
             >
               {{ getMonthlyPaymentButtonLabel(order) }}
             </button>
+            <p v-else-if="shouldShowMonthlyPaymentNotice(order)" class="profile-order-payment-note">
+              {{ getMonthlyPaymentNotice(order) }}
+            </p>
           </footer>
         </article>
       </div>
@@ -809,6 +822,17 @@ onMounted(() => {
 
 .profile-order-pay-btn:not(:disabled):hover {
   background: #142338;
+}
+
+.profile-order-payment-note {
+  margin: 0;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a3412;
+  padding: 0.75rem 0.85rem;
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1.45;
 }
 
 @media (max-width: 720px) {

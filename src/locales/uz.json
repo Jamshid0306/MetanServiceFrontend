@@ -362,6 +362,8 @@
     "remainingAmount": "Qolgan summa",
     "payMonthly": "Oylik to'lov qilish",
     "monthlyPaymentUnavailable": "Oylik to'lov hozircha mavjud emas",
+    "monthlyPaymentPendingCredit": "Oylik to'lov kredit ICAN tomonidan yakunlangandan keyin ochiladi.",
+    "monthlyPaymentCreditIdMissing": "Bu buyurtmada ICAN kredit ID topilmadi, shu sabab oylik to'lovni ochib bo'lmaydi.",
     "monthlyPaymentOpening": "Click ochilmoqda...",
     "monthlyPaymentStartError": "Oylik to'lovni boshlashda xatolik bo'ldi.",
     "monthlyPaymentUrlMissing": "Click to'lov havolasi topilmadi.",

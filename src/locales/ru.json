@@ -362,6 +362,8 @@
     "remainingAmount": "Остаток",
     "payMonthly": "Оплатить ежемесячный платеж",
     "monthlyPaymentUnavailable": "Ежемесячный платеж пока недоступен",
+    "monthlyPaymentPendingCredit": "Ежемесячный платеж откроется после завершения кредита в ICAN.",
+    "monthlyPaymentCreditIdMissing": "У этого заказа не найден кредитный ID ICAN, поэтому ежемесячный платеж открыть нельзя.",
     "monthlyPaymentOpening": "Открываем Click...",
     "monthlyPaymentStartError": "Не удалось начать ежемесячный платеж.",
     "monthlyPaymentUrlMissing": "Ссылка на оплату Click не найдена.",

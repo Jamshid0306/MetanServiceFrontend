@@ -64,6 +64,7 @@ const myIdJobId = ref("");
 const initialPaymentUrl = ref("");
 const tariffStepConfirmed = ref(false);
 const birthDatePickerInput = ref(null);
+const myIdPassportNumberInput = ref(null);
 let statusPollTimeoutId = null;
 
 const basketItems = computed(() => basketStore.basket);
@@ -263,6 +264,18 @@ const setBasketItemCreditPlan = (itemKey, creditPlan) => {
 const selectInstallmentPlanForItem = (item, plan) => {
   const nextCreditPlan = buildBasketCreditPlan(item, plan);
   setBasketItemCreditPlan(getBasketItemKey(item), nextCreditPlan);
+};
+
+const selectInstallmentPlanMonthsForItem = (item, months) => {
+  const selectedMonths = Number(months || 0);
+  const plan = getInstallmentSelectionForItem(item).plans.find(
+    (itemPlan) => Number(itemPlan.months) === selectedMonths
+  );
+  if (!plan) {
+    return;
+  }
+
+  selectInstallmentPlanForItem(item, plan);
 };
 
 const productsPayload = computed(() =>
@@ -801,10 +814,53 @@ const fetchOrderStatus = async () => {
 };
 
 const normalizeMyIdPassportInput = (value) =>
-  String(value || "")
+  `${String(value || "")
     .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 10);
+    .replace(/[^A-Z]/g, "")
+    .slice(0, 2)}${String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 7)}`;
+
+const toMyIdPassportPayload = (value) => {
+  const normalizedPassport = normalizeMyIdPassportInput(value);
+  return /^[A-Z]{2}\d{7}$/.test(normalizedPassport) ? normalizedPassport : "";
+};
+
+const getMyIdPassportSeries = () =>
+  String(checkoutForm.value.myIdPassport || "").slice(0, 2);
+
+const getMyIdPassportNumber = () =>
+  String(checkoutForm.value.myIdPassport || "").slice(2, 9);
+
+const setMyIdPassportParts = (series, number) => {
+  const normalizedSeries = String(series || "")
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "")
+    .slice(0, 2);
+  const normalizedNumber = String(number || "")
+    .replace(/\D/g, "")
+    .slice(0, 7);
+
+  checkoutForm.value.myIdPassport = `${normalizedSeries}${normalizedNumber}`;
+  return { normalizedSeries, normalizedNumber };
+};
+
+const handleMyIdPassportSeriesInput = (event) => {
+  const rawValue = String(event.target.value || "");
+  const pastedDigits = rawValue.replace(/\D/g, "");
+  const { normalizedSeries } = setMyIdPassportParts(
+    rawValue,
+    pastedDigits || getMyIdPassportNumber()
+  );
+
+  if (normalizedSeries.length === 2) {
+    requestAnimationFrame(() => myIdPassportNumberInput.value?.focus());
+  }
+};
+
+const handleMyIdPassportNumberInput = (event) => {
+  setMyIdPassportParts(getMyIdPassportSeries(), event.target.value);
+};
 
 const normalizeMyIdBirthDateInput = (value) => {
   const digits = String(value || "").replace(/\D/g, "").slice(0, 8);
@@ -1117,7 +1173,7 @@ const startInstallmentVerification = async () => {
     return;
   }
 
-  const passData = normalizeMyIdPassportInput(checkoutForm.value.myIdPassport);
+  const passData = toMyIdPassportPayload(checkoutForm.value.myIdPassport);
   const birthDate = toMyIdBirthDatePayload(checkoutForm.value.myIdBirthDate);
 
   if (!passData || !birthDate) {
@@ -1576,6 +1632,23 @@ onBeforeUnmount(() => {
                       {{ plan.months }} {{ t("credit.months") }}
                     </button>
                   </div>
+
+                  <label class="checkout-installment-select-wrap">
+                    <span>{{ t("checkoutPage.tariffTitle") }}</span>
+                    <select
+                      class="checkout-installment-select"
+                      :value="getInstallmentSelectionForItem(item).selectedPlan?.months || ''"
+                      @change="selectInstallmentPlanMonthsForItem(item, $event.target.value)"
+                    >
+                      <option
+                        v-for="plan in getInstallmentSelectionForItem(item).plans"
+                        :key="`${getBasketItemKey(item)}-${plan.months}:select`"
+                        :value="plan.months"
+                      >
+                        {{ plan.months }} {{ t("credit.months") }}
+                      </option>
+                    </select>
+                  </label>
                 </div>
               </div>
             </article>
@@ -1651,16 +1724,30 @@ onBeforeUnmount(() => {
 
                 <label class="checkout-field">
                   <span>{{ t("orderModal.passport") }}</span>
-                  <input
-                    :value="checkoutForm.myIdPassport"
-                    type="text"
-                    autocapitalize="characters"
-                    class="checkout-input"
-                    :placeholder="t('checkoutPage.myidPassportHint')"
-                    @input="
-                      checkoutForm.myIdPassport = normalizeMyIdPassportInput($event.target.value)
-                    "
-                  />
+                  <div class="checkout-passport-row">
+                    <input
+                      :value="getMyIdPassportSeries()"
+                      type="text"
+                      inputmode="text"
+                      autocapitalize="characters"
+                      autocomplete="off"
+                      class="checkout-input checkout-passport-series"
+                      placeholder="AA"
+                      @input="handleMyIdPassportSeriesInput"
+                    />
+                    <input
+                      ref="myIdPassportNumberInput"
+                      :value="getMyIdPassportNumber()"
+                      type="tel"
+                      inputmode="numeric"
+                      pattern="[0-9]*"
+                      autocomplete="off"
+                      maxlength="7"
+                      class="checkout-input checkout-passport-number"
+                      placeholder="1234567"
+                      @input="handleMyIdPassportNumberInput"
+                    />
+                  </div>
                 </label>
 
                 <label class="checkout-field checkout-field-wide">
@@ -1920,6 +2007,15 @@ onBeforeUnmount(() => {
 <style scoped>
 .checkout-page {
   color: #1f2933;
+  width: 100%;
+  overflow-x: clip;
+  box-sizing: border-box;
+}
+
+.checkout-page *,
+.checkout-page *::before,
+.checkout-page *::after {
+  box-sizing: border-box;
 }
 
 .checkout-head {
@@ -1970,6 +2066,7 @@ onBeforeUnmount(() => {
   font-size: 1.9rem;
   font-weight: 800;
   color: #1f2933;
+  overflow-wrap: anywhere;
 }
 
 .checkout-shell {
@@ -1982,6 +2079,7 @@ onBeforeUnmount(() => {
 .checkout-main {
   display: grid;
   gap: 16px;
+  min-width: 0;
 }
 
 .checkout-band,
@@ -2068,12 +2166,14 @@ onBeforeUnmount(() => {
 .checkout-flow-title {
   font-size: 1rem;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .checkout-flow-copy {
   font-size: 0.92rem;
   color: #64736a;
   line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .checkout-stepper {
@@ -2147,6 +2247,7 @@ onBeforeUnmount(() => {
   font-size: 0.92rem;
   font-weight: 600;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .checkout-step-panel {
@@ -2197,6 +2298,7 @@ onBeforeUnmount(() => {
 .checkout-product-copy {
   display: grid;
   gap: 10px;
+  min-width: 0;
 }
 
 .checkout-product-head {
@@ -2211,6 +2313,8 @@ onBeforeUnmount(() => {
   font-size: 1rem;
   font-weight: 800;
   color: #1f2933;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .checkout-product-price {
@@ -2235,6 +2339,8 @@ onBeforeUnmount(() => {
   background: #f7fbf8;
   font-size: 0.82rem;
   color: #4c5f54;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .checkout-installment-picker {
@@ -2258,6 +2364,10 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 
+.checkout-installment-select-wrap {
+  display: none;
+}
+
 .checkout-installment-btn {
   min-height: 36px;
   padding: 0 12px;
@@ -2275,6 +2385,30 @@ onBeforeUnmount(() => {
   border-color: #2f7d46;
   background: #f0fdf4;
   color: #21442c;
+}
+
+.checkout-installment-select {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 42px 0 14px;
+  border: 1px solid #d8e4dc;
+  border-radius: 8px;
+  background:
+    linear-gradient(45deg, transparent 50%, #21442c 50%) right 18px center / 7px 7px
+      no-repeat,
+    linear-gradient(135deg, #21442c 50%, transparent 50%) right 12px center / 7px 7px
+      no-repeat,
+    #ffffff;
+  color: #1f2933;
+  font-size: 16px;
+  font-weight: 800;
+  appearance: none;
+}
+
+.checkout-installment-select:focus {
+  outline: none;
+  border-color: #2f7d46;
+  box-shadow: 0 0 0 3px rgba(47, 125, 70, 0.12);
 }
 
 .checkout-form-grid {
@@ -2317,6 +2451,23 @@ onBeforeUnmount(() => {
   border-color: #2f7d46;
   background: #ffffff;
   box-shadow: 0 0 0 3px rgba(47, 125, 70, 0.12);
+}
+
+.checkout-passport-row {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.checkout-passport-series,
+.checkout-passport-number {
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.checkout-passport-series {
+  text-align: center;
 }
 
 .checkout-date-input-wrap {
@@ -2549,10 +2700,14 @@ onBeforeUnmount(() => {
 
 .checkout-summary-row span {
   color: #64736a;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .checkout-summary-row strong {
   color: #1f2933;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .checkout-summary-note {
@@ -2688,9 +2843,12 @@ onBeforeUnmount(() => {
 
 @media (max-width: 720px) {
   .checkout-page {
+    max-width: 100%;
     padding-left: 12px;
     padding-right: 12px;
-    padding-top: 28px;
+    padding-top: 18px;
+    padding-bottom: 28px;
+    margin-top: 18px;
   }
 
   .checkout-head {
@@ -2707,6 +2865,7 @@ onBeforeUnmount(() => {
   .checkout-title {
     font-size: 1.28rem;
     line-height: 1.2;
+    align-items: flex-start;
   }
 
   .checkout-kicker {
@@ -2725,7 +2884,7 @@ onBeforeUnmount(() => {
   .checkout-band,
   .checkout-summary-panel,
   .checkout-empty-state {
-    padding: 14px;
+    padding: 16px;
   }
 
   .checkout-section-head {
@@ -2754,15 +2913,21 @@ onBeforeUnmount(() => {
   }
 
   .checkout-stepper {
-    margin-inline: -2px;
-    padding: 0 2px 6px;
-    scroll-snap-type: x mandatory;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    overflow: visible;
+    padding: 0;
   }
 
   .checkout-step {
-    min-width: 176px;
-    scroll-snap-align: start;
+    min-width: 0;
+    width: 100%;
     padding: 10px;
+  }
+
+  .checkout-step:not(:last-child)::after {
+    display: none;
   }
 
   .checkout-step-label {
@@ -2770,14 +2935,20 @@ onBeforeUnmount(() => {
   }
 
   .checkout-product-row {
-    grid-template-columns: 64px minmax(0, 1fr);
-    gap: 10px;
-    padding: 10px;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 12px;
   }
 
   .checkout-product-media {
-    width: 64px;
-    height: 64px;
+    width: 100%;
+    height: auto;
+    max-height: 220px;
+    aspect-ratio: 4 / 3;
+  }
+
+  .checkout-product-image {
+    object-fit: contain;
   }
 
   .checkout-product-copy {
@@ -2794,6 +2965,8 @@ onBeforeUnmount(() => {
 
   .checkout-product-price {
     font-size: 0.9rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .checkout-option-chip {
@@ -2810,17 +2983,27 @@ onBeforeUnmount(() => {
   }
 
   .checkout-installment-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: none;
   }
 
-  .checkout-installment-btn {
-    min-height: 40px;
+  .checkout-installment-select-wrap {
+    display: grid;
+    gap: 8px;
+  }
+
+  .checkout-installment-select-wrap > span {
+    color: #4c5f54;
+    font-size: 0.82rem;
+    font-weight: 800;
   }
 
   .checkout-input {
     min-height: 48px;
     font-size: 16px;
+  }
+
+  .checkout-passport-row {
+    grid-template-columns: 74px minmax(0, 1fr);
   }
 
   .checkout-date-row {
@@ -2829,6 +3012,7 @@ onBeforeUnmount(() => {
 
   .checkout-date-picker-btn {
     min-height: 44px;
+    width: 100%;
   }
 
   .checkout-product-head,
@@ -2868,6 +3052,7 @@ onBeforeUnmount(() => {
 
   .checkout-summary-row {
     padding: 9px 0;
+    align-items: flex-start;
   }
 
   .checkout-summary-note {
@@ -2891,12 +3076,14 @@ onBeforeUnmount(() => {
 
 @media (max-width: 430px) {
   .checkout-page {
-    padding-left: 10px;
-    padding-right: 10px;
+    padding-left: 8px;
+    padding-right: 8px;
+    margin-top: 12px;
   }
 
   .checkout-head {
     align-items: flex-start;
+    padding: 10px;
   }
 
   .checkout-title {
@@ -2907,22 +3094,36 @@ onBeforeUnmount(() => {
     gap: 8px;
   }
 
+  .checkout-band,
+  .checkout-summary-panel,
+  .checkout-empty-state {
+    padding: 12px;
+  }
+
+  .checkout-stepper {
+    grid-template-columns: 1fr;
+  }
+
   .checkout-product-row {
     grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 10px;
   }
 
   .checkout-product-media {
     width: 100%;
-    height: auto;
-    aspect-ratio: 16 / 9;
+    max-height: 190px;
+    aspect-ratio: 4 / 3;
   }
 
-  .checkout-product-head {
-    align-items: flex-start;
+  .checkout-summary-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 
-  .checkout-product-price {
-    white-space: normal;
+  .checkout-summary-row strong {
+    text-align: left;
   }
 }
 </style>

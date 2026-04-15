@@ -569,6 +569,16 @@ export const formatCylinderOptionLabel = (option) => {
 
 export const normalizeProductOptions = (rawOptions = {}) => getNormalizedConfig(rawOptions);
 
+const getProductConfiguredDefaultPrice = (product) => {
+  const defaultPrice = String(product?.default_price || "").trim();
+  if (!defaultPrice) {
+    return null;
+  }
+
+  const numericDefaultPrice = parseNumericPrice(defaultPrice);
+  return numericDefaultPrice === null ? defaultPrice : numericDefaultPrice;
+};
+
 export const getProductDefaultPrice = (product, locale = "uz") => {
   const localizedPrice = product?.[`price_${locale}`];
 
@@ -639,10 +649,9 @@ export const getProductDefaultPrice = (product, locale = "uz") => {
   }
 
   // Fallback sifatida admin kiritgan `default_price`.
-  const defaultPrice = String(product?.default_price || "").trim();
-  if (defaultPrice) {
-    const numericDefaultPrice = parseNumericPrice(defaultPrice);
-    return numericDefaultPrice === null ? defaultPrice : numericDefaultPrice;
+  const configuredDefaultPrice = getProductConfiguredDefaultPrice(product);
+  if (configuredDefaultPrice !== null) {
+    return configuredDefaultPrice;
   }
 
   return ASK_PRICE_BY_LOCALE[locale] || ASK_PRICE_BY_LOCALE.uz;
@@ -787,6 +796,20 @@ export const getSelectedProductOptions = (product, selections = {}, pathConfig =
 };
 
 export const calculateConfiguredPrice = (product, locale, selections = {}, pathConfig = {}) => {
+  const hasExplicitSelection = ["fuel_type", "transmission", "cylinder_volume"].some(
+    (key) => {
+      const value = selections?.[key];
+      return value !== undefined && value !== null && String(value).trim() !== "";
+    }
+  );
+
+  if (pathConfig.useFallbackPath === false && !hasExplicitSelection) {
+    const configuredDefaultPrice = getProductConfiguredDefaultPrice(product);
+    if (configuredDefaultPrice !== null) {
+      return configuredDefaultPrice;
+    }
+  }
+
   const { transmission, cylinderVolume } = resolveSelectedPath(
     product,
     selections,
