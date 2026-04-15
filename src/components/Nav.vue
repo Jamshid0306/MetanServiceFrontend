@@ -48,15 +48,7 @@ const customerDisplayName = computed(() => {
 
   return name;
 });
-const customerSecondaryText = computed(() => {
-  const username = String(customerProfile.value?.telegramUsername || "").trim();
-  if (username) {
-    return `@${username.replace(/^@+/, "")}`;
-  }
-
-  const phone = String(customerProfile.value?.phone || "").trim();
-  return phone ? `+${phone}` : t("auth.userAccess");
-});
+const isProfileRoute = computed(() => route.path.startsWith("/profile"));
 const syncCustomerProfile = () => {
   customerProfile.value = getStoredCustomerSession();
 };
@@ -361,20 +353,22 @@ watch(
               <RouterLink v-if="!customerProfile" to="/login" class="login-chip ml-1 sm:ml-2">
                 {{ t("nav.login") }}
               </RouterLink>
-              <div v-else class="profile-chip ml-1 sm:ml-2">
-                <div class="profile-chip-avatar">
-                  <img
-                    v-if="customerProfile.photoUrl"
-                    :src="customerProfile.photoUrl"
-                    :alt="customerDisplayName"
-                    class="profile-chip-avatar-image"
-                  />
-                  <span v-else>{{ customerInitial }}</span>
-                </div>
-                <div class="profile-chip-copy">
-                  <strong>{{ customerDisplayName }}</strong>
-                  <small>{{ customerSecondaryText }}</small>
-                </div>
+              <div v-else class="profile-chip ml-1 sm:ml-2" :class="{ 'profile-chip-active': isProfileRoute }">
+                <RouterLink to="/profile/orders" class="profile-chip-main">
+                  <div class="profile-chip-avatar">
+                    <img
+                      v-if="customerProfile.photoUrl"
+                      :src="customerProfile.photoUrl"
+                      :alt="customerDisplayName"
+                      class="profile-chip-avatar-image"
+                    />
+                    <span v-else>{{ customerInitial }}</span>
+                  </div>
+                  <div class="profile-chip-copy">
+                    <strong>{{ customerDisplayName }}</strong>
+                    <small>{{ t("profile.orders") }}</small>
+                  </div>
+                </RouterLink>
                 <button type="button" class="profile-chip-logout" @click="logoutCustomer">
                   {{ t("nav.logout") }}
                 </button>
@@ -598,9 +592,17 @@ watch(
 }
 
 .profile-chip:hover,
-.mobile-profile-chip:hover {
+.mobile-profile-chip:hover,
+.profile-chip-active {
   border-color: rgba(20, 35, 56, 0.24);
   background: rgba(255, 255, 255, 1);
+}
+
+.profile-chip-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
 }
 
 .profile-chip-avatar {

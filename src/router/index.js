@@ -108,6 +108,15 @@ const routes = [
     },
   },
   {
+    path: "/profile/orders",
+    name: "ProfileOrders",
+    component: () => import("@/pages/ProfileOrdersPage.vue"),
+    meta: {
+      title: "Urganch Metan Service - Buyurtmalarim",
+      robots: "noindex,nofollow",
+    },
+  },
+  {
     path: "/:pathMatch(.*)*",
     name: "NotFound",
     component: () => import("@/pages/NotFoundPage.vue"),

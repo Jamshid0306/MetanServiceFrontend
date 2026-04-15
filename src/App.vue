@@ -101,6 +101,7 @@ const isProductsRoute = computed(
   () => route.path.startsWith("/products") || route.path.startsWith("/product")
 );
 const isBasketRoute = computed(() => route.path.startsWith("/basket"));
+const isProfileRoute = computed(() => route.path.startsWith("/profile"));
 const basketCount = computed(() => basketStore.basket.length);
 const isAuthRoute = computed(() =>
   ["Login", "Register", "ForgotPassword"].includes(String(route.name || ""))
@@ -153,6 +154,10 @@ watch(
               <strong>+{{ customerProfile.phone }}</strong>
             </p>
           </div>
+
+          <RouterLink to="/profile/orders" class="mobile-profile-orders">
+            {{ t("profile.orders") }}
+          </RouterLink>
 
           <button
             type="button"
@@ -207,7 +212,7 @@ watch(
         <button
           type="button"
           class="app-mobile-dock-link app-mobile-dock-link-profile"
-          :class="{ 'app-mobile-dock-link-active': profileExpanded }"
+          :class="{ 'app-mobile-dock-link-active': profileExpanded || isProfileRoute }"
           @click="toggleProfile"
         >
           <span class="app-mobile-dock-profile-avatar">
@@ -533,6 +538,25 @@ watch(
   color: #fff;
   font-size: 0.84rem;
   font-weight: 800;
+}
+
+.mobile-profile-orders {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 0.65rem;
+  min-height: 42px;
+  border-radius: 8px;
+  border: 1px solid rgba(20, 48, 79, 0.14);
+  background: #ffffff;
+  color: #18304f;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.mobile-profile-orders + .mobile-profile-logout {
+  margin-top: 0.55rem;
 }
 
 .quick-contact {
