@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { CircleCheckBig, Clock3, CreditCard, RefreshCw, ShoppingCart } from "lucide-vue-next";
+import { CalendarDays, CircleCheckBig, CreditCard, ShoppingCart } from "lucide-vue-next";
 
 import LeftArrow from "@/components/icons/LeftArrow.vue";
 import { apiClient, getApiErrorMessage, resolveAssetUrl, resolveAssetUrls } from "@/lib/api";
@@ -41,7 +41,6 @@ const checkoutForm = ref({
   name: "",
   phone: "+998",
   paymentMethod: "click",
-  myIdPinfl: "",
   myIdPassport: "",
   myIdBirthDate: "",
 });
@@ -63,6 +62,8 @@ const myIdProfileResult = ref(null);
 const myIdResultNote = ref("");
 const myIdJobId = ref("");
 const initialPaymentUrl = ref("");
+const tariffStepConfirmed = ref(false);
+const birthDatePickerInput = ref(null);
 let statusPollTimeoutId = null;
 
 const basketItems = computed(() => basketStore.basket);
@@ -112,6 +113,8 @@ const isInstallmentJourney = computed(
   () =>
     checkoutForm.value.paymentMethod === "myid" ||
     selectedPaymentQuery.value === "myid" ||
+    Boolean(myIdReturnSessionId.value) ||
+    currentStatusPaymentMethod.value === "myid" ||
     currentOrderMyIdCode.value === 1
 );
 const flowSwitchLocked = computed(
@@ -329,6 +332,13 @@ const installmentCompleted = computed(
   () => hasVerifiedMyId.value && currentOrderStatus.value === "completed"
 );
 const needsInitialPayment = computed(() => totalInitialPayment.value > 0);
+const tariffStepCompleted = computed(
+  () =>
+    showMyIdConfirmCard.value ||
+    (allInstallmentPlansSelected.value &&
+    (tariffStepConfirmed.value || hasVerifiedMyId.value || Boolean(currentOrderId.value))
+    )
+);
 const installmentReadyToSubmitCredit = computed(
   () =>
     !needsInitialPayment.value &&
@@ -407,12 +417,40 @@ const verifiedProfileSummary = computed(() => {
   };
 });
 
+const activeInstallmentStepKey = computed(() => {
+  if (!isInstallmentJourney.value) {
+    return "";
+  }
+
+  if (showMyIdConfirmCard.value) {
+    return "myid";
+  }
+
+  if (!tariffStepCompleted.value) {
+    return "tariff";
+  }
+
+  if (!hasVerifiedMyId.value) {
+    return "myid";
+  }
+
+  if (needsInitialPayment.value && !installmentCompleted.value) {
+    return "initial-payment";
+  }
+
+  if (!needsInitialPayment.value && !installmentCompleted.value) {
+    return "purchase";
+  }
+
+  return "complete";
+});
+
 const installmentStepItems = computed(() => {
   const steps = [
     {
       key: "tariff",
       label: t("checkoutPage.stepTariff"),
-      done: allInstallmentPlansSelected.value,
+      done: tariffStepCompleted.value,
     },
     {
       key: "myid",
@@ -438,13 +476,16 @@ const installmentStepItems = computed(() => {
   ];
 
   const firstPendingIndex = steps.findIndex((step) => !step.done);
-  return steps
-    .map((step, index) => ({
-      ...step,
-      number: index + 1,
-      state: step.done ? "done" : index === firstPendingIndex ? "active" : "todo",
-    }))
-    .filter((step) => step.state !== "done");
+  return steps.map((step, index) => ({
+    ...step,
+    number: index + 1,
+    state:
+      step.done
+        ? "done"
+        : step.key === activeInstallmentStepKey.value || index === firstPendingIndex
+          ? "active"
+          : "todo",
+  }));
 });
 
 const currentStatusVariant = computed(() => {
@@ -611,6 +652,12 @@ const applyStoredCustomerSession = () => {
 };
 
 const applyPaymentMethodFromQuery = () => {
+  if (myIdReturnSessionId.value) {
+    checkoutForm.value.paymentMethod = "myid";
+    tariffStepConfirmed.value = true;
+    return;
+  }
+
   if (selectedPaymentQuery.value === "myid" || selectedPaymentQuery.value === "click") {
     checkoutForm.value.paymentMethod = selectedPaymentQuery.value;
   }
@@ -753,16 +800,71 @@ const fetchOrderStatus = async () => {
   }
 };
 
-const normalizeMyIdPinflInput = (value) =>
-  String(value || "")
-    .replace(/\D/g, "")
-    .slice(0, 14);
-
 const normalizeMyIdPassportInput = (value) =>
   String(value || "")
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "")
     .slice(0, 10);
+
+const normalizeMyIdBirthDateInput = (value) => {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 8);
+  const day = digits.slice(0, 2);
+  const month = digits.slice(2, 4);
+  const year = digits.slice(4, 8);
+
+  return [day, month, year].filter(Boolean).join(".");
+};
+
+const toMyIdBirthDatePayload = (value) => {
+  const rawValue = String(value || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
+    return rawValue;
+  }
+
+  const match = rawValue.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!match) {
+    return "";
+  }
+
+  const [, day, month, year] = match;
+  const parsedDate = new Date(Number(year), Number(month) - 1, Number(day));
+  const isValidDate =
+    parsedDate.getFullYear() === Number(year) &&
+    parsedDate.getMonth() === Number(month) - 1 &&
+    parsedDate.getDate() === Number(day);
+
+  return isValidDate ? `${year}-${month}-${day}` : "";
+};
+
+const toMyIdBirthDateDisplay = (value) => {
+  const rawValue = String(value || "").trim();
+  const match = rawValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return normalizeMyIdBirthDateInput(rawValue);
+  }
+
+  const [, year, month, day] = match;
+  return `${day}.${month}.${year}`;
+};
+
+const openBirthDatePicker = () => {
+  const input = birthDatePickerInput.value;
+  if (!input) {
+    return;
+  }
+
+  if (typeof input.showPicker === "function") {
+    input.showPicker();
+    return;
+  }
+
+  input.click();
+  input.focus();
+};
+
+const handleBirthDatePickerChange = (event) => {
+  checkoutForm.value.myIdBirthDate = toMyIdBirthDateDisplay(event.target.value);
+};
 
 const replaceCheckoutQuery = async (nextQuery = {}) => {
   await router.replace({
@@ -771,7 +873,7 @@ const replaceCheckoutQuery = async (nextQuery = {}) => {
   });
 };
 
-const buildMyIdRedirectUri = () => `${window.location.origin}/checkout`;
+const buildMyIdRedirectUri = () => `${window.location.origin}/checkout?payment=myid`;
 
 const getPersistentCheckoutQuery = ({
   orderId = currentOrderId.value,
@@ -1015,11 +1117,10 @@ const startInstallmentVerification = async () => {
     return;
   }
 
-  const pinfl = normalizeMyIdPinflInput(checkoutForm.value.myIdPinfl);
   const passData = normalizeMyIdPassportInput(checkoutForm.value.myIdPassport);
-  const birthDate = String(checkoutForm.value.myIdBirthDate || "").trim();
+  const birthDate = toMyIdBirthDatePayload(checkoutForm.value.myIdBirthDate);
 
-  if ((!pinfl && !passData) || !birthDate) {
+  if (!passData || !birthDate) {
     pageError.value = t("checkoutPage.myidMissingIdentity");
     return;
   }
@@ -1031,7 +1132,7 @@ const startInstallmentVerification = async () => {
       "/payments/myid/initiate",
       {
         ...payload,
-        pinfl: pinfl || null,
+        pinfl: null,
         pass_data: passData || null,
         birth_date: birthDate,
         lang: locale.value,
@@ -1125,6 +1226,17 @@ const continueInitialPayment = () => {
   window.location.href = initialPaymentUrl.value;
 };
 
+const confirmTariffStep = () => {
+  pageError.value = "";
+
+  if (!allInstallmentPlansSelected.value) {
+    pageError.value = t("checkoutPage.installmentUnavailable");
+    return;
+  }
+
+  tariffStepConfirmed.value = true;
+};
+
 const submitInstallmentCredit = async () => {
   if (!installmentReadyToSubmitCredit.value || !currentOrderId.value) {
     return;
@@ -1177,6 +1289,15 @@ watch(
     applyPaymentMethodFromQuery();
   },
   { immediate: true }
+);
+
+watch(
+  () => checkoutForm.value.paymentMethod,
+  (paymentMethod) => {
+    if (paymentMethod !== "myid" && !currentOrderId.value) {
+      tariffStepConfirmed.value = false;
+    }
+  }
 );
 
 watch(
@@ -1309,34 +1430,6 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div
-      v-if="showStatusCard"
-      :class="['checkout-status-card', `is-${currentStatusVariant}`]"
-    >
-      <div class="checkout-status-icon">
-        <CircleCheckBig v-if="currentStatusVariant === 'success'" class="h-5 w-5" />
-        <Clock3 v-else class="h-5 w-5" />
-      </div>
-
-      <div class="checkout-status-copy">
-        <p class="checkout-status-kicker">
-          {{ t("checkoutPage.statusTitle") }} #{{ currentOrderId }}
-        </p>
-        <h2>{{ currentStatusTitle }}</h2>
-        <p>{{ currentStatusHint }}</p>
-      </div>
-
-      <button
-        type="button"
-        class="checkout-secondary-btn"
-        :disabled="orderStatusLoading"
-        @click="fetchOrderStatus"
-      >
-        <RefreshCw :class="['h-4 w-4', { 'animate-spin': orderStatusLoading }]" />
-        {{ t("checkoutPage.refreshStatus") }}
-      </button>
-    </div>
-
     <div v-if="orderStatusError" class="checkout-alert is-error">
       {{ orderStatusError }}
     </div>
@@ -1354,22 +1447,6 @@ onBeforeUnmount(() => {
           ? t("checkoutPage.myidCheckingResult")
           : t("checkoutPage.myidAwaitingResult")
       }}
-    </div>
-
-    <div v-if="showMyIdConfirmCard" class="checkout-alert is-success checkout-inline-alert">
-      <div>
-        <strong>{{ t("checkoutPage.myidReturnTitle") }}</strong>
-        <p>{{ t("checkoutPage.myidReturnHelp") }}</p>
-      </div>
-
-      <button
-        type="button"
-        class="checkout-primary-btn"
-        :disabled="myIdFinalizeLoading"
-        @click="finalizeMyIdReturn"
-      >
-        {{ myIdFinalizeLoading ? t("checkoutPage.myidConfirming") : t("checkoutPage.myidConfirm") }}
-      </button>
     </div>
 
     <div v-if="canShowCheckoutForm" class="checkout-shell">
@@ -1428,7 +1505,10 @@ onBeforeUnmount(() => {
           </div>
         </section>
 
-        <section class="checkout-band">
+        <section
+          v-if="!isInstallmentJourney || activeInstallmentStepKey === 'tariff'"
+          class="checkout-band"
+        >
           <div class="checkout-section-head">
             <h2>{{ t("basket") }}</h2>
             <p>
@@ -1500,84 +1580,131 @@ onBeforeUnmount(() => {
               </div>
             </article>
           </div>
+
+          <div v-if="isInstallmentJourney" class="checkout-step-actions">
+            <button
+              type="button"
+              class="checkout-primary-btn"
+              :disabled="!allInstallmentPlansSelected"
+              @click="confirmTariffStep"
+            >
+              {{ t("checkoutPage.continueToVerification") }}
+            </button>
+          </div>
         </section>
 
         <template v-if="isInstallmentJourney">
-          <section class="checkout-band">
+          <section
+            v-if="activeInstallmentStepKey === 'myid'"
+            class="checkout-band checkout-step-panel"
+          >
             <div class="checkout-section-head">
               <h2>{{ t("checkoutPage.verificationTitle") }}</h2>
               <p>{{ t("checkoutPage.verificationHelp") }}</p>
             </div>
 
-            <div class="checkout-form-grid">
-              <label class="checkout-field">
-                <span>{{ t("name") }}</span>
-                <input
-                  v-model="checkoutForm.name"
-                  type="text"
-                  autocomplete="name"
-                  class="checkout-input"
-                  :placeholder="t('checkoutPage.nameHint')"
-                  :readonly="isCustomerLocked"
-                />
-              </label>
+            <div v-if="showMyIdConfirmCard" class="checkout-myid-return-box">
+              <div>
+                <strong>{{ t("checkoutPage.myidReturnTitle") }}</strong>
+                <p>{{ t("checkoutPage.myidReturnHelp") }}</p>
+              </div>
 
-              <label class="checkout-field">
-                <span>{{ t("phone") }}</span>
-                <input
-                  :value="checkoutForm.phone"
-                  type="tel"
-                  autocomplete="tel"
-                  class="checkout-input"
-                  :placeholder="t('checkoutPage.phoneHint')"
-                  :readonly="isCustomerLocked"
-                  @input="
-                    !isCustomerLocked &&
-                    (checkoutForm.phone = formatUzbekistanPhoneInput($event.target.value))
-                  "
-                />
-              </label>
-
-              <label class="checkout-field">
-                <span>{{ t("orderModal.pinfl") }}</span>
-                <input
-                  :value="checkoutForm.myIdPinfl"
-                  type="text"
-                  inputmode="numeric"
-                  class="checkout-input"
-                  :placeholder="t('checkoutPage.myidPinflHint')"
-                  @input="checkoutForm.myIdPinfl = normalizeMyIdPinflInput($event.target.value)"
-                />
-              </label>
-
-              <label class="checkout-field">
-                <span>{{ t("orderModal.passport") }}</span>
-                <input
-                  :value="checkoutForm.myIdPassport"
-                  type="text"
-                  autocapitalize="characters"
-                  class="checkout-input"
-                  :placeholder="t('checkoutPage.myidPassportHint')"
-                  @input="
-                    checkoutForm.myIdPassport = normalizeMyIdPassportInput($event.target.value)
-                  "
-                />
-              </label>
-
-              <label class="checkout-field checkout-field-wide">
-                <span>{{ t("orderModal.birthDate") }}</span>
-                <input
-                  v-model="checkoutForm.myIdBirthDate"
-                  type="date"
-                  class="checkout-input"
-                />
-              </label>
+              <button
+                type="button"
+                class="checkout-primary-btn"
+                :disabled="myIdFinalizeLoading"
+                @click="finalizeMyIdReturn"
+              >
+                {{ myIdFinalizeLoading ? t("checkoutPage.myidConfirming") : t("checkoutPage.myidConfirm") }}
+              </button>
             </div>
 
-            <div
-              v-if="hasVerifiedMyId"
-              class="checkout-verified-box"
-            >
+            <template v-else>
+              <div class="checkout-form-grid">
+                <label class="checkout-field">
+                  <span>{{ t("name") }}</span>
+                  <input
+                    v-model="checkoutForm.name"
+                    type="text"
+                    autocomplete="name"
+                    class="checkout-input"
+                    :placeholder="t('checkoutPage.nameHint')"
+                    :readonly="isCustomerLocked"
+                  />
+                </label>
+
+                <label class="checkout-field">
+                  <span>{{ t("phone") }}</span>
+                  <input
+                    :value="checkoutForm.phone"
+                    type="tel"
+                    autocomplete="tel"
+                    class="checkout-input"
+                    :placeholder="t('checkoutPage.phoneHint')"
+                    :readonly="isCustomerLocked"
+                    @input="
+                      !isCustomerLocked &&
+                      (checkoutForm.phone = formatUzbekistanPhoneInput($event.target.value))
+                    "
+                  />
+                </label>
+
+                <label class="checkout-field">
+                  <span>{{ t("orderModal.passport") }}</span>
+                  <input
+                    :value="checkoutForm.myIdPassport"
+                    type="text"
+                    autocapitalize="characters"
+                    class="checkout-input"
+                    :placeholder="t('checkoutPage.myidPassportHint')"
+                    @input="
+                      checkoutForm.myIdPassport = normalizeMyIdPassportInput($event.target.value)
+                    "
+                  />
+                </label>
+
+                <label class="checkout-field checkout-field-wide">
+                  <span>{{ t("orderModal.birthDate") }}</span>
+                  <div class="checkout-date-input-wrap">
+                    <div class="checkout-date-row">
+                      <input
+                        :value="checkoutForm.myIdBirthDate"
+                        type="text"
+                        inputmode="numeric"
+                        autocomplete="bday"
+                        class="checkout-input checkout-date-input"
+                        :placeholder="t('checkoutPage.birthDateHint')"
+                        @input="
+                          checkoutForm.myIdBirthDate = normalizeMyIdBirthDateInput($event.target.value)
+                        "
+                      />
+                      <button
+                        type="button"
+                        class="checkout-date-picker-btn"
+                        @click="openBirthDatePicker"
+                      >
+                        <CalendarDays class="h-4 w-4" />
+                        {{ t("checkoutPage.birthDateCalendar") }}
+                      </button>
+                      <input
+                        ref="birthDatePickerInput"
+                        type="date"
+                        class="checkout-native-date-input"
+                        :value="toMyIdBirthDatePayload(checkoutForm.myIdBirthDate)"
+                        tabindex="-1"
+                        aria-hidden="true"
+                        @change="handleBirthDatePickerChange"
+                      />
+                    </div>
+                    <small>{{ t("checkoutPage.birthDateHelp") }}</small>
+                  </div>
+                </label>
+              </div>
+
+              <div
+                v-if="hasVerifiedMyId"
+                class="checkout-verified-box"
+              >
               <div>
                 <strong>{{ t("checkoutPage.verificationDone") }}</strong>
                 <p>{{ myIdResultNote || t("checkoutPage.verificationReady") }}</p>
@@ -1589,21 +1716,25 @@ onBeforeUnmount(() => {
                 </p>
                 <p v-if="myIdJobId" class="checkout-verified-meta">Job ID: {{ myIdJobId }}</p>
               </div>
-            </div>
+              </div>
 
-            <div class="checkout-actions">
-              <button
-                type="button"
-                class="checkout-primary-btn"
-                :disabled="isVerificationButtonDisabled"
-                @click="startInstallmentVerification"
-              >
-                {{ verificationActionLabel }}
-              </button>
-            </div>
+              <div class="checkout-actions">
+                <button
+                  type="button"
+                  class="checkout-primary-btn"
+                  :disabled="isVerificationButtonDisabled"
+                  @click="startInstallmentVerification"
+                >
+                  {{ verificationActionLabel }}
+                </button>
+              </div>
+            </template>
           </section>
 
-          <section v-if="needsInitialPayment" class="checkout-band">
+          <section
+            v-if="activeInstallmentStepKey === 'initial-payment' && needsInitialPayment"
+            class="checkout-band checkout-step-panel checkout-payment-focus"
+          >
             <div class="checkout-section-head">
               <h2>{{ t("checkoutPage.initialPaymentTitle") }}</h2>
               <p>{{ t("checkoutPage.initialPaymentStepHelp") }}</p>
@@ -1627,7 +1758,10 @@ onBeforeUnmount(() => {
             </div>
           </section>
 
-          <section v-else class="checkout-band">
+          <section
+            v-if="activeInstallmentStepKey === 'purchase' && !needsInitialPayment"
+            class="checkout-band checkout-step-panel"
+          >
             <div class="checkout-section-head">
               <h2>{{ t("checkoutPage.purchaseTitle") }}</h2>
               <p>{{ t("checkoutPage.purchaseHelp") }}</p>
@@ -1646,6 +1780,26 @@ onBeforeUnmount(() => {
                 @click="submitInstallmentCredit"
               >
                 {{ purchaseActionLabel }}
+              </button>
+            </div>
+          </section>
+
+          <section
+            v-if="activeInstallmentStepKey === 'complete'"
+            class="checkout-band checkout-step-panel checkout-complete-panel"
+          >
+            <div class="checkout-next-step">
+              <div>
+                <strong>{{ t("checkoutPage.stepComplete") }}</strong>
+                <p>{{ currentStatusHint || t("checkoutPage.myidHintCompleted") }}</p>
+              </div>
+
+              <button
+                type="button"
+                class="checkout-primary-btn"
+                @click="router.push('/profile/orders')"
+              >
+                {{ t("profile.orders") }}
               </button>
             </div>
           </section>
@@ -1765,7 +1919,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .checkout-page {
-  color: #171717;
+  color: #1f2933;
 }
 
 .checkout-head {
@@ -1773,6 +1927,11 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 16px;
   margin-bottom: 24px;
+  padding: 18px;
+  border: 1px solid #e3ebe5;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbf8 100%);
+  box-shadow: 0 14px 38px rgba(31, 41, 51, 0.06);
 }
 
 .checkout-back,
@@ -1789,16 +1948,18 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: 44px;
   height: 44px;
-  border: 1px solid #d4d4d4;
+  border: 1px solid #d8e4dc;
   background: #ffffff;
-  color: #171717;
+  color: #21442c;
+  box-shadow: 0 8px 18px rgba(31, 41, 51, 0.05);
 }
 
 .checkout-kicker {
   margin: 0 0 4px;
   font-size: 0.85rem;
-  font-weight: 600;
-  color: #737373;
+  font-weight: 800;
+  color: #5f7167;
+  text-transform: uppercase;
 }
 
 .checkout-title {
@@ -1808,7 +1969,7 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 1.9rem;
   font-weight: 800;
-  color: #171717;
+  color: #1f2933;
 }
 
 .checkout-shell {
@@ -1827,8 +1988,9 @@ onBeforeUnmount(() => {
 .checkout-status-card,
 .checkout-summary-panel,
 .checkout-empty-state {
-  border: 1px solid #e5e5e5;
-  background: #ffffff;
+  border: 1px solid #e3ebe5;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 16px 42px rgba(31, 41, 51, 0.06);
 }
 
 .checkout-band,
@@ -1841,7 +2003,7 @@ onBeforeUnmount(() => {
 .checkout-band,
 .checkout-summary-panel,
 .checkout-empty-state {
-  padding: 20px;
+  padding: 22px;
 }
 
 .checkout-section-head {
@@ -1855,13 +2017,13 @@ onBeforeUnmount(() => {
 .checkout-section-head h2 {
   margin: 0;
   font-size: 1.1rem;
-  font-weight: 700;
-  color: #171717;
+  font-weight: 800;
+  color: #1f2933;
 }
 
 .checkout-section-head p {
   margin: 6px 0 0;
-  color: #525252;
+  color: #64736a;
   font-size: 0.95rem;
   line-height: 1.5;
 }
@@ -1875,20 +2037,32 @@ onBeforeUnmount(() => {
 .checkout-flow-btn {
   display: grid;
   gap: 6px;
-  padding: 14px;
+  padding: 16px;
   text-align: left;
-  border: 1px solid #d4d4d4;
-  background: #fafaf9;
-  color: #171717;
+  border: 1px solid #d8e4dc;
+  background: #fbfdfb;
+  color: #1f2933;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 }
 
 .checkout-flow-btn.active {
-  border-color: #14532d;
-  background: #f0fdf4;
+  border-color: #2f7d46;
+  background: #f2fbf5;
+  box-shadow: 0 10px 28px rgba(47, 125, 70, 0.1);
 }
 
 .checkout-flow-btn.disabled {
   opacity: 0.55;
+}
+
+.checkout-flow-btn:not(:disabled):hover {
+  transform: translateY(-1px);
+  border-color: #b8d8c2;
 }
 
 .checkout-flow-title {
@@ -1898,34 +2072,52 @@ onBeforeUnmount(() => {
 
 .checkout-flow-copy {
   font-size: 0.92rem;
-  color: #525252;
+  color: #64736a;
   line-height: 1.45;
 }
 
 .checkout-stepper {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
 }
 
 .checkout-step {
+  position: relative;
+  min-width: 150px;
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 12px;
-  border: 1px solid #e5e5e5;
+  border: 1px solid #e3ebe5;
   border-radius: 8px;
-  background: #fafaf9;
+  background: #fbfdfb;
+}
+
+.checkout-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: -11px;
+  top: 50%;
+  width: 10px;
+  height: 2px;
+  background: #d8e4dc;
+  transform: translateY(-50%);
 }
 
 .checkout-step.is-done {
-  border-color: #16a34a;
-  background: #f0fdf4;
+  border-color: #9bd6ad;
+  background: #f2fbf5;
+  opacity: 0.68;
 }
 
 .checkout-step.is-active {
-  border-color: #ca8a04;
-  background: #fffbeb;
+  border-color: #2f7d46;
+  background: #f0fdf4;
+  box-shadow: 0 12px 28px rgba(47, 125, 70, 0.12);
 }
 
 .checkout-step-number {
@@ -1936,24 +2128,40 @@ onBeforeUnmount(() => {
   width: 26px;
   height: 26px;
   border-radius: 999px;
-  background: #262626;
+  background: #6d7f73;
   color: #ffffff;
   font-size: 0.82rem;
   font-weight: 700;
 }
 
 .checkout-step.is-done .checkout-step-number {
-  background: #16a34a;
+  background: #2f7d46;
+  color: #ffffff;
 }
 
 .checkout-step.is-active .checkout-step-number {
-  background: #ca8a04;
+  background: #21442c;
 }
 
 .checkout-step-label {
   font-size: 0.92rem;
   font-weight: 600;
   line-height: 1.4;
+}
+
+.checkout-step-panel {
+  animation: checkoutStepEnter 0.22s ease both;
+}
+
+@keyframes checkoutStepEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .checkout-products {
@@ -1966,8 +2174,10 @@ onBeforeUnmount(() => {
   grid-template-columns: 88px minmax(0, 1fr);
   gap: 14px;
   padding: 14px;
-  border: 1px solid #ececec;
+  border: 1px solid #e3ebe5;
   border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(31, 41, 51, 0.04);
 }
 
 .checkout-product-media {
@@ -1975,7 +2185,7 @@ onBeforeUnmount(() => {
   height: 88px;
   border-radius: 8px;
   overflow: hidden;
-  background: #f5f5f4;
+  background: #eef6f0;
 }
 
 .checkout-product-image {
@@ -1999,14 +2209,14 @@ onBeforeUnmount(() => {
 .checkout-product-head h3 {
   margin: 0;
   font-size: 1rem;
-  font-weight: 700;
-  color: #171717;
+  font-weight: 800;
+  color: #1f2933;
 }
 
 .checkout-product-price {
   white-space: nowrap;
   font-size: 0.98rem;
-  color: #14532d;
+  color: #2f7d46;
 }
 
 .checkout-product-options {
@@ -2020,11 +2230,11 @@ onBeforeUnmount(() => {
   align-items: center;
   min-height: 32px;
   padding: 0 10px;
-  border: 1px solid #e5e5e5;
+  border: 1px solid #e3ebe5;
   border-radius: 999px;
-  background: #fafaf9;
+  background: #f7fbf8;
   font-size: 0.82rem;
-  color: #404040;
+  color: #4c5f54;
 }
 
 .checkout-installment-picker {
@@ -2039,7 +2249,7 @@ onBeforeUnmount(() => {
   align-items: center;
   flex-wrap: wrap;
   font-size: 0.9rem;
-  color: #525252;
+  color: #64736a;
 }
 
 .checkout-installment-grid {
@@ -2051,16 +2261,20 @@ onBeforeUnmount(() => {
 .checkout-installment-btn {
   min-height: 36px;
   padding: 0 12px;
-  border: 1px solid #d4d4d4;
+  border: 1px solid #d8e4dc;
   background: #ffffff;
-  color: #171717;
-  font-weight: 600;
+  color: #1f2933;
+  font-weight: 700;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 
 .checkout-installment-btn.active {
-  border-color: #14532d;
+  border-color: #2f7d46;
   background: #f0fdf4;
-  color: #14532d;
+  color: #21442c;
 }
 
 .checkout-form-grid {
@@ -2080,24 +2294,92 @@ onBeforeUnmount(() => {
 
 .checkout-field span {
   font-size: 0.9rem;
-  font-weight: 600;
-  color: #404040;
+  font-weight: 700;
+  color: #4c5f54;
 }
 
 .checkout-input {
   min-height: 46px;
   width: 100%;
   padding: 0 14px;
-  border: 1px solid #d4d4d4;
+  border: 1px solid #d8e4dc;
   border-radius: 8px;
-  background: #ffffff;
-  color: #171717;
+  background: #fbfdfb;
+  color: #1f2933;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .checkout-input:focus {
   outline: none;
-  border-color: #16a34a;
-  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.12);
+  border-color: #2f7d46;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(47, 125, 70, 0.12);
+}
+
+.checkout-date-input-wrap {
+  display: grid;
+  gap: 6px;
+}
+
+.checkout-date-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.checkout-date-input {
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.checkout-date-input::placeholder {
+  color: #8aa095;
+  letter-spacing: 0;
+}
+
+.checkout-date-input-wrap small {
+  color: #64736a;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.checkout-date-picker-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 46px;
+  border: 1px solid #d8e4dc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #21442c;
+  padding: 0 12px;
+  font-size: 0.86rem;
+  font-weight: 800;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.checkout-date-picker-btn:hover {
+  border-color: #b8d8c2;
+  background: #f7fbf8;
+  transform: translateY(-1px);
+}
+
+.checkout-native-date-input {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .checkout-verified-box,
@@ -2107,9 +2389,60 @@ onBeforeUnmount(() => {
   gap: 16px;
   align-items: center;
   padding: 16px;
-  border: 1px solid #dcfce7;
+  border: 1px solid #c8ead2;
   border-radius: 8px;
-  background: #f0fdf4;
+  background: #f2fbf5;
+}
+
+.checkout-myid-return-box {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid #c8ead2;
+  border-radius: 8px;
+  background: #f2fbf5;
+}
+
+.checkout-myid-return-box strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #21442c;
+  font-size: 1rem;
+}
+
+.checkout-myid-return-box p {
+  margin: 0;
+  color: #386247;
+  line-height: 1.5;
+}
+
+.checkout-myid-return-box .checkout-primary-btn {
+  justify-self: end;
+}
+
+.checkout-payment-focus {
+  border-color: #9bd6ad;
+  background: linear-gradient(180deg, #ffffff 0%, #f2fbf5 100%);
+}
+
+.checkout-payment-focus .checkout-section-head {
+  max-width: 620px;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+.checkout-payment-focus .checkout-next-step {
+  width: min(620px, 100%);
+  margin: 0 auto;
+  border-color: #c8ead2;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(47, 125, 70, 0.1);
+}
+
+.checkout-complete-panel {
+  border-color: #c8ead2;
+  background: #f2fbf5;
 }
 
 .checkout-verified-box strong,
@@ -2117,14 +2450,14 @@ onBeforeUnmount(() => {
   display: block;
   margin-bottom: 4px;
   font-size: 1rem;
-  color: #14532d;
+  color: #21442c;
 }
 
 .checkout-verified-box p,
 .checkout-next-step p,
 .checkout-next-step span {
   margin: 0;
-  color: #166534;
+  color: #386247;
   line-height: 1.5;
 }
 
@@ -2139,6 +2472,12 @@ onBeforeUnmount(() => {
   margin-top: 16px;
 }
 
+.checkout-step-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
 .checkout-primary-btn,
 .checkout-secondary-btn {
   display: inline-flex;
@@ -2147,16 +2486,39 @@ onBeforeUnmount(() => {
   gap: 8px;
   min-height: 44px;
   padding: 0 16px;
-  border: 1px solid #171717;
-  background: #171717;
+  border: 1px solid #21442c;
+  background: #21442c;
   color: #ffffff;
-  font-weight: 700;
+  font-weight: 800;
+  box-shadow: 0 10px 24px rgba(33, 68, 44, 0.14);
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 }
 
 .checkout-secondary-btn {
-  border-color: #d4d4d4;
+  border-color: #d8e4dc;
   background: #ffffff;
-  color: #171717;
+  color: #21442c;
+  box-shadow: none;
+}
+
+.checkout-primary-btn:not(:disabled):hover,
+.checkout-secondary-btn:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.checkout-primary-btn:not(:disabled):hover {
+  border-color: #2f7d46;
+  background: #2f7d46;
+  box-shadow: 0 14px 28px rgba(47, 125, 70, 0.16);
+}
+
+.checkout-secondary-btn:not(:disabled):hover {
+  border-color: #b8d8c2;
+  background: #f7fbf8;
 }
 
 .checkout-primary-btn:disabled,
@@ -2177,7 +2539,7 @@ onBeforeUnmount(() => {
   gap: 16px;
   align-items: center;
   padding: 10px 0;
-  border-top: 1px solid #f1f1f1;
+  border-top: 1px solid #edf2ee;
 }
 
 .checkout-summary-row:first-of-type {
@@ -2186,16 +2548,16 @@ onBeforeUnmount(() => {
 }
 
 .checkout-summary-row span {
-  color: #525252;
+  color: #64736a;
 }
 
 .checkout-summary-row strong {
-  color: #171717;
+  color: #1f2933;
 }
 
 .checkout-summary-note {
   margin: 16px 0 0;
-  color: #525252;
+  color: #64736a;
   line-height: 1.6;
 }
 
@@ -2208,8 +2570,8 @@ onBeforeUnmount(() => {
 }
 
 .checkout-status-card.is-success {
-  border-color: #bbf7d0;
-  background: #f0fdf4;
+  border-color: #c8ead2;
+  background: #f2fbf5;
 }
 
 .checkout-status-card.is-error {
@@ -2218,8 +2580,8 @@ onBeforeUnmount(() => {
 }
 
 .checkout-status-card.is-pending {
-  border-color: #fde68a;
-  background: #fffbeb;
+  border-color: #f0d68a;
+  background: #fffaf0;
 }
 
 .checkout-status-icon {
@@ -2230,7 +2592,7 @@ onBeforeUnmount(() => {
   height: 40px;
   border-radius: 8px;
   background: #ffffff;
-  color: #171717;
+  color: #21442c;
   flex-shrink: 0;
 }
 
@@ -2243,19 +2605,19 @@ onBeforeUnmount(() => {
   margin: 0 0 4px;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #525252;
+  color: #64736a;
 }
 
 .checkout-status-copy h2 {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 700;
-  color: #171717;
+  color: #1f2933;
 }
 
 .checkout-status-copy p {
   margin: 6px 0 0;
-  color: #404040;
+  color: #4c5f54;
   line-height: 1.5;
 }
 
@@ -2270,16 +2632,17 @@ onBeforeUnmount(() => {
 }
 
 .checkout-alert.is-success {
-  border-color: #bbf7d0;
-  background: #f0fdf4;
-  color: #166534;
+  border-color: #c8ead2;
+  background: #f2fbf5;
+  color: #386247;
 }
 
 .checkout-inline-alert {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  justify-content: flex-start;
   gap: 16px;
-  align-items: center;
+  align-items: stretch;
 }
 
 .checkout-inline-alert strong {
@@ -2289,6 +2652,10 @@ onBeforeUnmount(() => {
 
 .checkout-inline-alert p {
   margin: 0;
+}
+
+.checkout-inline-alert .checkout-primary-btn {
+  align-self: flex-end;
 }
 
 .checkout-empty-state {
@@ -2305,7 +2672,7 @@ onBeforeUnmount(() => {
 
 .checkout-empty-copy {
   margin: 0;
-  color: #525252;
+  color: #64736a;
   line-height: 1.6;
 }
 
@@ -2321,12 +2688,29 @@ onBeforeUnmount(() => {
 
 @media (max-width: 720px) {
   .checkout-page {
-    padding-left: 16px;
-    padding-right: 16px;
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 28px;
+  }
+
+  .checkout-head {
+    gap: 12px;
+    margin-bottom: 14px;
+    padding: 12px;
+  }
+
+  .checkout-back {
+    width: 40px;
+    height: 40px;
   }
 
   .checkout-title {
-    font-size: 1.5rem;
+    font-size: 1.28rem;
+    line-height: 1.2;
+  }
+
+  .checkout-kicker {
+    font-size: 0.72rem;
   }
 
   .checkout-flow-switch,
@@ -2334,13 +2718,117 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 
+  .checkout-main {
+    gap: 12px;
+  }
+
+  .checkout-band,
+  .checkout-summary-panel,
+  .checkout-empty-state {
+    padding: 14px;
+  }
+
+  .checkout-section-head {
+    margin-bottom: 12px;
+  }
+
+  .checkout-section-head h2 {
+    font-size: 1rem;
+  }
+
+  .checkout-section-head p {
+    font-size: 0.88rem;
+  }
+
+  .checkout-flow-btn {
+    min-height: 86px;
+    padding: 13px;
+  }
+
+  .checkout-flow-title {
+    font-size: 0.95rem;
+  }
+
+  .checkout-flow-copy {
+    font-size: 0.84rem;
+  }
+
+  .checkout-stepper {
+    margin-inline: -2px;
+    padding: 0 2px 6px;
+    scroll-snap-type: x mandatory;
+  }
+
+  .checkout-step {
+    min-width: 176px;
+    scroll-snap-align: start;
+    padding: 10px;
+  }
+
+  .checkout-step-label {
+    font-size: 0.84rem;
+  }
+
   .checkout-product-row {
-    grid-template-columns: 72px minmax(0, 1fr);
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px;
   }
 
   .checkout-product-media {
-    width: 72px;
-    height: 72px;
+    width: 64px;
+    height: 64px;
+  }
+
+  .checkout-product-copy {
+    gap: 8px;
+  }
+
+  .checkout-product-head {
+    gap: 6px;
+  }
+
+  .checkout-product-head h3 {
+    font-size: 0.92rem;
+  }
+
+  .checkout-product-price {
+    font-size: 0.9rem;
+  }
+
+  .checkout-option-chip {
+    min-height: 28px;
+    padding: 0 8px;
+    font-size: 0.75rem;
+  }
+
+  .checkout-installment-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.82rem;
+  }
+
+  .checkout-installment-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .checkout-installment-btn {
+    min-height: 40px;
+  }
+
+  .checkout-input {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .checkout-date-row {
+    grid-template-columns: 1fr;
+  }
+
+  .checkout-date-picker-btn {
+    min-height: 44px;
   }
 
   .checkout-product-head,
@@ -2352,13 +2840,89 @@ onBeforeUnmount(() => {
     align-items: stretch;
   }
 
+  .checkout-status-card {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .checkout-status-icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  .checkout-status-copy h2 {
+    font-size: 1rem;
+  }
+
+  .checkout-status-copy p {
+    font-size: 0.88rem;
+  }
+
+  .checkout-payment-focus .checkout-section-head {
+    text-align: left;
+  }
+
+  .checkout-summary-panel {
+    box-shadow: 0 10px 28px rgba(31, 41, 51, 0.05);
+  }
+
+  .checkout-summary-row {
+    padding: 9px 0;
+  }
+
+  .checkout-summary-note {
+    font-size: 0.88rem;
+  }
+
   .checkout-actions {
+    justify-content: stretch;
+  }
+
+  .checkout-step-actions {
     justify-content: stretch;
   }
 
   .checkout-primary-btn,
   .checkout-secondary-btn {
     width: 100%;
+    min-height: 48px;
+  }
+}
+
+@media (max-width: 430px) {
+  .checkout-page {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .checkout-head {
+    align-items: flex-start;
+  }
+
+  .checkout-title {
+    font-size: 1.14rem;
+  }
+
+  .checkout-flow-switch {
+    gap: 8px;
+  }
+
+  .checkout-product-row {
+    grid-template-columns: 1fr;
+  }
+
+  .checkout-product-media {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+  }
+
+  .checkout-product-head {
+    align-items: flex-start;
+  }
+
+  .checkout-product-price {
+    white-space: normal;
   }
 }
 </style>
