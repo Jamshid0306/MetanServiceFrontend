@@ -20,6 +20,21 @@ const errorMessage = ref("");
 const monthlyPaymentLoadingByOrderId = ref({});
 
 const customerPhone = computed(() => normalizeCustomerPhone(customerSession.value?.phone));
+const resolvedCustomerAddress = computed(() => {
+  const sessionAddress = String(customerSession.value?.address || "").trim();
+  if (sessionAddress) {
+    return sessionAddress;
+  }
+
+  for (const order of orders.value || []) {
+    const orderAddress = String(order?.customer_address || "").trim();
+    if (orderAddress) {
+      return orderAddress;
+    }
+  }
+
+  return "";
+});
 
 const statusLabel = (status = "") => {
   const normalizedStatus = String(status || "").trim().toLowerCase();
@@ -345,6 +360,7 @@ onMounted(() => {
       <div v-if="customerSession" class="profile-orders-user">
         <strong>{{ customerSession.name }}</strong>
         <span>{{ formatCustomerPhone(customerSession.phone) }}</span>
+        <span v-if="resolvedCustomerAddress">{{ resolvedCustomerAddress }}</span>
       </div>
     </section>
 

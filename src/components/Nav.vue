@@ -354,7 +354,7 @@ watch(
                 {{ t("nav.login") }}
               </RouterLink>
               <div v-else class="profile-chip ml-1 sm:ml-2" :class="{ 'profile-chip-active': isProfileRoute }">
-                <RouterLink to="/profile/orders" class="profile-chip-main">
+                <RouterLink to="/profile" class="profile-chip-main">
                   <div class="profile-chip-avatar">
                     <img
                       v-if="customerProfile.photoUrl"

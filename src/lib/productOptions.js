@@ -569,14 +569,24 @@ export const formatCylinderOptionLabel = (option) => {
 
 export const normalizeProductOptions = (rawOptions = {}) => getNormalizedConfig(rawOptions);
 
-const getProductConfiguredDefaultPrice = (product) => {
-  const defaultPrice = String(product?.default_price || "").trim();
-  if (!defaultPrice) {
-    return null;
-  }
+export const getMinimumCylinderPrice = (product) => {
+  const config = getNormalizedConfig(product?.config_options);
+  let minimumPrice = null;
 
-  const numericDefaultPrice = parseNumericPrice(defaultPrice);
-  return numericDefaultPrice === null ? defaultPrice : numericDefaultPrice;
+  config.fuel_types.forEach((fuelType) => {
+    (fuelType.transmissions || []).forEach((transmission) => {
+      (transmission.cylinder_volumes || []).forEach((cylinderVolume) => {
+        const price = parseNumericPrice(cylinderVolume?.price_delta);
+        if (price === null || price <= 0) {
+          return;
+        }
+
+        minimumPrice = minimumPrice === null ? price : Math.min(minimumPrice, price);
+      });
+    });
+  });
+
+  return minimumPrice;
 };
 
 export const getProductDefaultPrice = (product, locale = "uz") => {
@@ -646,12 +656,6 @@ export const getProductDefaultPrice = (product, locale = "uz") => {
     }
 
     return numericLocalizedPrice;
-  }
-
-  // Fallback sifatida admin kiritgan `default_price`.
-  const configuredDefaultPrice = getProductConfiguredDefaultPrice(product);
-  if (configuredDefaultPrice !== null) {
-    return configuredDefaultPrice;
   }
 
   return ASK_PRICE_BY_LOCALE[locale] || ASK_PRICE_BY_LOCALE.uz;
@@ -804,10 +808,7 @@ export const calculateConfiguredPrice = (product, locale, selections = {}, pathC
   );
 
   if (pathConfig.useFallbackPath === false && !hasExplicitSelection) {
-    const configuredDefaultPrice = getProductConfiguredDefaultPrice(product);
-    if (configuredDefaultPrice !== null) {
-      return configuredDefaultPrice;
-    }
+    return getProductDefaultPrice(product, locale);
   }
 
   const { transmission, cylinderVolume } = resolveSelectedPath(

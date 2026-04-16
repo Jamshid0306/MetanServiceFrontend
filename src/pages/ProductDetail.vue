@@ -26,6 +26,7 @@ import {
   formatCylinderCountLabel,
   formatCylinderOptionLabel,
   getProductDefaultPrice,
+  getMinimumCylinderPrice,
   formatPriceValue,
   getCreditPlans,
   hasCreditPricing,
@@ -67,6 +68,8 @@ const notification = ref({ show: false, message: "" });
 const selectedOptions = ref({});
 const selectedExtraServiceIds = ref([]);
 const selectedCreditMonths = ref(null);
+/** `installment` — tariflar va kredit reja; `full` — faqat to‘liq narx. */
+const paymentScheduleMode = ref("");
 const lastAutoFilledCreditAmount = ref("");
 /**
  * Programma xizmati: null = hali tanlanmagan, true = Ha, false = Yo'q.
@@ -80,6 +83,9 @@ const orderSubmitting = ref(false);
 const orderError = ref("");
 const orderForm = ref(createEmptyOrderForm());
 const stickyPriceVisible = ref(false);
+/** Savatga bosilganda balon tanlanmagan bo‘lsa select atrofida qizil chegarа. */
+const cylinderVolumeSelectHighlighted = ref(false);
+const paymentModeSelectHighlighted = ref(false);
 let swiperInstance = null;
 let priceSummaryObserver = null;
 
@@ -679,12 +685,36 @@ const isProductOptionSelectionComplete = computed(() => {
     selectionHasValue(raw, "transmission")
   );
 });
-const selectedPrice = computed(() =>
-  calculateConfiguredPrice(store.product, locale.value, resolvedSelectedOptions.value, {
-    useFallbackPath: false,
-    gearboxProgramDeclined: balloonProgramEnabled.value !== true,
+const hasUserSelectedProductOption = computed(() =>
+  ["fuel_type", "transmission", "cylinder_volume"].some((key) => {
+    const value = selectedOptions.value?.[key];
+    return value !== undefined && value !== null && String(value).trim() !== "";
   })
 );
+const displayedMinimumCylinderPrice = computed(() => {
+  const cylinderGroup = orderedOptionGroups.value.find(
+    (group) => group.key === "cylinder_volume"
+  );
+  const prices = (cylinderGroup?.options || [])
+    .map((option) => parseNumericPrice(option?.price_delta))
+    .filter((price) => price !== null && price > 0);
+
+  return prices.length ? Math.min(...prices) : null;
+});
+const selectedPrice = computed(() => {
+  if (!hasUserSelectedProductOption.value) {
+    return (
+      displayedMinimumCylinderPrice.value ??
+      getMinimumCylinderPrice(store.product) ??
+      getProductDefaultPrice(store.product, locale.value)
+    );
+  }
+
+  return calculateConfiguredPrice(store.product, locale.value, resolvedSelectedOptions.value, {
+    useFallbackPath: false,
+    gearboxProgramDeclined: balloonProgramEnabled.value !== true,
+  });
+});
 const additionalServices = computed(() =>
   Array.isArray(store.product?.extra_services) ? store.product.extra_services : []
 );
@@ -709,25 +739,44 @@ const combinedSelectedPrice = computed(() => {
 
   return numericBasePrice + additionalServicesTotal.value;
 });
+
+const initialPaymentNumeric = computed(() =>
+  parseNumericPrice(store.product?.initial_payment_amount)
+);
+const hasProductInitialPayment = computed(() => {
+  if (!store.product) {
+    return false;
+  }
+  const enabled = Number(store.product.initial_payment_enabled) === 1;
+  const amt = initialPaymentNumeric.value;
+  return enabled && amt !== null && amt > 0;
+});
+/** Tariflar va oyiga to‘lov: raqamli tanlangan narxdan bosh to‘lov ayiriladi. */
+const amountUsedForCreditPlans = computed(() => {
+  const total = parseNumericPrice(combinedSelectedPrice.value);
+  if (total === null) {
+    return combinedSelectedPrice.value;
+  }
+  if (!hasProductInitialPayment.value) {
+    return total;
+  }
+  const down = initialPaymentNumeric.value;
+  if (down === null || !Number.isFinite(down) || down <= 0) {
+    return total;
+  }
+  return Math.max(0, Math.round(total - down));
+});
+
+/** Tariflar (oylar) ro‘yxati: to‘liq tanlangan narx bo‘yicha — bosh to‘lov tufayli bo‘shab qolmasin. */
 const creditPlans = computed(() =>
   getCreditPlans(store.product, creditTariffsStore.tariffs, {
     amount: combinedSelectedPrice.value,
     locale: locale.value,
   })
 );
-
-/** Kredit mavjud bo‘lsa: 12 oylik reja bo‘lsa default shu, aks holda birinchi reja. */
+/** Sahifa ilk ochilganda tarif tanlanmagan holatda turadi. */
 const setDefaultCreditMonthsForProduct = () => {
-  const plans = getCreditPlans(store.product, creditTariffsStore.tariffs, {
-    amount: combinedSelectedPrice.value,
-    locale: locale.value,
-  });
-  if (!plans.length) {
-    selectedCreditMonths.value = null;
-    return;
-  }
-  const defaultPlan = plans.find((plan) => plan.months === 12) ?? plans[0] ?? null;
-  selectedCreditMonths.value = defaultPlan?.months ?? null;
+  selectedCreditMonths.value = null;
 };
 
 const selectedCreditConfig = computed(() => {
@@ -742,25 +791,75 @@ const selectedCreditConfig = computed(() => {
       return match;
     }
   }
-  return plans.find((plan) => plan.months === 12) ?? plans[0] ?? null;
+  return null;
 });
+const previewCreditConfig = computed(
+  () => selectedCreditConfig.value || creditPlans.value.find((plan) => plan.months === 12) || creditPlans.value[0] || null
+);
 const selectedCreditPlan = computed(() => {
-  if (
-    !hasCreditPricing(store.product, creditTariffsStore.tariffs, {
-      amount: combinedSelectedPrice.value,
-      locale: locale.value,
-    }) ||
-    !selectedCreditConfig.value
-  ) {
+  if (!previewCreditConfig.value) {
     return null;
   }
-
   return calculateCreditPlan(
-    combinedSelectedPrice.value,
-    selectedCreditConfig.value.percent,
-    selectedCreditConfig.value.months
+    amountUsedForCreditPlans.value,
+    previewCreditConfig.value.percent,
+    previewCreditConfig.value.months
   );
 });
+
+const productCreditEnabled = computed(() => Boolean(Number(store.product?.credit_enabled)));
+/** Muddatli to‘lov uchun tariflar va oyiga to‘lov hisobini ko‘rsatish mumkin bo‘lsa. */
+const hasInstallmentTariffs = computed(
+  () =>
+    productCreditEnabled.value &&
+    creditPlans.value.length > 0
+);
+/** 100% to‘lov tanlanganda bosh to‘lov qatori yashirinadi; muddatli yo‘q bo‘lsa har doim ko‘rinadi. */
+const showInitialPaymentRow = computed(
+  () =>
+    hasProductInitialPayment.value &&
+    (!hasInstallmentTariffs.value || paymentScheduleMode.value !== "full")
+);
+const showPricePaymentFooter = computed(
+  () => hasInstallmentTariffs.value || showInitialPaymentRow.value
+);
+
+const creditTariffsSectionRef = ref(null);
+
+const focusFirstCreditPlanButton = () => {
+  const root = creditTariffsSectionRef.value;
+  if (!root) {
+    return;
+  }
+  const btn = root.querySelector(".credit-plan-btn");
+  if (btn && typeof btn.focus === "function") {
+    btn.focus();
+  }
+};
+
+const onInstallmentModeClick = () => {
+  if (!hasInstallmentTariffs.value) {
+    return;
+  }
+  paymentModeSelectHighlighted.value = false;
+  paymentScheduleMode.value = "installment";
+  nextTick(() => {
+    creditTariffsSectionRef.value?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+    requestAnimationFrame(focusFirstCreditPlanButton);
+  });
+};
+
+const onFullPaymentModeClick = () => {
+  if (!hasInstallmentTariffs.value) {
+    return;
+  }
+  paymentModeSelectHighlighted.value = false;
+  paymentScheduleMode.value = "full";
+};
+
 const configuredBasketItem = computed(() =>
   store.product
     ? (() => {
@@ -795,15 +894,24 @@ const configuredBasketItem = computed(() =>
         return {
           ...baseItem,
           selected_options: [...baseItem.selected_options, ...serviceOptions],
-          credit_plan: selectedCreditConfig.value
-            ? {
-                tariff_id: selectedCreditConfig.value.id || null,
-                months: selectedCreditConfig.value.months,
-                percent: selectedCreditConfig.value.percent,
-                monthly_payment: selectedCreditPlan.value?.monthlyPayment || null,
-                total: selectedCreditPlan.value?.total || null,
-              }
-            : null,
+          credit_plan:
+            paymentScheduleMode.value === "installment" && selectedCreditConfig.value
+              ? {
+                  tariff_id: selectedCreditConfig.value.id || null,
+                  months: selectedCreditConfig.value.months,
+                  percent: selectedCreditConfig.value.percent,
+                  monthly_payment: selectedCreditPlan.value?.monthlyPayment || null,
+                  total: selectedCreditPlan.value?.total || null,
+                }
+              : null,
+          payment_schedule_mode:
+            hasInstallmentTariffs.value
+              ? paymentScheduleMode.value === "installment"
+                ? "installment"
+                : paymentScheduleMode.value === "full"
+                  ? "full"
+                  : null
+              : "full",
           selected_price_uz:
             numericPriceUz === null ? baseItem.selected_price_uz : numericPriceUz + extraPriceUz,
           selected_price_ru:
@@ -835,13 +943,15 @@ const currentOrderTotalLabel = computed(() => {
 
   return formatPrice(combinedSelectedPrice.value);
 });
-const canUseCreditOrder = computed(
+const creditPricingAvailable = computed(
   () =>
     hasCreditPricing(store.product, creditTariffsStore.tariffs, {
       amount: combinedSelectedPrice.value,
       locale: locale.value,
-    }) &&
-    Boolean(selectedCreditConfig.value)
+    }) && Boolean(selectedCreditConfig.value)
+);
+const canUseCreditOrder = computed(
+  () => creditPricingAvailable.value && paymentScheduleMode.value === "installment"
 );
 const selectedOptionsSummary = computed(
   () => configuredBasketItem.value?.selected_options || []
@@ -859,12 +969,13 @@ const orderProductsPayload = computed(() => {
       quantity: item.quantity,
       price: item[`selected_price_${locale.value}`] ?? item[`price_${locale.value}`] ?? "",
       selected_options: item.selected_options || [],
-      credit_plan: selectedCreditConfig.value
-        ? {
-            months: selectedCreditConfig.value.months,
-            percent: selectedCreditConfig.value.percent,
-          }
-        : null,
+      credit_plan:
+        paymentScheduleMode.value === "installment" && selectedCreditConfig.value
+          ? {
+              months: selectedCreditConfig.value.months,
+              percent: selectedCreditConfig.value.percent,
+            }
+          : null,
     },
   ];
 });
@@ -964,20 +1075,7 @@ const resetOrderForm = (orderType = canUseCreditOrder.value ? "credit" : "standa
   };
 };
 
-const openOrderModal = () => {
-  if (!store.product) return;
-  if (!isProductOptionSelectionComplete.value) {
-    notification.value = {
-      show: true,
-      message: productOptionSelectionErrorMessage.value,
-    };
-    return;
-  }
-  customerProfile.value = getStoredCustomerSession();
-  resetOrderForm(canUseCreditOrder.value ? "credit" : "standard");
-  orderError.value = "";
-  orderModalOpen.value = true;
-};
+
 
 const closeOrderModal = () => {
   if (orderSubmitting.value) return;
@@ -992,13 +1090,48 @@ const closeFuelGuideModal = () => {
 };
 
 const handleAddToBasket = () => {
-  if (detailAnimating.value || !configuredBasketItem.value) return;
-  if (!isProductOptionSelectionComplete.value) {
-    notification.value = {
-      show: true,
-      message: productOptionSelectionErrorMessage.value,
-    };
+  if (detailAnimating.value) {
     return;
+  }
+
+  if (!isProductOptionSelectionComplete.value) {
+    const resolved = resolvedSelectedOptions.value;
+    const raw = selectedOptions.value;
+    const needsCylinder =
+      requiredOptionGroupKeys.value.includes("cylinder_volume") &&
+      !selectionHasValue(resolved, "cylinder_volume") &&
+      !selectionHasValue(raw, "cylinder_volume");
+    const cylGroup = orderedOptionGroups.value.find((g) => g.key === "cylinder_volume");
+    const multiCylinder = Boolean(cylGroup && cylGroup.options.length > 1);
+
+    if (needsCylinder && multiCylinder) {
+      cylinderVolumeSelectHighlighted.value = true;
+      nextTick(() => {
+        document.getElementById("detail-cylinder-volume-select")?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      });
+    } else {
+      cylinderVolumeSelectHighlighted.value = false;
+      nextTick(() => {
+        document.getElementById("detail-product-options")?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      });
+    }
+
+    notification.value = { show: false, message: "" };
+    return;
+  }
+
+  if (!configuredBasketItem.value) {
+    return;
+  }
+
+  if (hasInstallmentTariffs.value && !paymentScheduleMode.value) {
+    paymentModeSelectHighlighted.value = true;
   }
 
   basketStore.addToBasket(configuredBasketItem.value);
@@ -1279,9 +1412,10 @@ const handleClick = (product) => {
     showCheck.value = { ...showCheck.value, [id]: false };
     animating.value = { ...animating.value, [id]: false };
   }, 1600);
-  basketStore.addToBasket(
-    buildConfiguredBasketItem(product, {}, 1, { useFallbackPath: false })
-  );
+  basketStore.addToBasket({
+    ...buildConfiguredBasketItem(product, {}, 1, { useFallbackPath: false }),
+    payment_schedule_mode: null,
+  });
 };
 
 const toggleExtraService = (serviceId) => {
@@ -1321,16 +1455,41 @@ watch(
 );
 
 watch(
+  () => String(selectedOptions.value?.cylinder_volume || "").trim(),
+  (id) => {
+    if (id) {
+      cylinderVolumeSelectHighlighted.value = false;
+    }
+  }
+);
+
+watch(
   creditPlans,
   (plans) => {
     const currentMonths = Number(selectedCreditMonths.value);
-    if (!plans.some((plan) => plan.months === currentMonths)) {
-      const defaultPlan =
-        plans.find((plan) => plan.months === 12) ?? plans[0] ?? null;
-      selectedCreditMonths.value = defaultPlan?.months ?? null;
+    if (Number.isFinite(currentMonths) && currentMonths > 0 && !plans.some((plan) => plan.months === currentMonths)) {
+      selectedCreditMonths.value = null;
     }
   },
   { immediate: true }
+);
+
+watch(hasInstallmentTariffs, (ok) => {
+  if (!ok) {
+    paymentModeSelectHighlighted.value = false;
+    paymentScheduleMode.value = "";
+    if (orderForm.value.orderType === "credit") {
+      orderForm.value.orderType = "standard";
+    }
+  }
+});
+
+watch(
+  () => store.product?.id,
+  () => {
+    paymentModeSelectHighlighted.value = false;
+    paymentScheduleMode.value = "";
+  }
 );
 
 watch(
@@ -1493,7 +1652,7 @@ onBeforeUnmount(() => {
                 v-for="(img, index) in images"
                 :key="index"
                 :src="img"
-                class="detail-thumb h-24 w-24 cursor-pointer rounded-xl border object-cover transition-all duration-300"
+                class="detail-thumb h-24 w-24 cursor-pointer rounded-xl border object-contain transition-all duration-300"
                 @click="goToSlide(index)"
               />
             </div>
@@ -1563,48 +1722,105 @@ onBeforeUnmount(() => {
               </span>
 
               <div
-                v-if="selectedCreditPlan && selectedCreditConfig"
-                class="detail-credit-inline"
+                v-if="showPricePaymentFooter"
+                class="detail-price-payment-footer"
               >
                 <div
-                  v-if="creditPlans.length"
-                  class="detail-credit-inline-block"
+                  v-if="hasInstallmentTariffs"
+                  class="detail-payment-badges"
+                  role="group"
+                  :aria-label="t('credit.installment') + ', ' + t('credit.fullPayment')"
+                >
+                  <button
+                    type="button"
+                    class="detail-payment-badge detail-payment-badge-btn"
+                    :class="{
+                      'detail-payment-badge-active':
+                        paymentScheduleMode === 'installment',
+                      'detail-payment-badge-unselected':
+                        paymentModeSelectHighlighted && !paymentScheduleMode,
+                    }"
+                    @click="onInstallmentModeClick"
+                  >
+                    {{ t("credit.installment") }}
+                  </button>
+                  <button
+                    type="button"
+                    class="detail-payment-badge detail-payment-badge-btn"
+                    :class="{
+                      'detail-payment-badge-active': paymentScheduleMode === 'full',
+                      'detail-payment-badge-unselected':
+                        paymentModeSelectHighlighted && !paymentScheduleMode,
+                    }"
+                    @click="onFullPaymentModeClick"
+                  >
+                    {{ t("credit.fullPayment") }}
+                  </button>
+                </div>
+
+                <div
+                  v-if="hasInstallmentTariffs"
+                  ref="creditTariffsSectionRef"
+                  class="detail-credit-inline detail-credit-inline--stacked"
                 >
                   <div
-                    class="credit-plan-switcher detail-credit-plan-switcher"
-                    :style="{
-                      gridTemplateColumns: `repeat(${Math.max(creditPlans.length, 1)}, minmax(0, 1fr))`,
-                    }"
+                    v-if="creditPlans.length"
+                    class="detail-credit-inline-block"
                   >
-                    <button
-                      v-for="plan in creditPlans"
-                      :key="`${plan.months}-${plan.percent}`"
-                      type="button"
-                      class="credit-plan-btn"
-                      :aria-label="`${plan.months} ${t('credit.months')}`"
-                      :class="
-                        selectedCreditConfig?.months === plan.months
-                          ? 'credit-plan-btn-active'
-                          : ''
-                      "
-                      @click="selectedCreditMonths = plan.months"
+                    <div class="detail-credit-tariffs-label">
+                      {{ t("credit.tariffs") }}
+                    </div>
+                    <div
+                      class="credit-plan-switcher detail-credit-plan-switcher"
+                      :style="{
+                        gridTemplateColumns: `repeat(${Math.max(creditPlans.length, 1)}, minmax(0, 1fr))`,
+                      }"
                     >
-                      <span>{{ plan.months }} {{ t("credit.months") }}</span>
-                    </button>
+                      <button
+                        v-for="plan in creditPlans"
+                        :key="`${plan.months}-${plan.percent}`"
+                        type="button"
+                        class="credit-plan-btn"
+                        :aria-label="`${plan.months} ${t('credit.months')}`"
+                        :class="
+                          selectedCreditConfig?.months === plan.months
+                            ? 'credit-plan-btn-active'
+                            : ''
+                        "
+                        @click="selectedCreditMonths = plan.months"
+                      >
+                        <span>{{ plan.months }} {{ t("credit.months") }}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div
+                    v-if="selectedCreditPlan"
+                    class="detail-credit-payment"
+                  >
+                    <strong class="detail-credit-inline-value">
+                      <span>{{ previewCreditConfig?.months }} {{ t("credit.months") }}</span>
+                      <span
+                        class="detail-credit-inline-separator"
+                        aria-hidden="true"
+                      >
+                        •
+                      </span>
+                      <span>{{ formatPrice(selectedCreditPlan.monthlyPayment) }}</span>
+                    </strong>
                   </div>
                 </div>
 
-                <div class="detail-credit-payment">
-                  <strong class="detail-credit-inline-value">
-                    <span>{{ selectedCreditConfig.months }} {{ t("credit.months") }}</span>
-                    <span
-                      class="detail-credit-inline-separator"
-                      aria-hidden="true"
-                    >
-                      •
-                    </span>
-                    <span>{{ formatPrice(selectedCreditPlan.monthlyPayment) }}</span>
-                  </strong>
+                <div
+                  v-if="showInitialPaymentRow"
+                  class="detail-initial-payment-card"
+                >
+                  <span class="detail-initial-payment-kicker">{{
+                    t("credit.downPaymentAvailable")
+                  }}</span>
+                  <strong class="detail-initial-payment-value">{{
+                    formatPrice(initialPaymentNumeric)
+                  }}</strong>
                 </div>
               </div>
             </div>
@@ -1613,13 +1829,9 @@ onBeforeUnmount(() => {
           <div class="detail-actions">
             <div
               v-if="optionGroups.length"
+              id="detail-product-options"
               class="detail-options detail-section"
             >
-            <div class="detail-options-head">
-              <p class="detail-options-kicker">
-                {{ t("productOptions.selectionHelp") }}
-              </p>
-            </div>
             <template
               v-for="group in orderedOptionGroups"
               :key="group.key"
@@ -1649,12 +1861,17 @@ onBeforeUnmount(() => {
                   group.key === 'cylinder_volume' &&
                   group.options.length > 1
                 "
+                id="detail-cylinder-volume-select"
                 class="detail-select-shell"
               >
                 <div
                   class="detail-select-wrap"
                   :class="{
                     'detail-select-wrap-active': selectedOptions[group.key],
+                    'detail-select-wrap-error':
+                      group.key === 'cylinder_volume' &&
+                      cylinderVolumeSelectHighlighted &&
+                      !selectedOptions[group.key],
                   }"
                 >
                   <select
@@ -1872,18 +2089,11 @@ onBeforeUnmount(() => {
               <strong class="detail-order-total">{{ currentOrderTotalLabel }}</strong>
             </div>
 
-            <p
-              v-if="orderedOptionGroups.length && !isProductOptionSelectionComplete"
-              class="detail-options-required-hint"
-            >
-              {{ productOptionSelectionErrorMessage }}
-            </p>
-
             <div class="detail-primary-actions">
               <button
+                type="button"
                 @click="handleAddToBasket"
-                :disabled="!isProductOptionSelectionComplete"
-                class="detail-add-btn relative flex flex-1 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-2xl py-4 font-medium text-white transition-all duration-300 active:scale-95 disabled:cursor-not-allowed disabled:opacity-55 disabled:active:scale-100"
+                class="detail-add-btn relative flex flex-1 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-2xl py-4 font-medium text-white transition-all duration-300 active:scale-95"
               >
                 <span
                   :class="
@@ -1907,15 +2117,6 @@ onBeforeUnmount(() => {
                   "
                   class="absolute w-6 h-6 text-white transition-all duration-500"
                 />
-              </button>
-
-              <button
-                type="button"
-                class="detail-order-btn"
-                :disabled="!isProductOptionSelectionComplete"
-                @click="openOrderModal"
-              >
-                {{ t("order_now") }}
               </button>
             </div>
             </div>
@@ -2498,6 +2699,8 @@ onBeforeUnmount(() => {
   background: var(--detail-surface);
   flex-shrink: 0;
   opacity: 0.82;
+  object-fit: contain;
+  object-position: center;
 }
 
 .detail-thumb:hover {
@@ -2573,12 +2776,130 @@ onBeforeUnmount(() => {
   color: var(--detail-subtle);
 }
 
+.detail-price-payment-footer {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.35rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--detail-border);
+}
+
+.detail-payment-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.detail-payment-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.38rem 0.72rem;
+  border-radius: 999px;
+  border: 1px solid rgba(72, 122, 93, 0.22);
+  background: rgba(243, 250, 245, 0.96);
+  color: #2f5d45;
+}
+
+.detail-payment-badge-btn {
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.detail-payment-badge-btn:hover {
+  border-color: rgba(24, 75, 51, 0.35);
+  box-shadow: 0 2px 10px rgba(24, 75, 51, 0.08);
+}
+
+.detail-payment-badge-btn:focus-visible {
+  outline: 2px solid rgba(24, 75, 51, 0.45);
+  outline-offset: 2px;
+}
+
+.detail-payment-badge-btn:active {
+  transform: scale(0.98);
+}
+
+.detail-payment-badge-active {
+  background: linear-gradient(135deg, #2f7a57 0%, #1f6546 100%);
+  color: #ffffff;
+  border-color: #245f42;
+  box-shadow: 0 8px 20px rgba(31, 101, 70, 0.2);
+}
+
+.detail-payment-badge-active:hover {
+  background: linear-gradient(135deg, #2f7a57 0%, #1f6546 100%);
+  color: #ffffff;
+  border-color: #245f42;
+}
+
+.detail-payment-badge-unselected {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.15);
+}
+
+.detail-credit-tariffs-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--detail-subtle);
+}
+
+.detail-initial-payment-card {
+  display: grid;
+  gap: 0.45rem;
+  justify-items: center;
+  text-align: center;
+  min-width: 0;
+  width: 100%;
+  padding: 0.78rem 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(72, 122, 93, 0.2);
+  background: linear-gradient(145deg, #f2faf5 0%, #d9efe3 52%, #cfe8da 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 8px 20px rgba(24, 75, 51, 0.06);
+}
+
+.detail-initial-payment-kicker {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #3a6b50;
+  line-height: 1.3;
+  max-width: min(100%, 24rem);
+}
+
+.detail-initial-payment-value {
+  display: block;
+  font-size: clamp(0.95rem, 1.75vw, 1.08rem);
+  line-height: 1.1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #184b33;
+  letter-spacing: -0.015em;
+}
+
 .detail-credit-inline {
   display: grid;
   gap: 0.85rem;
   margin-top: 0.2rem;
   padding-top: 1rem;
   border-top: 1px solid var(--detail-border);
+}
+
+.detail-credit-inline.detail-credit-inline--stacked {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 
 .detail-credit-inline-block {
@@ -2873,6 +3194,25 @@ onBeforeUnmount(() => {
   border-color: rgba(24, 48, 79, 0.18);
   background:
     linear-gradient(180deg, rgba(249, 251, 253, 0.98), rgba(238, 243, 248, 0.98));
+}
+
+.detail-select-wrap-error {
+  border-color: #dc2626 !important;
+  background: linear-gradient(180deg, rgba(255, 250, 250, 0.98), rgba(254, 242, 242, 0.98)) !important;
+  box-shadow:
+    0 0 0 4px rgba(220, 38, 38, 0.16),
+    0 14px 28px rgba(220, 38, 38, 0.1) !important;
+}
+
+.detail-select-wrap-error:hover {
+  border-color: #b91c1c !important;
+}
+
+.detail-select-wrap-error:focus-within {
+  border-color: #b91c1c !important;
+  box-shadow:
+    0 0 0 4px rgba(220, 38, 38, 0.22),
+    0 14px 28px rgba(220, 38, 38, 0.12) !important;
 }
 
 .detail-select-input {

@@ -64,6 +64,7 @@ export const toCustomerSession = (customer = {}) => {
     id: customer?.id ?? null,
     name,
     phone,
+    address: String(customer?.address ?? "").trim(),
     telegramUsername: String(
       customer?.telegram_username ?? customer?.telegramUsername ?? ""
     ).trim(),

@@ -24,7 +24,6 @@ const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
 const expanded = ref(false);
-const profileExpanded = ref(false);
 const loaderStore = useLoaderStore();
 const basketStore = useBasketStore();
 const customerProfile = ref(null);
@@ -49,9 +48,6 @@ const syncCustomerProfile = () => {
 
 const toggleExpand = () => {
   expanded.value = !expanded.value;
-  if (expanded.value) {
-    profileExpanded.value = false;
-  }
 };
 
 const toggleProfile = () => {
@@ -62,10 +58,7 @@ const toggleProfile = () => {
     return;
   }
 
-  profileExpanded.value = !profileExpanded.value;
-  if (profileExpanded.value) {
-    expanded.value = false;
-  }
+  router.push("/profile");
 };
 
 const logoutCustomer = () => {
@@ -74,7 +67,6 @@ const logoutCustomer = () => {
     window.localStorage.removeItem("customer_access_token");
   }
   syncCustomerProfile();
-  profileExpanded.value = false;
   router.push("/login");
 };
 
@@ -121,7 +113,6 @@ watch(
   () => route.fullPath,
   () => {
     expanded.value = false;
-    profileExpanded.value = false;
     syncCustomerProfile();
   }
 );
@@ -136,39 +127,6 @@ watch(
     <Loader v-if="showLoader" />
 
     <div v-if="showPublicExtras" class="app-mobile-dock lg:hidden">
-      <transition name="contact-panel">
-        <div v-if="profileExpanded && customerProfile" class="mobile-profile-panel">
-          <div class="mobile-profile-head">
-            <span class="mobile-profile-avatar">
-              {{ String(customerProfile.name || "U").trim().charAt(0).toUpperCase() }}
-            </span>
-            <div class="mobile-profile-copy">
-              <strong>{{ customerProfile.name }}</strong>
-              <small>{{ profileSecondaryText }}</small>
-            </div>
-          </div>
-
-          <div class="mobile-profile-meta">
-            <p v-if="customerProfile.phone">
-              <span>{{ t("phone") }}</span>
-              <strong>+{{ customerProfile.phone }}</strong>
-            </p>
-          </div>
-
-          <RouterLink to="/profile/orders" class="mobile-profile-orders">
-            {{ t("profile.orders") }}
-          </RouterLink>
-
-          <button
-            type="button"
-            class="mobile-profile-logout"
-            @click="logoutCustomer"
-          >
-            {{ t("nav.logout") }}
-          </button>
-        </div>
-      </transition>
-
       <div class="app-mobile-dock-inner">
         <RouterLink
           to="/"
@@ -212,7 +170,7 @@ watch(
         <button
           type="button"
           class="app-mobile-dock-link app-mobile-dock-link-profile"
-          :class="{ 'app-mobile-dock-link-active': profileExpanded || isProfileRoute }"
+          :class="{ 'app-mobile-dock-link-active': isProfileRoute }"
           @click="toggleProfile"
         >
           <span class="app-mobile-dock-profile-avatar">

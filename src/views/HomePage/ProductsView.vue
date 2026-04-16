@@ -246,8 +246,8 @@ const sortedProducts = computed(() => {
 
 .product-media {
   position: relative;
-  min-height: 170px;
-  height: 170px;
+  width: 100%;
+  aspect-ratio: 4 / 3;
   border-radius: 16px;
   border: 1px solid rgba(20, 35, 56, 0.08);
   background: #f3f5f7;
@@ -270,12 +270,13 @@ const sortedProducts = computed(() => {
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
   transition: transform 0.45s ease;
 }
 
 .product-card:hover .product-image {
-  transform: translateY(-4px) scale(1.06);
+  transform: scale(1.02);
 }
 
 .product-title {

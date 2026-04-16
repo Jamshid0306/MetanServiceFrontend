@@ -108,6 +108,15 @@ const routes = [
     },
   },
   {
+    path: "/profile",
+    name: "Profile",
+    component: () => import("@/pages/ProfilePage.vue"),
+    meta: {
+      title: "Urganch Metan Service - Profil",
+      robots: "noindex,nofollow",
+    },
+  },
+  {
     path: "/profile/orders",
     name: "ProfileOrders",
     component: () => import("@/pages/ProfileOrdersPage.vue"),

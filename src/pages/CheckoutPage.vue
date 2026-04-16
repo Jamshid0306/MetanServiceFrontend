@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter, RouterLink } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { CalendarDays, CircleCheckBig, CreditCard, ShoppingCart } from "lucide-vue-next";
 
@@ -65,6 +65,12 @@ const initialPaymentUrl = ref("");
 const tariffStepConfirmed = ref(false);
 const birthDatePickerInput = ref(null);
 const myIdPassportNumberInput = ref(null);
+const createEmptyMyIdIdentityErrors = () => ({
+  passportSeries: false,
+  passportNumber: false,
+  birthDate: false,
+});
+const myIdIdentityErrors = ref(createEmptyMyIdIdentityErrors());
 let statusPollTimeoutId = null;
 
 const basketItems = computed(() => basketStore.basket);
@@ -121,6 +127,65 @@ const isInstallmentJourney = computed(
 const flowSwitchLocked = computed(
   () => Boolean(currentOrderId.value) && ["pending", "prepared"].includes(currentOrderStatus.value)
 );
+
+const getItemCheckoutScheduleMode = (item) => {
+  const mode = String(item?.payment_schedule_mode || "").trim().toLowerCase();
+  if (mode === "installment" || mode === "full") {
+    return mode;
+  }
+  return item?.credit_plan?.months ? "installment" : "full";
+};
+
+const basketCheckoutPaymentIntent = computed(() => {
+  const creditItems = basketItems.value.filter((item) =>
+    hasCreditPricing(item, creditTariffsStore.tariffs, {
+      amount: getBasketPrice(item, locale.value),
+      locale: locale.value,
+    })
+  );
+
+  if (!creditItems.length) {
+    return "straight";
+  }
+
+  const modes = new Set(creditItems.map((item) => getItemCheckoutScheduleMode(item)));
+  if (modes.has("installment") && modes.has("full")) {
+    return "mixed";
+  }
+
+  if (modes.has("installment")) {
+    return "installment";
+  }
+
+  return "straight";
+});
+
+const paymentFlowChoiceLockedByBasket = computed(
+  () =>
+    Boolean(basketItems.value.length) &&
+    !currentOrderId.value &&
+    !String(myIdReturnSessionId.value || "").trim()
+);
+
+const isCheckoutPaymentFlowSwitchDisabled = computed(
+  () => flowSwitchLocked.value || paymentFlowChoiceLockedByBasket.value
+);
+
+const isBasketPaymentModeMixed = computed(() => basketCheckoutPaymentIntent.value === "mixed");
+
+const syncPaymentMethodWithBasket = () => {
+  if (currentOrderId.value || String(myIdReturnSessionId.value || "").trim()) {
+    return;
+  }
+
+  if (basketCheckoutPaymentIntent.value === "installment") {
+    checkoutForm.value.paymentMethod = "myid";
+    return;
+  }
+
+  checkoutForm.value.paymentMethod = "click";
+};
+
 const hasActiveStraightPaymentOrder = computed(
   () =>
     Boolean(currentOrderId.value) &&
@@ -322,6 +387,36 @@ const totalInitialPaymentFormatted = computed(() => formatPriceValue(totalInitia
 const totalMonthlyInstallmentFormatted = computed(() =>
   formatPriceValue(totalMonthlyInstallment.value)
 );
+
+const summaryInstallmentMonthsDisplay = computed(() => {
+  locale.value;
+
+  if (!basketItems.value.length) {
+    return "";
+  }
+
+  const monthsList = [];
+  basketItems.value.forEach((item) => {
+    const selection = getInstallmentSelectionForItem(item);
+    const months = Number(selection.selectedPlan?.months || item?.credit_plan?.months || 0);
+    if (!Number.isFinite(months) || months <= 0) {
+      return;
+    }
+    const qty = Math.max(1, Number(item?.quantity || 1));
+    for (let i = 0; i < qty; i += 1) {
+      monthsList.push(months);
+    }
+  });
+
+  if (!monthsList.length) {
+    return "";
+  }
+
+  const unique = [...new Set(monthsList)].sort((a, b) => a - b);
+  const monthSuffix = t("credit.months");
+  return unique.map((m) => `${m} ${monthSuffix}`).join(", ");
+});
+
 const canShowCheckoutForm = computed(() => basketItems.value.length > 0);
 const basketSupportsInstallment = computed(() =>
   basketItems.value.every((item) =>
@@ -341,15 +436,35 @@ const allInstallmentPlansSelected = computed(
 );
 const showStatusCard = computed(() => Boolean(currentOrderId.value && orderStatus.value));
 const hasVerifiedMyId = computed(() => Boolean(myIdProfileResult.value) || currentOrderMyIdCode.value === 1);
-const installmentCompleted = computed(
-  () => hasVerifiedMyId.value && currentOrderStatus.value === "completed"
-);
 const needsInitialPayment = computed(() => totalInitialPayment.value > 0);
+const installmentCompleted = computed(() => {
+  if (!hasVerifiedMyId.value || currentOrderStatus.value !== "completed") {
+    return false;
+  }
+
+  // For flows with initial payment, completion means Click payment succeeded.
+  if (needsInitialPayment.value) {
+    return currentStatusPaymentMethod.value === "click";
+  }
+
+  return true;
+});
 const tariffStepCompleted = computed(
   () =>
     showMyIdConfirmCard.value ||
     (allInstallmentPlansSelected.value &&
-    (tariffStepConfirmed.value || hasVerifiedMyId.value || Boolean(currentOrderId.value))
+      (tariffStepConfirmed.value ||
+        hasVerifiedMyId.value ||
+        Boolean(currentOrderId.value) ||
+        basketCheckoutPaymentIntent.value === "installment"))
+);
+
+/** Installment tariff already chosen on product page — hide duplicate tariff step here. */
+const showCheckoutInstallmentTariffStep = computed(
+  () =>
+    !(
+      basketCheckoutPaymentIntent.value === "installment" &&
+      allInstallmentPlansSelected.value
     )
 );
 const installmentReadyToSubmitCredit = computed(
@@ -458,13 +573,26 @@ const activeInstallmentStepKey = computed(() => {
   return "complete";
 });
 
+/** Muddatli + MyID: ism/telefon UI da ko‘rinmaydi; sessiyasiz mijoz avval tizimga kirishi kerak. */
+const installmentMyIdGuestNeedLogin = computed(
+  () =>
+    isInstallmentJourney.value &&
+    !isCustomerLocked.value &&
+    activeInstallmentStepKey.value === "myid" &&
+    !showMyIdConfirmCard.value
+);
+
 const installmentStepItems = computed(() => {
   const steps = [
-    {
-      key: "tariff",
-      label: t("checkoutPage.stepTariff"),
-      done: tariffStepCompleted.value,
-    },
+    ...(showCheckoutInstallmentTariffStep.value
+      ? [
+          {
+            key: "tariff",
+            label: t("checkoutPage.stepTariff"),
+            done: tariffStepCompleted.value,
+          },
+        ]
+      : []),
     {
       key: "myid",
       label: t("checkoutPage.stepVerification"),
@@ -594,18 +722,18 @@ const currentStatusHint = computed(() => {
 
 const isVerificationButtonDisabled = computed(
   () =>
-    Boolean(myIdDisabledReason.value) ||
     myIdStartLoading.value ||
     myIdFinalizeLoading.value ||
-    basketHasInvalidPrice.value ||
-    totalAmount.value <= 0
+    installmentMyIdGuestNeedLogin.value ||
+    hasVerifiedMyId.value
 );
 const isStraightPaymentButtonDisabled = computed(
   () =>
     clickSubmitLoading.value ||
     basketHasInvalidPrice.value ||
     totalAmount.value <= 0 ||
-    hasActiveStraightPaymentOrder.value
+    hasActiveStraightPaymentOrder.value ||
+    isBasketPaymentModeMixed.value
 );
 
 const stopStatusPolling = () => {
@@ -624,6 +752,17 @@ const scheduleStatusPolling = () => {
   statusPollTimeoutId = window.setTimeout(() => {
     fetchOrderStatus();
   }, 4000);
+};
+
+const redirectCompletedInstallmentToOrders = () => {
+  if (!installmentCompleted.value) {
+    return false;
+  }
+
+  basketStore.clearBasket();
+  stopStatusPolling();
+  router.replace("/profile/orders");
+  return true;
 };
 
 const getInitialPaymentStorageKey = (orderId) =>
@@ -663,6 +802,13 @@ const applyStoredCustomerSession = () => {
   checkoutForm.value.name = session.name || "";
   checkoutForm.value.phone = formatUzbekistanPhoneInput(session.phone || "");
 };
+
+watch(
+  () => route.fullPath,
+  () => {
+    applyStoredCustomerSession();
+  }
+);
 
 const applyPaymentMethodFromQuery = () => {
   if (myIdReturnSessionId.value) {
@@ -713,6 +859,7 @@ const refreshBasketProductPaymentFlags = async () => {
     );
     basketStore.replaceBasketItem(itemKey, {
       ...item,
+      payment_schedule_mode: item.payment_schedule_mode,
       credit_enabled: Boolean(latestProduct.credit_enabled),
       credit_months: latestProduct.credit_months,
       credit_percent: latestProduct.credit_percent,
@@ -800,6 +947,10 @@ const fetchOrderStatus = async () => {
       initialPaymentUrl.value = readInitialPaymentUrl(currentOrderId.value);
     }
 
+    if (redirectCompletedInstallmentToOrders()) {
+      return;
+    }
+
     if (currentOrderStatus.value === "completed") {
       basketStore.clearBasket();
     }
@@ -853,6 +1004,9 @@ const handleMyIdPassportSeriesInput = (event) => {
     pastedDigits || getMyIdPassportNumber()
   );
 
+  myIdIdentityErrors.value.passportSeries = false;
+  myIdIdentityErrors.value.passportNumber = false;
+
   if (normalizedSeries.length === 2) {
     requestAnimationFrame(() => myIdPassportNumberInput.value?.focus());
   }
@@ -860,6 +1014,8 @@ const handleMyIdPassportSeriesInput = (event) => {
 
 const handleMyIdPassportNumberInput = (event) => {
   setMyIdPassportParts(getMyIdPassportSeries(), event.target.value);
+  myIdIdentityErrors.value.passportSeries = false;
+  myIdIdentityErrors.value.passportNumber = false;
 };
 
 const normalizeMyIdBirthDateInput = (value) => {
@@ -869,6 +1025,11 @@ const normalizeMyIdBirthDateInput = (value) => {
   const year = digits.slice(4, 8);
 
   return [day, month, year].filter(Boolean).join(".");
+};
+
+const handleMyIdBirthDateTextInput = (event) => {
+  checkoutForm.value.myIdBirthDate = normalizeMyIdBirthDateInput(event.target.value);
+  myIdIdentityErrors.value.birthDate = false;
 };
 
 const toMyIdBirthDatePayload = (value) => {
@@ -920,6 +1081,33 @@ const openBirthDatePicker = () => {
 
 const handleBirthDatePickerChange = (event) => {
   checkoutForm.value.myIdBirthDate = toMyIdBirthDateDisplay(event.target.value);
+  myIdIdentityErrors.value.birthDate = false;
+};
+
+const clearMyIdIdentityErrors = () => {
+  myIdIdentityErrors.value = createEmptyMyIdIdentityErrors();
+};
+
+const validateMyIdIdentityFields = () => {
+  clearMyIdIdentityErrors();
+  let ok = true;
+  const series = String(getMyIdPassportSeries() || "").trim();
+  const num = String(getMyIdPassportNumber() || "").trim();
+
+  if (!/^[A-Z]{2}$/.test(series)) {
+    myIdIdentityErrors.value.passportSeries = true;
+    ok = false;
+  }
+  if (!/^\d{7}$/.test(num)) {
+    myIdIdentityErrors.value.passportNumber = true;
+    ok = false;
+  }
+  if (!toMyIdBirthDatePayload(checkoutForm.value.myIdBirthDate)) {
+    myIdIdentityErrors.value.birthDate = true;
+    ok = false;
+  }
+
+  return ok;
 };
 
 const replaceCheckoutQuery = async (nextQuery = {}) => {
@@ -959,6 +1147,11 @@ const resetTransientMyIdState = () => {
 const buildCheckoutPayload = () => {
   if (!canShowCheckoutForm.value) {
     pageError.value = t("checkoutPage.emptyAction");
+    return null;
+  }
+
+  if (isBasketPaymentModeMixed.value) {
+    pageError.value = t("checkoutPage.basketPaymentModeMixed");
     return null;
   }
 
@@ -1157,6 +1350,12 @@ const fetchMyIdSessionResult = async () => {
 const startInstallmentVerification = async () => {
   pageError.value = "";
   resetTransientMyIdState();
+  clearMyIdIdentityErrors();
+
+  if (isBasketPaymentModeMixed.value) {
+    pageError.value = t("checkoutPage.basketPaymentModeMixed");
+    return;
+  }
 
   if (myIdDisabledReason.value) {
     pageError.value = myIdDisabledReason.value;
@@ -1168,6 +1367,10 @@ const startInstallmentVerification = async () => {
     return;
   }
 
+  if (!validateMyIdIdentityFields()) {
+    return;
+  }
+
   const payload = buildCheckoutPayload();
   if (!payload) {
     return;
@@ -1175,11 +1378,6 @@ const startInstallmentVerification = async () => {
 
   const passData = toMyIdPassportPayload(checkoutForm.value.myIdPassport);
   const birthDate = toMyIdBirthDatePayload(checkoutForm.value.myIdBirthDate);
-
-  if (!passData || !birthDate) {
-    pageError.value = t("checkoutPage.myidMissingIdentity");
-    return;
-  }
 
   myIdStartLoading.value = true;
 
@@ -1225,6 +1423,11 @@ const startInstallmentVerification = async () => {
 
 const submitStraightPayment = async () => {
   pageError.value = "";
+
+  if (isBasketPaymentModeMixed.value) {
+    pageError.value = t("checkoutPage.basketPaymentModeMixed");
+    return;
+  }
 
   if (hasActiveStraightPaymentOrder.value) {
     await fetchOrderStatus();
@@ -1285,6 +1488,11 @@ const continueInitialPayment = () => {
 const confirmTariffStep = () => {
   pageError.value = "";
 
+  if (isBasketPaymentModeMixed.value) {
+    pageError.value = t("checkoutPage.basketPaymentModeMixed");
+    return;
+  }
+
   if (!allInstallmentPlansSelected.value) {
     pageError.value = t("checkoutPage.installmentUnavailable");
     return;
@@ -1339,7 +1547,11 @@ watch(
 watch(
   () => selectedPaymentQuery.value,
   () => {
-    if (flowSwitchLocked.value || currentOrderMyIdCode.value === 1) {
+    if (
+      flowSwitchLocked.value ||
+      currentOrderMyIdCode.value === 1 ||
+      paymentFlowChoiceLockedByBasket.value
+    ) {
       return;
     }
     applyPaymentMethodFromQuery();
@@ -1365,9 +1577,43 @@ watch(
       !currentOrderId.value &&
       currentOrderMyIdCode.value !== 1
     ) {
+      if (
+        paymentFlowChoiceLockedByBasket.value &&
+        basketCheckoutPaymentIntent.value === "installment"
+      ) {
+        return;
+      }
       checkoutForm.value.paymentMethod = "click";
     }
   }
+);
+
+watch(
+  () => creditTariffsStore.tariffs,
+  () => {
+    if (currentOrderId.value || String(myIdReturnSessionId.value || "").trim()) {
+      return;
+    }
+    syncPaymentMethodWithBasket();
+    if (!paymentFlowChoiceLockedByBasket.value) {
+      applyPaymentMethodFromQuery();
+    }
+  },
+  { deep: true }
+);
+
+watch(
+  basketItems,
+  () => {
+    if (currentOrderId.value || String(myIdReturnSessionId.value || "").trim()) {
+      return;
+    }
+    syncPaymentMethodWithBasket();
+    if (!paymentFlowChoiceLockedByBasket.value) {
+      applyPaymentMethodFromQuery();
+    }
+  },
+  { deep: true }
 );
 
 watch(
@@ -1428,6 +1674,13 @@ watch(
       const itemKey = getBasketItemKey(item);
       const selection = selectionMap[itemKey];
 
+      if (getItemCheckoutScheduleMode(item) === "full") {
+        if (item?.credit_plan) {
+          setBasketItemCreditPlan(itemKey, null);
+        }
+        return;
+      }
+
       if (!selection?.plans?.length) {
         if (item?.credit_plan) {
           setBasketItemCreditPlan(itemKey, null);
@@ -1452,7 +1705,6 @@ onMounted(async () => {
   }
 
   applyStoredCustomerSession();
-  applyPaymentMethodFromQuery();
   await refreshBasketProductPaymentFlags();
 
   await Promise.all([
@@ -1460,6 +1712,11 @@ onMounted(async () => {
     fetchMyIdMeta(),
     basketItems.value.length ? creditTariffsStore.fetchTariffs() : Promise.resolve(),
   ]);
+
+  syncPaymentMethodWithBasket();
+  if (!paymentFlowChoiceLockedByBasket.value) {
+    applyPaymentMethodFromQuery();
+  }
 
   initialPaymentUrl.value = readInitialPaymentUrl(currentOrderId.value);
 });
@@ -1471,7 +1728,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="checkout-page max-w-6xl mx-auto px-4 py-12 mt-[30px]">
+  <div
+    class="checkout-page max-w-6xl mx-auto px-4 py-12"
+  >
     <div class="checkout-head">
       <button type="button" class="checkout-back" @click="router.push('/basket')">
         <LeftArrow :size="24" />
@@ -1494,6 +1753,10 @@ onBeforeUnmount(() => {
       {{ pageError }}
     </div>
 
+    <div v-if="canShowCheckoutForm && isBasketPaymentModeMixed" class="checkout-alert is-error">
+      {{ t("checkoutPage.basketPaymentModeMixed") }}
+    </div>
+
     <div
       v-if="myIdReturnSessionId && !showMyIdConfirmCard && myIdReturnReasonCode === null"
       class="checkout-alert is-success"
@@ -1507,40 +1770,7 @@ onBeforeUnmount(() => {
 
     <div v-if="canShowCheckoutForm" class="checkout-shell">
       <main class="checkout-main">
-        <section class="checkout-band">
-          <div class="checkout-flow-switch">
-            <button
-              type="button"
-              :class="[
-                'checkout-flow-btn',
-                { active: !isInstallmentJourney, disabled: flowSwitchLocked },
-              ]"
-              :disabled="flowSwitchLocked"
-              @click="checkoutForm.paymentMethod = 'click'"
-            >
-              <span class="checkout-flow-title">{{ t("checkoutPage.oneTimeOption") }}</span>
-              <span class="checkout-flow-copy">{{ t("checkoutPage.oneTimeDescription") }}</span>
-            </button>
 
-            <button
-              type="button"
-              :class="[
-                'checkout-flow-btn',
-                {
-                  active: isInstallmentJourney,
-                  disabled: Boolean(myIdDisabledReason) || flowSwitchLocked,
-                },
-              ]"
-              :disabled="Boolean(myIdDisabledReason) || flowSwitchLocked"
-              @click="checkoutForm.paymentMethod = 'myid'"
-            >
-              <span class="checkout-flow-title">{{ t("checkoutPage.installmentOption") }}</span>
-              <span class="checkout-flow-copy">
-                {{ myIdDisabledReason || t("checkoutPage.myidDescription") }}
-              </span>
-            </button>
-          </div>
-        </section>
 
         <section
           v-if="isInstallmentJourney && installmentStepItems.length"
@@ -1551,18 +1781,22 @@ onBeforeUnmount(() => {
               v-for="step in installmentStepItems"
               :key="step.key"
               :class="['checkout-step', `is-${step.state}`]"
+              :aria-label="step.label"
+              :title="step.label"
             >
               <span class="checkout-step-number">
                 <CircleCheckBig v-if="step.state === 'done'" class="h-4 w-4" />
                 <template v-else>{{ step.number }}</template>
               </span>
-              <span class="checkout-step-label">{{ step.label }}</span>
             </div>
           </div>
         </section>
 
         <section
-          v-if="!isInstallmentJourney || activeInstallmentStepKey === 'tariff'"
+          v-if="
+            !isInstallmentJourney ||
+            (showCheckoutInstallmentTariffStep && activeInstallmentStepKey === 'tariff')
+          "
           class="checkout-band"
         >
           <div class="checkout-section-head">
@@ -1608,7 +1842,10 @@ onBeforeUnmount(() => {
                   </span>
                 </div>
 
-                <div v-if="isInstallmentJourney" class="checkout-installment-picker">
+                <div
+                  v-if="isInstallmentJourney && showCheckoutInstallmentTariffStep"
+                  class="checkout-installment-picker"
+                >
                   <div class="checkout-installment-head">
                     <strong>{{ t("checkoutPage.tariffTitle") }}</strong>
                     <span v-if="getInstallmentSelectionForItem(item).selectedPayment">
@@ -1654,7 +1891,10 @@ onBeforeUnmount(() => {
             </article>
           </div>
 
-          <div v-if="isInstallmentJourney" class="checkout-step-actions">
+          <div
+            v-if="isInstallmentJourney && showCheckoutInstallmentTariffStep"
+            class="checkout-step-actions"
+          >
             <button
               type="button"
               class="checkout-primary-btn"
@@ -1692,36 +1932,15 @@ onBeforeUnmount(() => {
               </button>
             </div>
 
+            <div v-else-if="installmentMyIdGuestNeedLogin" class="checkout-alert is-error checkout-myid-login-hint">
+              <p>{{ t("checkoutPage.installmentMyIdGuestHint") }}</p>
+              <RouterLink class="checkout-myid-login-link" :to="{ path: '/login', query: { redirect: route.fullPath } }">
+                {{ t("nav.login") }}
+              </RouterLink>
+            </div>
+
             <template v-else>
               <div class="checkout-form-grid">
-                <label class="checkout-field">
-                  <span>{{ t("name") }}</span>
-                  <input
-                    v-model="checkoutForm.name"
-                    type="text"
-                    autocomplete="name"
-                    class="checkout-input"
-                    :placeholder="t('checkoutPage.nameHint')"
-                    :readonly="isCustomerLocked"
-                  />
-                </label>
-
-                <label class="checkout-field">
-                  <span>{{ t("phone") }}</span>
-                  <input
-                    :value="checkoutForm.phone"
-                    type="tel"
-                    autocomplete="tel"
-                    class="checkout-input"
-                    :placeholder="t('checkoutPage.phoneHint')"
-                    :readonly="isCustomerLocked"
-                    @input="
-                      !isCustomerLocked &&
-                      (checkoutForm.phone = formatUzbekistanPhoneInput($event.target.value))
-                    "
-                  />
-                </label>
-
                 <label class="checkout-field">
                   <span>{{ t("orderModal.passport") }}</span>
                   <div class="checkout-passport-row">
@@ -1732,6 +1951,7 @@ onBeforeUnmount(() => {
                       autocapitalize="characters"
                       autocomplete="off"
                       class="checkout-input checkout-passport-series"
+                      :class="{ 'checkout-input-invalid': myIdIdentityErrors.passportSeries }"
                       placeholder="AA"
                       @input="handleMyIdPassportSeriesInput"
                     />
@@ -1744,6 +1964,7 @@ onBeforeUnmount(() => {
                       autocomplete="off"
                       maxlength="7"
                       class="checkout-input checkout-passport-number"
+                      :class="{ 'checkout-input-invalid': myIdIdentityErrors.passportNumber }"
                       placeholder="1234567"
                       @input="handleMyIdPassportNumberInput"
                     />
@@ -1753,7 +1974,10 @@ onBeforeUnmount(() => {
                 <label class="checkout-field checkout-field-wide">
                   <span>{{ t("orderModal.birthDate") }}</span>
                   <div class="checkout-date-input-wrap">
-                    <div class="checkout-date-row">
+                    <div
+                      class="checkout-date-row checkout-date-combo"
+                      :class="{ 'checkout-date-combo-invalid': myIdIdentityErrors.birthDate }"
+                    >
                       <input
                         :value="checkoutForm.myIdBirthDate"
                         type="text"
@@ -1761,17 +1985,15 @@ onBeforeUnmount(() => {
                         autocomplete="bday"
                         class="checkout-input checkout-date-input"
                         :placeholder="t('checkoutPage.birthDateHint')"
-                        @input="
-                          checkoutForm.myIdBirthDate = normalizeMyIdBirthDateInput($event.target.value)
-                        "
+                        @input="handleMyIdBirthDateTextInput"
                       />
                       <button
                         type="button"
                         class="checkout-date-picker-btn"
+                        :aria-label="t('checkoutPage.birthDateCalendar')"
                         @click="openBirthDatePicker"
                       >
-                        <CalendarDays class="h-4 w-4" />
-                        {{ t("checkoutPage.birthDateCalendar") }}
+                        <CalendarDays class="h-5 w-5" />
                       </button>
                       <input
                         ref="birthDatePickerInput"
@@ -1831,7 +2053,6 @@ onBeforeUnmount(() => {
               <div>
                 <strong>{{ t("checkoutPage.initialPayment") }}</strong>
                 <p>{{ totalInitialPaymentFormatted }}</p>
-                <span>{{ currentStatusHint }}</span>
               </div>
 
               <button
@@ -1877,16 +2098,16 @@ onBeforeUnmount(() => {
           >
             <div class="checkout-next-step">
               <div>
-                <strong>{{ t("checkoutPage.stepComplete") }}</strong>
+                <strong>{{ t("checkoutPage.applicationSentTitle") }}</strong>
                 <p>{{ currentStatusHint || t("checkoutPage.myidHintCompleted") }}</p>
               </div>
 
               <button
                 type="button"
                 class="checkout-primary-btn"
-                @click="router.push('/profile/orders')"
+                @click="router.push('/products')"
               >
-                {{ t("profile.orders") }}
+                {{ t("checkoutPage.continueShopping") }}
               </button>
             </div>
           </section>
@@ -1968,6 +2189,14 @@ onBeforeUnmount(() => {
             <strong>{{ totalAmountFormatted }}</strong>
           </div>
 
+          <div
+            v-if="isInstallmentJourney && summaryInstallmentMonthsDisplay"
+            class="checkout-summary-row"
+          >
+            <span>{{ t("credit.term") }}</span>
+            <strong>{{ summaryInstallmentMonthsDisplay }}</strong>
+          </div>
+
           <div v-if="isInstallmentJourney" class="checkout-summary-row">
             <span>{{ t("checkoutPage.monthlyPaymentTotal") }}</span>
             <strong>{{ totalMonthlyInstallmentFormatted }}</strong>
@@ -2022,7 +2251,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-top: 50px;
+  margin-bottom: 20px;
   padding: 18px;
   border: 1px solid #e3ebe5;
   border-radius: 8px;
@@ -2132,6 +2362,13 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
+.checkout-flow-locked-hint {
+  margin: 12px 0 0;
+  font-size: 0.9rem;
+  color: #64736a;
+  line-height: 1.45;
+}
+
 .checkout-flow-btn {
   display: grid;
   gap: 6px;
@@ -2186,12 +2423,13 @@ onBeforeUnmount(() => {
 
 .checkout-step {
   position: relative;
-  min-width: 150px;
+  min-width: 44px;
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px;
+  justify-content: center;
+  gap: 0;
+  padding: 10px 12px;
   border: 1px solid #e3ebe5;
   border-radius: 8px;
   background: #fbfdfb;
@@ -2241,13 +2479,6 @@ onBeforeUnmount(() => {
 
 .checkout-step.is-active .checkout-step-number {
   background: #21442c;
-}
-
-.checkout-step-label {
-  font-size: 0.92rem;
-  font-weight: 600;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
 }
 
 .checkout-step-panel {
@@ -2453,6 +2684,37 @@ onBeforeUnmount(() => {
   box-shadow: 0 0 0 3px rgba(47, 125, 70, 0.12);
 }
 
+.checkout-input:read-only,
+.checkout-input:-moz-read-only {
+  color: #1f2933;
+  -webkit-text-fill-color: #1f2933;
+  opacity: 1;
+  cursor: default;
+  background: #f4faf6;
+}
+
+.checkout-myid-login-hint {
+  display: grid;
+  gap: 12px;
+  align-items: center;
+}
+
+.checkout-myid-login-hint p {
+  margin: 0;
+}
+
+.checkout-myid-login-link {
+  justify-self: start;
+  font-weight: 800;
+  color: #21442c;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.checkout-myid-login-link:hover {
+  color: #16301f;
+}
+
 .checkout-passport-row {
   display: grid;
   grid-template-columns: 82px minmax(0, 1fr);
@@ -2477,14 +2739,64 @@ onBeforeUnmount(() => {
 
 .checkout-date-row {
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
 }
 
-.checkout-date-input {
+.checkout-date-combo {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border: 1px solid #d8e4dc;
+  border-radius: 8px;
+  background: #fbfdfb;
+  overflow: hidden;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.checkout-date-combo:focus-within {
+  border-color: #2f7d46;
+  box-shadow: 0 0 0 3px rgba(47, 125, 70, 0.12);
+  background: #ffffff;
+}
+
+.checkout-date-combo-invalid {
+  border-color: #dc2626 !important;
+  box-shadow: none !important;
+}
+
+.checkout-date-combo-invalid:focus-within {
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18) !important;
+}
+
+.checkout-input.checkout-input-invalid {
+  border-color: #dc2626 !important;
+  box-shadow: none !important;
+}
+
+.checkout-input.checkout-input-invalid:focus {
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18) !important;
+}
+
+.checkout-date-combo .checkout-date-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
   font-weight: 800;
   letter-spacing: 0.04em;
+}
+
+.checkout-date-combo .checkout-date-input:focus {
+  outline: none;
+  border: none;
+  box-shadow: none;
+  background: transparent;
 }
 
 .checkout-date-input::placeholder {
@@ -2498,29 +2810,36 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
-.checkout-date-picker-btn {
+.checkout-date-combo .checkout-date-picker-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  flex-shrink: 0;
+  width: 48px;
+  min-width: 48px;
   min-height: 46px;
-  border: 1px solid #d8e4dc;
-  border-radius: 8px;
+  margin: 0;
+  border: none;
+  border-left: 1px solid #e3ebe5;
+  border-radius: 0;
   background: #ffffff;
   color: #21442c;
-  padding: 0 12px;
-  font-size: 0.86rem;
-  font-weight: 800;
+  padding: 0;
+  cursor: pointer;
   transition:
-    border-color 0.2s ease,
     background-color 0.2s ease,
-    transform 0.2s ease;
+    color 0.2s ease;
 }
 
-.checkout-date-picker-btn:hover {
-  border-color: #b8d8c2;
-  background: #f7fbf8;
-  transform: translateY(-1px);
+.checkout-date-combo .checkout-date-picker-btn:hover {
+  background: #f2fbf5;
+  color: #1a3d24;
+}
+
+.checkout-date-combo .checkout-date-picker-btn:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(47, 125, 70, 0.35);
+  z-index: 1;
 }
 
 .checkout-native-date-input {
@@ -2913,25 +3232,36 @@ onBeforeUnmount(() => {
   }
 
   .checkout-stepper {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-    overflow: visible;
-    padding: 0;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
   }
 
   .checkout-step {
+    flex: 1 1 0;
     min-width: 0;
-    width: 100%;
-    padding: 10px;
+    width: auto;
+    padding: 8px 6px;
+    gap: 6px;
   }
 
   .checkout-step:not(:last-child)::after {
-    display: none;
+    display: block;
+    right: -9px;
+    width: 8px;
   }
 
-  .checkout-step-label {
-    font-size: 0.84rem;
+  .checkout-step-number {
+    width: 22px;
+    height: 22px;
+    font-size: 0.72rem;
   }
 
   .checkout-product-row {
@@ -3006,13 +3336,10 @@ onBeforeUnmount(() => {
     grid-template-columns: 74px minmax(0, 1fr);
   }
 
-  .checkout-date-row {
-    grid-template-columns: 1fr;
-  }
-
-  .checkout-date-picker-btn {
-    min-height: 44px;
-    width: 100%;
+  .checkout-date-combo .checkout-date-picker-btn {
+    min-height: 48px;
+    width: 48px;
+    min-width: 48px;
   }
 
   .checkout-product-head,
@@ -3098,10 +3425,6 @@ onBeforeUnmount(() => {
   .checkout-summary-panel,
   .checkout-empty-state {
     padding: 12px;
-  }
-
-  .checkout-stepper {
-    grid-template-columns: 1fr;
   }
 
   .checkout-product-row {

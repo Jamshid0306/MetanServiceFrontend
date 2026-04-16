@@ -78,7 +78,6 @@ const createInitialProduct = () => ({
   name: { uz: "", ru: "" },
   description: { uz: "", ru: "" },
   characteristic: { uz: "", ru: "" },
-  default_price: "",
   // Display order for frontend listing.
   // Same order numbers will be ordered by `id` as a tie-breaker.
   order: 999999,
@@ -163,13 +162,6 @@ const getMinimumOptionPrice = (rawOptions) => {
     const cylinderVolumes = Array.isArray(fuelType?.cylinder_volumes)
       ? fuelType.cylinder_volumes
       : [];
-    const gb = Boolean(fuelType?.gearbox_program_enabled);
-    const auto = getNumericPrice(fuelType?.automatic_price_delta);
-    const manual = getNumericPrice(fuelType?.manual_price_delta);
-    // default_price catalog/home uchun faqat balon hajmi narxidan olinishi kerak.
-    // Avtomat/Mehanika qo‘shimchasi product detailda foydalanuvchi tanlagandan keyin qo‘shiladi.
-    const gearMin = 0;
-
     if (!cylinderVolumes.length) {
       return;
     }
@@ -179,8 +171,7 @@ const getMinimumOptionPrice = (rawOptions) => {
       if (v === null) {
         return;
       }
-      const addon = 0;
-      registerMinimumPrice(v + addon);
+      registerMinimumPrice(v);
     });
   });
 
@@ -357,7 +348,6 @@ const openUpdateModal = (product) => {
       uz: product.characteristic_uz || "",
       ru: product.characteristic_ru || "",
     },
-    default_price: formatOptionPriceInput(product.default_price),
     images: [],
     oldImages: oldImages,
     options: mapOptionsForForm(product, product.config_options),
@@ -436,10 +426,6 @@ const onCylinderCountInput = (event, option) => {
 
 const onCreditPercentInput = (event) => {
   return formatNumericInput(event.target.value);
-};
-
-const onDefaultPriceInput = (event) => {
-  newProduct.value.default_price = formatNumericInput(event.target.value);
 };
 
 const onInitialPaymentInput = (event) => {
@@ -531,7 +517,7 @@ const addOrUpdateProduct = async () => {
     "characteristic_en",
     fallbackCharacteristicEn
   );
-  formData.append("default_price", newProduct.value.default_price || "");
+  formData.append("default_price", "");
   const order = Number(newProduct.value.order);
   formData.append("order", String(Number.isFinite(order) ? order : 999999));
   formData.append("is_active", String(Boolean(newProduct.value.is_active)));
@@ -830,12 +816,6 @@ const toggleProductActive = async (product) => {
             <div class="product-price-value">
               {{ formatPrice(product.price_ru) }}
             </div>
-            <span
-              v-if="product.default_price"
-              class="product-price-note"
-            >
-              Без выбора: {{ formatPrice(product.default_price) }}
-            </span>
           </div>
         </Motion>
       </AnimatePresence>
@@ -1219,25 +1199,6 @@ const toggleProductActive = async (product) => {
                 />
                 <span>Показывать на сайте (каталог, поиск, главная)</span>
               </label>
-            </div>
-
-            <div class="editor-section space-y-3">
-              <div class="editor-section-head">
-                <div>
-                  <h3 class="editor-section-title">Цена без выбора</h3>
-                  <p class="editor-section-copy">
-                    Эта цена показывается на странице товара, пока пользователь ещё ничего не выбрал.
-                  </p>
-                </div>
-              </div>
-
-              <input
-                :value="newProduct.default_price"
-                @input="onDefaultPriceInput"
-                placeholder="Цена по умолчанию"
-                inputmode="numeric"
-                class="editor-field"
-              />
             </div>
 
             <div class="editor-section space-y-3">
