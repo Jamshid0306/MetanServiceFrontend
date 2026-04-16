@@ -86,6 +86,7 @@ const stickyPriceVisible = ref(false);
 /** Savatga bosilganda balon tanlanmagan bo‘lsa select atrofida qizil chegarа. */
 const cylinderVolumeSelectHighlighted = ref(false);
 const paymentModeSelectHighlighted = ref(false);
+const creditTariffSelectHighlighted = ref(false);
 let swiperInstance = null;
 let priceSummaryObserver = null;
 
@@ -842,6 +843,7 @@ const onInstallmentModeClick = () => {
     return;
   }
   paymentModeSelectHighlighted.value = false;
+  creditTariffSelectHighlighted.value = false;
   paymentScheduleMode.value = "installment";
   nextTick(() => {
     creditTariffsSectionRef.value?.scrollIntoView({
@@ -857,6 +859,7 @@ const onFullPaymentModeClick = () => {
     return;
   }
   paymentModeSelectHighlighted.value = false;
+  creditTariffSelectHighlighted.value = false;
   paymentScheduleMode.value = "full";
 };
 
@@ -1132,6 +1135,29 @@ const handleAddToBasket = () => {
 
   if (hasInstallmentTariffs.value && !paymentScheduleMode.value) {
     paymentModeSelectHighlighted.value = true;
+    creditTariffSelectHighlighted.value = false;
+    nextTick(() => {
+      document.getElementById("detail-payment-mode")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+    notification.value = { show: false, message: "" };
+    return;
+  }
+
+  if (paymentScheduleMode.value === "installment" && !selectedCreditConfig.value) {
+    creditTariffSelectHighlighted.value = true;
+    paymentModeSelectHighlighted.value = false;
+    nextTick(() => {
+      creditTariffsSectionRef.value?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      requestAnimationFrame(focusFirstCreditPlanButton);
+    });
+    notification.value = { show: false, message: "" };
+    return;
   }
 
   basketStore.addToBasket(configuredBasketItem.value);
@@ -1477,6 +1503,7 @@ watch(
 watch(hasInstallmentTariffs, (ok) => {
   if (!ok) {
     paymentModeSelectHighlighted.value = false;
+    creditTariffSelectHighlighted.value = false;
     paymentScheduleMode.value = "";
     if (orderForm.value.orderType === "credit") {
       orderForm.value.orderType = "standard";
@@ -1488,7 +1515,17 @@ watch(
   () => store.product?.id,
   () => {
     paymentModeSelectHighlighted.value = false;
+    creditTariffSelectHighlighted.value = false;
     paymentScheduleMode.value = "";
+  }
+);
+
+watch(
+  () => selectedCreditConfig.value?.months || null,
+  (months) => {
+    if (months) {
+      creditTariffSelectHighlighted.value = false;
+    }
   }
 );
 
@@ -1731,6 +1768,7 @@ onBeforeUnmount(() => {
                   role="group"
                   :aria-label="t('credit.installment') + ', ' + t('credit.fullPayment')"
                 >
+                  <div id="detail-payment-mode" class="detail-payment-mode-anchor"></div>
                   <button
                     type="button"
                     class="detail-payment-badge detail-payment-badge-btn"
@@ -1772,6 +1810,7 @@ onBeforeUnmount(() => {
                     </div>
                     <div
                       class="credit-plan-switcher detail-credit-plan-switcher"
+                      :class="{ 'detail-credit-plan-switcher-unselected': creditTariffSelectHighlighted }"
                       :style="{
                         gridTemplateColumns: `repeat(${Math.max(creditPlans.length, 1)}, minmax(0, 1fr))`,
                       }"
@@ -2844,6 +2883,13 @@ onBeforeUnmount(() => {
   box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.15);
 }
 
+.detail-payment-mode-anchor {
+  position: relative;
+  top: -10px;
+  width: 0;
+  height: 0;
+}
+
 .detail-credit-tariffs-label {
   font-size: 0.72rem;
   font-weight: 700;
@@ -2930,6 +2976,13 @@ onBeforeUnmount(() => {
   border-radius: 14px;
   justify-content: center;
   text-align: center;
+}
+
+.detail-credit-plan-switcher-unselected {
+  border: 1px solid #dc2626;
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.15);
 }
 
 .detail-credit-payment {

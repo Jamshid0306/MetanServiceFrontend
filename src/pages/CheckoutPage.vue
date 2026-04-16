@@ -556,6 +556,9 @@ const creditExtraPhonesPayload = computed(() => {
   }
   return values.slice(0, 3);
 });
+const areCreditExtraPhonesComplete = computed(
+  () => creditExtraPhonesPayload.value.length === 3
+);
 
 const verifiedProfileSummary = computed(() => {
   const profileRoot = myIdProfileResult.value?.profile;
@@ -1543,6 +1546,14 @@ const submitInstallmentCredit = async () => {
     return;
   }
 
+  if (!areCreditExtraPhonesComplete.value) {
+    pageError.value =
+      locale.value === "ru"
+        ? "Заполните 3 дополнительных номера телефона."
+        : "3 ta qo'shimcha telefon raqamini to'ldiring.";
+    return;
+  }
+
   pageError.value = "";
   creditSubmitLoading.value = true;
 
@@ -2149,7 +2160,11 @@ onBeforeUnmount(() => {
               <button
                 type="button"
                 class="checkout-primary-btn"
-                :disabled="!installmentReadyToSubmitCredit || creditSubmitLoading"
+                :disabled="
+                  !installmentReadyToSubmitCredit ||
+                  creditSubmitLoading ||
+                  !areCreditExtraPhonesComplete
+                "
                 @click="submitInstallmentCredit"
               >
                 {{ purchaseActionLabel }}
