@@ -44,6 +44,15 @@ const checkoutForm = ref({
   myIdPassport: "",
   myIdBirthDate: "",
 });
+const createEmptyCreditContact = () => ({
+  phone: "+998",
+  relation: "relative",
+});
+const creditExtraContacts = ref([
+  createEmptyCreditContact(),
+  createEmptyCreditContact(),
+  createEmptyCreditContact(),
+]);
 
 const pageError = ref("");
 const clickSubmitLoading = ref(false);
@@ -516,6 +525,37 @@ const verificationActionLabel = computed(() => {
 const purchaseActionLabel = computed(() =>
   creditSubmitLoading.value ? t("checkoutPage.purchaseWaiting") : t("buy")
 );
+const creditContactRelationOptions = computed(() => [
+  {
+    value: "relative",
+    label: locale.value === "ru" ? "Член семьи" : "Oila a'zosi",
+  },
+  {
+    value: "spouse",
+    label: locale.value === "ru" ? "Супруг(а)" : "Turmush o'rtog'i",
+  },
+  {
+    value: "parent",
+    label: locale.value === "ru" ? "Родитель" : "Ota-ona",
+  },
+  {
+    value: "sibling",
+    label: locale.value === "ru" ? "Брат / сестра" : "Aka-uka / opa-singil",
+  },
+]);
+const creditExtraPhonesPayload = computed(() => {
+  const seen = new Set();
+  const values = [];
+  for (const contact of creditExtraContacts.value) {
+    const normalized = normalizeCustomerPhone(contact.phone);
+    if (normalized.length !== 12 || seen.has(normalized)) {
+      continue;
+    }
+    seen.add(normalized);
+    values.push(normalized);
+  }
+  return values.slice(0, 3);
+});
 
 const verifiedProfileSummary = computed(() => {
   const profileRoot = myIdProfileResult.value?.profile;
@@ -1507,7 +1547,9 @@ const submitInstallmentCredit = async () => {
   creditSubmitLoading.value = true;
 
   try {
-    const response = await apiClient.post(`/payments/orders/${currentOrderId.value}/submit-credit`);
+    const response = await apiClient.post(`/payments/orders/${currentOrderId.value}/submit-credit`, {
+      phones: creditExtraPhonesPayload.value,
+    });
     const responseData = response.data || {};
 
     myIdResultNote.value = String(responseData?.result_note || "").trim();
@@ -2112,6 +2154,39 @@ onBeforeUnmount(() => {
               >
                 {{ purchaseActionLabel }}
               </button>
+            </div>
+
+            <div class="checkout-credit-phones">
+              <p class="checkout-credit-phones-title">
+                {{ locale === "ru" ? "Дополнительные телефоны (до 3)" : "Qo'shimcha telefonlar (3 tagacha)" }}
+              </p>
+              <div class="checkout-credit-phones-list">
+                <div
+                  v-for="(contact, index) in creditExtraContacts"
+                  :key="`credit-contact-${index}`"
+                  class="checkout-credit-phone-row"
+                >
+                  <input
+                    :value="contact.phone"
+                    type="tel"
+                    class="checkout-input"
+                    :placeholder="locale === 'ru' ? '+998 XX XXX XX XX' : '+998 XX XXX XX XX'"
+                    @input="contact.phone = formatUzbekistanPhoneInput($event.target.value)"
+                  />
+                  <select
+                    v-model="contact.relation"
+                    class="checkout-input checkout-credit-relation"
+                  >
+                    <option
+                      v-for="option in creditContactRelationOptions"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </option>
+                  </select>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -2959,6 +3034,36 @@ onBeforeUnmount(() => {
   font-size: 0.9rem;
 }
 
+.checkout-credit-phones {
+  margin-top: 14px;
+  border: 1px solid #d8e6dc;
+  border-radius: 14px;
+  background: #f8fcf9;
+  padding: 12px;
+}
+
+.checkout-credit-phones-title {
+  margin: 0 0 8px;
+  color: #2f5c3f;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.checkout-credit-phones-list {
+  display: grid;
+  gap: 8px;
+}
+
+.checkout-credit-phone-row {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: 8px;
+}
+
+.checkout-credit-relation {
+  min-height: 44px;
+}
+
 .checkout-actions {
   display: flex;
   justify-content: flex-end;
@@ -3421,6 +3526,10 @@ onBeforeUnmount(() => {
   .checkout-secondary-btn {
     width: 100%;
     min-height: 48px;
+  }
+
+  .checkout-credit-phone-row {
+    grid-template-columns: 1fr;
   }
 }
 
