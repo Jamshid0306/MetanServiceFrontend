@@ -759,10 +759,7 @@ const redirectCompletedInstallmentToOrders = () => {
     return false;
   }
 
-  basketStore.clearBasket();
-  stopStatusPolling();
-  router.replace("/profile/orders");
-  return true;
+  return false;
 };
 
 const getInitialPaymentStorageKey = (orderId) =>
@@ -1643,6 +1640,32 @@ watch(
 );
 
 watch(
+  () => [myIdReturnSessionId.value, effectiveMyIdAuthCode.value, myIdReturnReasonCode.value],
+  async ([sessionId, authCode, reasonCode]) => {
+    if (isMyIdPopupWindow.value) {
+      return;
+    }
+    if (!sessionId || !authCode || reasonCode !== null) {
+      return;
+    }
+
+    const key = `${sessionId}:auth:${authCode}`;
+    if (myIdReturnProcessedKey.value === key) {
+      return;
+    }
+
+    myIdReturnProcessedKey.value = key;
+    pageError.value = "";
+    await finalizeMyIdPayload({
+      sessionId,
+      authCode,
+      orderId: currentOrderId.value,
+    });
+  },
+  { immediate: true }
+);
+
+watch(
   () => [myIdReturnSessionId.value, myIdReturnAuthCode.value, myIdReturnReasonCode.value],
   async ([sessionId, authCode, reasonCode]) => {
     if (isMyIdPopupWindow.value) {
@@ -2105,9 +2128,9 @@ onBeforeUnmount(() => {
               <button
                 type="button"
                 class="checkout-primary-btn"
-                @click="router.push('/products')"
+                @click="router.push('/profile/orders')"
               >
-                {{ t("checkoutPage.continueShopping") }}
+                {{ t("profile.orders") }}
               </button>
             </div>
           </section>
@@ -2226,8 +2249,8 @@ onBeforeUnmount(() => {
       <p class="checkout-empty-copy">
         {{ showStatusCard ? currentStatusHint : t("checkoutPage.emptyAction") }}
       </p>
-      <button type="button" class="checkout-primary-btn" @click="router.push('/products')">
-        {{ t("checkoutPage.continueShopping") }}
+      <button type="button" class="checkout-primary-btn" @click="router.push('/profile/orders')">
+        {{ t("profile.orders") }}
       </button>
     </div>
   </div>

@@ -17,7 +17,6 @@ const saving = ref(false);
 const notifShow = ref(false);
 const notifMessage = ref("");
 const notifVariant = ref("success");
-const productSearch = ref("");
 const serviceImagePreview = ref("");
 
 const createInitialService = () => ({
@@ -61,7 +60,6 @@ const resetForm = () => {
   currentServiceId.value = null;
   currentLang.value = "uz";
   saving.value = false;
-  productSearch.value = "";
 };
 
 const closeModal = () => {
@@ -88,7 +86,7 @@ const openUpdateModal = (service) => {
       ru: service.characteristic_ru || "",
     },
     price: formatNumericInput(service.price_uz || service.price_ru || service.price_en),
-    product_ids: Array.isArray(service.product_ids) ? [...service.product_ids] : [],
+    product_ids: [],
     file: null,
     image_path: service.image_path || "",
   };
@@ -103,16 +101,6 @@ const handleServiceFileChange = (event) => {
     file,
     serviceForm.value.image_path ? resolveAssetUrl(serviceForm.value.image_path) : ""
   );
-};
-
-const toggleProduct = (productId) => {
-  const next = new Set(serviceForm.value.product_ids);
-  if (next.has(productId)) {
-    next.delete(productId);
-  } else {
-    next.add(productId);
-  }
-  serviceForm.value.product_ids = [...next];
 };
 
 const submitService = async () => {
@@ -190,33 +178,9 @@ const confirmDelete = async () => {
 const services = computed(() =>
   Array.isArray(store.services) ? store.services : []
 );
-const products = computed(() =>
-  Array.isArray(store.products) ? store.products : []
-);
 const getServiceImageUrl = (service) => resolveAssetUrl(service?.image_path);
-const selectedProductsCount = computed(() => serviceForm.value.product_ids.length);
-const filteredProducts = computed(() => {
-  const query = String(productSearch.value || "").trim().toLowerCase();
-  if (!query) {
-    return products.value;
-  }
-
-  return products.value.filter((product) => {
-    const id = String(product.id || "");
-    const nameRu = String(product.name_ru || "").toLowerCase();
-    const nameUz = String(product.name_uz || "").toLowerCase();
-    return (
-      id.includes(query) ||
-      nameRu.includes(query) ||
-      nameUz.includes(query)
-    );
-  });
-});
 
 onMounted(async () => {
-  if (!store.products.length) {
-    await store.getProducts();
-  }
   await store.getServices();
 });
 
@@ -324,9 +288,9 @@ onBeforeUnmount(() => {
                   <small>Текущая вкладка</small>
                 </div>
                 <div class="service-stat-card">
-                  <span>Товаров</span>
-                  <strong>{{ selectedProductsCount }}</strong>
-                  <small>Выбрано в услуге</small>
+                  <span>Привязка</span>
+                  <strong>В товаре</strong>
+                  <small>Отмечается в карточке товара</small>
                 </div>
               </div>
             </div>
@@ -438,50 +402,18 @@ onBeforeUnmount(() => {
               <div class="editor-panel service-products-panel">
                 <div class="editor-section-head service-products-head">
                   <div>
-                    <h3 class="editor-section-title">Связанные товары</h3>
+                    <h3 class="editor-section-title">Привязка к товарам</h3>
                     <p class="editor-section-copy">
-                      Отметьте товары, где эта услуга должна отображаться у клиента.
+                      Выбор товаров перенесён в форму продукта: откройте товар и отметьте нужные услуги чекбоксом.
                     </p>
                   </div>
                 </div>
 
-                <div class="service-products-toolbar">
-                  <input
-                    v-model="productSearch"
-                    type="text"
-                    class="editor-field service-editor-field service-search-field"
-                    placeholder="Поиск по ID или названию товара..."
-                  />
-                  <div class="service-selected-pill">
-                    Выбрано: {{ selectedProductsCount }}
-                  </div>
-                </div>
-
-                <div class="service-products-list">
-                  <label
-                    v-for="product in filteredProducts"
-                    :key="product.id"
-                    class="service-product-item"
-                    :class="{
-                      'service-product-item-active': serviceForm.product_ids.includes(product.id),
-                    }"
-                  >
-                    <input
-                      type="checkbox"
-                      :checked="serviceForm.product_ids.includes(product.id)"
-                      @change="toggleProduct(product.id)"
-                    />
-                    <div class="service-product-copy">
-                      <strong>#{{ product.id }} {{ product.name_ru }}</strong>
-                  <span>{{ product.name_uz || product.name_ru || "Название не заполнено" }}</span>
-                    </div>
-                  </label>
-                <div v-if="!filteredProducts.length" class="service-empty-state">
-                  По вашему поиску товары не найдены.
+                <div class="service-empty-state">
+                  Эта форма сохраняет только данные услуги. Привязка выполняется в разделе товаров.
                 </div>
               </div>
             </div>
-          </div>
 
             <div class="editor-actions service-modal-actions">
               <button type="button" class="editor-secondary-btn service-modal-action-btn" @click="closeModal">

@@ -93,6 +93,7 @@ const createInitialProduct = () => ({
 const newProduct = ref(createInitialProduct());
 
 const imagePreviews = ref([]);
+const selectedServiceIds = ref([]);
 
 const showNotification = (msg) => {
   notifMessage.value = msg;
@@ -352,6 +353,11 @@ const openUpdateModal = (product) => {
     oldImages: oldImages,
     options: mapOptionsForForm(product, product.config_options),
   };
+  selectedServiceIds.value = Array.isArray(product?.extra_services)
+    ? product.extra_services
+        .map((service) => Number(service?.id || 0))
+        .filter((id) => Number.isFinite(id) && id > 0)
+    : [];
 
   showModal.value = true;
 };
@@ -359,10 +365,110 @@ const openUpdateModal = (product) => {
 const resetForm = () => {
   newProduct.value = createInitialProduct();
   imagePreviews.value = [];
+  selectedServiceIds.value = [];
   loading.value = false;
   isUpdate.value = false;
   currentProductId.value = null;
   currentLang.value = "uz";
+};
+
+const services = computed(() =>
+  Array.isArray(store.services) ? store.services : []
+);
+
+const toggleServiceForProduct = (serviceId) => {
+  const normalizedId = Number(serviceId || 0);
+  if (!Number.isFinite(normalizedId) || normalizedId <= 0) {
+    return;
+  }
+
+  const next = new Set(selectedServiceIds.value);
+  if (next.has(normalizedId)) {
+    next.delete(normalizedId);
+  } else {
+    next.add(normalizedId);
+  }
+  selectedServiceIds.value = [...next];
+};
+
+const syncProductServiceLinks = async (productId) => {
+  const normalizedProductId = Number(productId || 0);
+  if (!Number.isFinite(normalizedProductId) || normalizedProductId <= 0) {
+    return true;
+  }
+
+  if (!Array.isArray(store.services) || !store.services.length) {
+    const loaded = await store.getServices();
+    if (!loaded) {
+      return false;
+    }
+  }
+
+  const selectedSet = new Set(
+    selectedServiceIds.value
+      .map((id) => Number(id || 0))
+      .filter((id) => Number.isFinite(id) && id > 0)
+  );
+
+  for (const service of store.services) {
+    const serviceId = Number(service?.id || 0);
+    if (!Number.isFinite(serviceId) || serviceId <= 0) {
+      continue;
+    }
+
+    const currentProductIds = Array.isArray(service?.product_ids)
+      ? service.product_ids
+          .map((id) => Number(id || 0))
+          .filter((id) => Number.isFinite(id) && id > 0)
+      : [];
+    const nextProductIdsSet = new Set(currentProductIds);
+
+    if (selectedSet.has(serviceId)) {
+      nextProductIdsSet.add(normalizedProductId);
+    } else {
+      nextProductIdsSet.delete(normalizedProductId);
+    }
+
+    const nextProductIds = [...nextProductIdsSet].sort((a, b) => a - b);
+    const currentSorted = [...currentProductIds].sort((a, b) => a - b);
+    const unchanged =
+      nextProductIds.length === currentSorted.length &&
+      nextProductIds.every((id, index) => id === currentSorted[index]);
+
+    if (unchanged) {
+      continue;
+    }
+
+    const payload = new FormData();
+    payload.append("name_uz", String(service?.name_uz || "").trim());
+    payload.append("name_ru", String(service?.name_ru || "").trim());
+    payload.append(
+      "name_en",
+      String(service?.name_en || service?.name_ru || service?.name_uz || "").trim()
+    );
+    payload.append("characteristic_uz", String(service?.characteristic_uz || "").trim());
+    payload.append("characteristic_ru", String(service?.characteristic_ru || "").trim());
+    payload.append(
+      "characteristic_en",
+      String(
+        service?.characteristic_en ||
+          service?.characteristic_ru ||
+          service?.characteristic_uz ||
+          ""
+      ).trim()
+    );
+    payload.append("price_uz", String(service?.price_uz || "").trim());
+    payload.append("price_ru", String(service?.price_ru || service?.price_uz || "").trim());
+    payload.append("price_en", String(service?.price_en || service?.price_ru || "").trim());
+    payload.append("product_ids", JSON.stringify(nextProductIds));
+
+    const ok = await store.updateService(serviceId, payload);
+    if (!ok) {
+      return false;
+    }
+  }
+
+  return true;
 };
 
 const addFuelType = () => {
@@ -565,10 +671,19 @@ const addOrUpdateProduct = async () => {
     if (isUpdate.value) {
       isSuccess = await store.updateProduct(currentProductId.value, formData);
       if (isSuccess) {
+        isSuccess = await syncProductServiceLinks(currentProductId.value);
+      }
+      if (isSuccess) {
         showNotification("Товар успешно обновлён!");
       }
     } else {
       isSuccess = await store.createProduct(formData);
+      if (isSuccess) {
+        const createdProduct = Array.isArray(store.products)
+          ? [...store.products].sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0))[0]
+          : null;
+        isSuccess = await syncProductServiceLinks(createdProduct?.id);
+      }
       if (isSuccess) {
         showNotification("Товар успешно добавлен!");
       }
@@ -595,7 +710,7 @@ const deleteProduct = async () => {
 
 onMounted(async () => {
   useLoaderStore().loader = true;
-  await store.getProducts();
+  await Promise.all([store.getProducts(), store.getServices()]);
 });
 watch(
   () => newProduct.value.credit_enabled,
@@ -1169,6 +1284,39 @@ const toggleProductActive = async (product) => {
                 :placeholder="`Характеристика (${currentLang.toUpperCase()})`"
                 class="editor-field editor-textarea editor-textarea-tall"
               ></textarea>
+            </div>
+
+            <div class="editor-section space-y-3">
+              <div class="editor-section-head">
+                <div>
+                  <h3 class="editor-section-title">Услуги для товара</h3>
+                  <p class="editor-section-copy">
+                    Отметьте услуги, которые должны показываться в карточке этого товара.
+                  </p>
+                </div>
+              </div>
+
+              <div v-if="services.length" class="product-service-list">
+                <label
+                  v-for="service in services"
+                  :key="service.id"
+                  class="product-service-item"
+                  :class="{ 'product-service-item-active': selectedServiceIds.includes(Number(service.id)) }"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="selectedServiceIds.includes(Number(service.id))"
+                    @change="toggleServiceForProduct(service.id)"
+                  />
+                  <div class="product-service-copy">
+                    <strong>#{{ service.id }} {{ service.name_ru || service.name_uz }}</strong>
+                    <span>{{ service.characteristic_ru || service.characteristic_uz || "Описание не заполнено" }}</span>
+                  </div>
+                </label>
+              </div>
+              <div v-else class="editor-empty-state">
+                Сначала добавьте услуги в блоке «Дополнительные услуги».
+              </div>
             </div>
 
             <div class="editor-section space-y-3">
@@ -1949,6 +2097,54 @@ const toggleProductActive = async (product) => {
   background: #173c74;
   color: #ffffff;
   box-shadow: 0 10px 18px rgba(8, 30, 72, 0.16);
+}
+
+.product-service-list {
+  display: grid;
+  gap: 0.55rem;
+  max-height: 250px;
+  overflow: auto;
+  padding-right: 0.25rem;
+}
+
+.product-service-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  border: 1px solid rgba(20, 54, 108, 0.12);
+  border-radius: 12px;
+  padding: 0.6rem 0.7rem;
+  background: #eef5ff;
+}
+
+.product-service-item input {
+  margin-top: 0.15rem;
+  width: 16px;
+  height: 16px;
+}
+
+.product-service-item-active {
+  border-color: rgba(23, 60, 116, 0.42);
+  background: #dbe9ff;
+}
+
+.product-service-copy {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.product-service-copy strong {
+  color: #173c74;
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.product-service-copy span {
+  color: #4b6285;
+  font-size: 0.75rem;
+  line-height: 1.3;
 }
 
 .language-btn {
