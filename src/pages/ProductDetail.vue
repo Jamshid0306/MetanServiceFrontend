@@ -1759,7 +1759,7 @@ onBeforeUnmount(() => {
                 </div>
 
                 <div
-                  v-if="hasInstallmentTariffs"
+                  v-if="hasInstallmentTariffs && paymentScheduleMode !== 'full'"
                   ref="creditTariffsSectionRef"
                   class="detail-credit-inline detail-credit-inline--stacked"
                 >
