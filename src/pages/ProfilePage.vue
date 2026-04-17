@@ -221,15 +221,18 @@ onUnmounted(() => {
 }
 
 .profile-avatar {
+  flex: 0 0 58px;
   display: grid;
   place-items: center;
   width: 58px;
   height: 58px;
+  aspect-ratio: 1 / 1;
   border-radius: 50%;
   background: #f3f4f6;
   color: #9ca3af;
   font-size: 1.15rem;
   font-weight: 900;
+  line-height: 1;
 }
 
 .profile-hero-copy {
