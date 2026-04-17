@@ -85,6 +85,7 @@ const orderForm = ref(createEmptyOrderForm());
 const stickyPriceVisible = ref(false);
 /** Savatga bosilganda balon tanlanmagan bo‘lsa select atrofida qizil chegarа. */
 const cylinderVolumeSelectHighlighted = ref(false);
+const balloonProgramSelectHighlighted = ref(false);
 const paymentModeSelectHighlighted = ref(false);
 const creditTariffSelectHighlighted = ref(false);
 let swiperInstance = null;
@@ -925,6 +926,17 @@ const configuredBasketItem = computed(() =>
       })()
     : null
 );
+const isConfiguredProductInBasket = computed(() => {
+  const item = configuredBasketItem.value;
+  if (!item) {
+    return false;
+  }
+  const productId = Number(item.id || 0);
+  if (!Number.isFinite(productId) || productId <= 0) {
+    return false;
+  }
+  return basketStore.basket.some((basketItem) => Number(basketItem?.id || 0) === productId);
+});
 const currentOrderTotal = computed(() => {
   const numericPrice = parseNumericPrice(combinedSelectedPrice.value);
   return numericPrice === null ? 0 : numericPrice;
@@ -1093,11 +1105,22 @@ const closeFuelGuideModal = () => {
 };
 
 const handleAddToBasket = () => {
+  if (isConfiguredProductInBasket.value) {
+    router.push({ name: "Basket" });
+    return;
+  }
+
   if (detailAnimating.value) {
     return;
   }
 
-  if (!isProductOptionSelectionComplete.value) {
+  balloonProgramSelectHighlighted.value = false;
+
+  if (
+    !isProductOptionSelectionComplete.value &&
+    !(hasTransmissionGroup.value && balloonProgramEnabled.value === null)
+  ) {
+    balloonProgramSelectHighlighted.value = false;
     const resolved = resolvedSelectedOptions.value;
     const raw = selectedOptions.value;
     const needsCylinder =
@@ -1155,6 +1178,18 @@ const handleAddToBasket = () => {
         block: "center",
       });
       requestAnimationFrame(focusFirstCreditPlanButton);
+    });
+    notification.value = { show: false, message: "" };
+    return;
+  }
+
+  if (hasTransmissionGroup.value && balloonProgramEnabled.value === null) {
+    balloonProgramSelectHighlighted.value = true;
+    nextTick(() => {
+      document.getElementById("detail-balloon-program")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
     });
     notification.value = { show: false, message: "" };
     return;
@@ -1358,6 +1393,7 @@ const fetchProductData = async (id) => {
 
 const setBalloonProgramEnabled = (enabled) => {
   balloonProgramEnabled.value = enabled === true ? true : false;
+  balloonProgramSelectHighlighted.value = false;
 
   // Transmission tanlovi o'chirilsa, narx transmissionPrice qo'shilmasdan faqat balon hajmi narxidan hisoblanadi.
   const next = { ...(selectedOptions.value || {}) };
@@ -1810,7 +1846,6 @@ onBeforeUnmount(() => {
                     </div>
                     <div
                       class="credit-plan-switcher detail-credit-plan-switcher"
-                      :class="{ 'detail-credit-plan-switcher-unselected': creditTariffSelectHighlighted }"
                       :style="{
                         gridTemplateColumns: `repeat(${Math.max(creditPlans.length, 1)}, minmax(0, 1fr))`,
                       }"
@@ -1824,7 +1859,9 @@ onBeforeUnmount(() => {
                         :class="
                           selectedCreditConfig?.months === plan.months
                             ? 'credit-plan-btn-active'
-                            : ''
+                            : creditTariffSelectHighlighted
+                              ? 'credit-plan-btn-unselected'
+                              : ''
                         "
                         @click="selectedCreditMonths = plan.months"
                       >
@@ -1994,6 +2031,7 @@ onBeforeUnmount(() => {
 
             <div
               v-if="hasTransmissionGroup"
+              id="detail-balloon-program"
               class="detail-option-group detail-services-program-group"
             >
               <div class="detail-option-headline">
@@ -2013,6 +2051,9 @@ onBeforeUnmount(() => {
                   :class="{
                     'balloon-program-toggle-btn-active':
                       balloonProgramEnabled === true,
+                    'balloon-program-toggle-btn-unselected':
+                      balloonProgramSelectHighlighted &&
+                      balloonProgramEnabled === null,
                   }"
                 >
                   <input
@@ -2031,6 +2072,9 @@ onBeforeUnmount(() => {
                   :class="{
                     'balloon-program-toggle-btn-active':
                       balloonProgramEnabled === false,
+                    'balloon-program-toggle-btn-unselected':
+                      balloonProgramSelectHighlighted &&
+                      balloonProgramEnabled === null,
                   }"
                 >
                   <input
@@ -2136,15 +2180,21 @@ onBeforeUnmount(() => {
               >
                 <span
                   :class="
-                    detailAnimating ? 'opacity-0 scale-90' : 'opacity-100 scale-100'
+                    detailAnimating && !isConfiguredProductInBasket
+                      ? 'opacity-0 scale-90'
+                      : 'opacity-100 scale-100'
                   "
                   class="transition-all duration-300"
                 >
-                  {{ $t("add_to_cart") }}
+                  {{
+                    isConfiguredProductInBasket
+                      ? $t("go_to_basket")
+                      : $t("add_to_cart")
+                  }}
                 </span>
                 <ShoppingCart
                   :class="
-                    detailAnimating
+                    detailAnimating && !isConfiguredProductInBasket
                       ? 'translate-x-44 opacity-0'
                       : 'translate-x-0 opacity-100'
                   "
@@ -2152,7 +2202,9 @@ onBeforeUnmount(() => {
                 />
                 <Check
                   :class="
-                    detailShowCheck ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+                    detailShowCheck && !isConfiguredProductInBasket
+                      ? 'opacity-100 scale-100'
+                      : 'opacity-0 scale-50'
                   "
                   class="absolute w-6 h-6 text-white transition-all duration-500"
                 />
@@ -2879,8 +2931,11 @@ onBeforeUnmount(() => {
 }
 
 .detail-payment-badge-unselected {
-  border-color: #dc2626;
-  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.15);
+  border-color: #ef4444;
+  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+  box-shadow:
+    0 0 0 1px rgba(239, 68, 68, 0.16),
+    0 8px 18px rgba(239, 68, 68, 0.14);
 }
 
 .detail-payment-mode-anchor {
@@ -2979,10 +3034,7 @@ onBeforeUnmount(() => {
 }
 
 .detail-credit-plan-switcher-unselected {
-  border: 1px solid #dc2626;
-  border-radius: 12px;
-  padding: 6px;
-  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.15);
+  padding: 0;
 }
 
 .detail-credit-payment {
@@ -3116,6 +3168,14 @@ onBeforeUnmount(() => {
   border-color: #245f42;
 }
 
+.credit-plan-btn-unselected {
+  border-color: #ef4444;
+  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+  box-shadow:
+    0 0 0 1px rgba(239, 68, 68, 0.16),
+    0 8px 18px rgba(239, 68, 68, 0.14);
+}
+
 .detail-options {
   background: var(--detail-surface);
 }
@@ -3212,6 +3272,14 @@ onBeforeUnmount(() => {
 .balloon-program-toggle-btn-active:hover {
   background: var(--detail-accent);
   color: #ffffff;
+}
+
+.balloon-program-toggle-btn-unselected {
+  border-color: #ef4444;
+  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+  box-shadow:
+    0 0 0 1px rgba(239, 68, 68, 0.16),
+    0 8px 18px rgba(239, 68, 68, 0.14);
 }
 
 .detail-select-shell {

@@ -1,8 +1,10 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter, RouterLink } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { CalendarDays, CircleCheckBig, CreditCard, ShoppingCart } from "lucide-vue-next";
+import { VueDatePicker } from "@vuepic/vue-datepicker";
+import "@vuepic/vue-datepicker/dist/main.css";
 
 import LeftArrow from "@/components/icons/LeftArrow.vue";
 import { apiClient, getApiErrorMessage, resolveAssetUrl, resolveAssetUrls } from "@/lib/api";
@@ -72,7 +74,6 @@ const myIdResultNote = ref("");
 const myIdJobId = ref("");
 const initialPaymentUrl = ref("");
 const tariffStepConfirmed = ref(false);
-const birthDatePickerInput = ref(null);
 const myIdPassportNumberInput = ref(null);
 const createEmptyMyIdIdentityErrors = () => ({
   passportSeries: false,
@@ -215,6 +216,14 @@ const getBasketItemInitialPaymentAmount = (item) => {
   }
   return Number(parseNumericPrice(item.initial_payment_amount) || 0);
 };
+const getInstallmentBaseAmount = (item) => {
+  const itemPrice = Number(parseNumericPrice(getBasketPrice(item, locale.value)) || 0);
+  const initialPayment = getBasketItemInitialPaymentAmount(item);
+  return Math.max(itemPrice - initialPayment, 0);
+};
+const shouldShowItemInitialPayment = (item) =>
+  getItemCheckoutScheduleMode(item) === "installment" &&
+  getBasketItemInitialPaymentAmount(item) > 0;
 
 const normalizeImages = (images) => {
   if (!images) return [];
@@ -249,6 +258,16 @@ const getDefaultCreditPlan = (plans = []) =>
   plans.find((plan) => plan.months === 12) || plans[0] || null;
 
 const resolveSelectedCreditPlanForItem = (item, plans = getItemCreditPlans(item)) => {
+  const currentTariffId = Number(item?.credit_plan?.tariff_id || item?.credit_plan?.id || 0);
+  if (Number.isFinite(currentTariffId) && currentTariffId > 0) {
+    const matchedByTariffId = plans.find(
+      (plan) => Number(plan?.id || plan?.tariff_id || 0) === currentTariffId
+    );
+    if (matchedByTariffId) {
+      return matchedByTariffId;
+    }
+  }
+
   const currentMonths = Number(item?.credit_plan?.months || 0);
   if (Number.isFinite(currentMonths) && currentMonths > 0) {
     const matchedPlan = plans.find((plan) => plan.months === currentMonths);
@@ -266,7 +285,7 @@ const buildBasketCreditPlan = (item, plan) => {
   }
 
   const payment = calculateCreditPlan(
-    getBasketPrice(item, locale.value),
+    getInstallmentBaseAmount(item),
     plan.percent,
     plan.months
   );
@@ -292,11 +311,23 @@ const installmentSelectionsByKey = computed(() =>
     const plans = getItemCreditPlans(item);
     const selectedPlan = resolveSelectedCreditPlanForItem(item, plans);
     const selectedPayment = selectedPlan
-      ? calculateCreditPlan(
-          getBasketPrice(item, locale.value),
-          selectedPlan.percent,
-          selectedPlan.months
-        )
+      ? (() => {
+          const existingMonthlyPayment = Number(
+            item?.credit_plan?.monthly_payment || item?.credit_plan?.monthlyPayment || 0
+          );
+          const existingTotal = Number(item?.credit_plan?.total || 0);
+          if (existingMonthlyPayment > 0 || existingTotal > 0) {
+            return {
+              monthlyPayment: existingMonthlyPayment > 0 ? existingMonthlyPayment : 0,
+              total: existingTotal > 0 ? existingTotal : 0,
+            };
+          }
+          return calculateCreditPlan(
+            getInstallmentBaseAmount(item),
+            selectedPlan.percent,
+            selectedPlan.months
+          );
+        })()
       : null;
 
     acc[getBasketItemKey(item)] = {
@@ -1104,25 +1135,32 @@ const toMyIdBirthDateDisplay = (value) => {
   return `${day}.${month}.${year}`;
 };
 
-const openBirthDatePicker = () => {
-  const input = birthDatePickerInput.value;
-  if (!input) {
-    return;
-  }
-
-  if (typeof input.showPicker === "function") {
-    input.showPicker();
-    return;
-  }
-
-  input.click();
-  input.focus();
-};
-
-const handleBirthDatePickerChange = (event) => {
-  checkoutForm.value.myIdBirthDate = toMyIdBirthDateDisplay(event.target.value);
-  myIdIdentityErrors.value.birthDate = false;
-};
+const myIdBirthDateModel = computed({
+  get() {
+    const payload = toMyIdBirthDatePayload(checkoutForm.value.myIdBirthDate);
+    if (!payload) {
+      return null;
+    }
+    const parsed = new Date(`${payload}T00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  },
+  set(value) {
+    if (!value) {
+      checkoutForm.value.myIdBirthDate = "";
+      myIdIdentityErrors.value.birthDate = false;
+      return;
+    }
+    const dateValue = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(dateValue.getTime())) {
+      return;
+    }
+    const day = String(dateValue.getDate()).padStart(2, "0");
+    const month = String(dateValue.getMonth() + 1).padStart(2, "0");
+    const year = String(dateValue.getFullYear());
+    checkoutForm.value.myIdBirthDate = `${day}.${month}.${year}`;
+    myIdIdentityErrors.value.birthDate = false;
+  },
+});
 
 const clearMyIdIdentityErrors = () => {
   myIdIdentityErrors.value = createEmptyMyIdIdentityErrors();
@@ -1148,6 +1186,30 @@ const validateMyIdIdentityFields = () => {
   }
 
   return ok;
+};
+const scrollToFirstMyIdIdentityError = () => {
+  nextTick(() => {
+    const firstInvalid = document.querySelector(
+      ".checkout-input-invalid, .checkout-date-combo-invalid"
+    );
+    if (!firstInvalid) {
+      return;
+    }
+
+    firstInvalid.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+
+    const focusTarget =
+      firstInvalid.matches("input, select, textarea, button")
+        ? firstInvalid
+        : firstInvalid.querySelector("input, select, textarea, button");
+
+    if (focusTarget && typeof focusTarget.focus === "function") {
+      focusTarget.focus({ preventScroll: true });
+    }
+  });
 };
 
 const replaceCheckoutQuery = async (nextQuery = {}) => {
@@ -1408,6 +1470,7 @@ const startInstallmentVerification = async () => {
   }
 
   if (!validateMyIdIdentityFields()) {
+    scrollToFirstMyIdIdentityError();
     return;
   }
 
@@ -1928,6 +1991,10 @@ onBeforeUnmount(() => {
                       {{ t("credit.monthlyPayment") }}:
                       {{ formatPriceValue(getInstallmentSelectionForItem(item).selectedPayment.monthlyPayment) }}
                     </span>
+                    <span v-if="shouldShowItemInitialPayment(item)" class="checkout-installment-initial">
+                      {{ t("checkoutPage.initialPayment") }}:
+                      {{ formatPriceValue(getBasketItemInitialPaymentAmount(item)) }}
+                    </span>
                   </div>
 
                   <div class="checkout-installment-grid">
@@ -2054,32 +2121,22 @@ onBeforeUnmount(() => {
                       class="checkout-date-row checkout-date-combo"
                       :class="{ 'checkout-date-combo-invalid': myIdIdentityErrors.birthDate }"
                     >
-                      <input
-                        :value="checkoutForm.myIdBirthDate"
-                        type="text"
-                        inputmode="numeric"
-                        autocomplete="bday"
-                        class="checkout-input checkout-date-input"
+                      <VueDatePicker
+                        v-model="myIdBirthDateModel"
+                        :enable-time-picker="false"
+                        :clearable="false"
+                        auto-apply
+                        format="dd.MM.yyyy"
+                        text-input
                         :placeholder="t('checkoutPage.birthDateHint')"
-                        @input="handleMyIdBirthDateTextInput"
-                      />
-                      <button
-                        type="button"
-                        class="checkout-date-picker-btn"
-                        :aria-label="t('checkoutPage.birthDateCalendar')"
-                        @click="openBirthDatePicker"
+                        :max-date="new Date()"
+                        class="checkout-date-picker"
+                        :input-class-name="'checkout-input checkout-date-input'"
                       >
-                        <CalendarDays class="h-5 w-5" />
-                      </button>
-                      <input
-                        ref="birthDatePickerInput"
-                        type="date"
-                        class="checkout-native-date-input"
-                        :value="toMyIdBirthDatePayload(checkoutForm.myIdBirthDate)"
-                        tabindex="-1"
-                        aria-hidden="true"
-                        @change="handleBirthDatePickerChange"
-                      />
+                        <template #input-icon>
+                          <CalendarDays class="h-5 w-5" />
+                        </template>
+                      </VueDatePicker>
                     </div>
                     <small>{{ t("checkoutPage.birthDateHelp") }}</small>
                   </div>
@@ -2292,14 +2349,17 @@ onBeforeUnmount(() => {
             </p>
           </div>
 
-          <div class="checkout-summary-row">
-            <span>{{ t("checkoutPage.productsCount") }}</span>
-            <strong>{{ basketItemCount }}</strong>
+          <div
+            v-if="isInstallmentJourney && needsInitialPayment"
+            class="checkout-summary-row"
+          >
+            <span>{{ t("checkoutPage.initialPayment") }}</span>
+            <strong>{{ totalInitialPaymentFormatted }}</strong>
           </div>
 
-          <div class="checkout-summary-row">
-            <span>{{ t("allBasket") }}</span>
-            <strong>{{ totalAmountFormatted }}</strong>
+          <div v-if="isInstallmentJourney" class="checkout-summary-row">
+            <span>{{ t("checkoutPage.monthlyPaymentTotal") }}</span>
+            <strong>{{ totalMonthlyInstallmentFormatted }}</strong>
           </div>
 
           <div
@@ -2310,17 +2370,14 @@ onBeforeUnmount(() => {
             <strong>{{ summaryInstallmentMonthsDisplay }}</strong>
           </div>
 
-          <div v-if="isInstallmentJourney" class="checkout-summary-row">
-            <span>{{ t("checkoutPage.monthlyPaymentTotal") }}</span>
-            <strong>{{ totalMonthlyInstallmentFormatted }}</strong>
+          <div class="checkout-summary-row">
+            <span>{{ t("checkoutPage.productsCount") }}</span>
+            <strong>{{ basketItemCount }}</strong>
           </div>
 
-          <div
-            v-if="isInstallmentJourney && needsInitialPayment"
-            class="checkout-summary-row"
-          >
-            <span>{{ t("checkoutPage.initialPayment") }}</span>
-            <strong>{{ totalInitialPaymentFormatted }}</strong>
+          <div class="checkout-summary-row">
+            <span>{{ t("allBasket") }}</span>
+            <strong>{{ totalAmountFormatted }}</strong>
           </div>
 
           <p class="checkout-summary-note">
@@ -2702,6 +2759,11 @@ onBeforeUnmount(() => {
   color: #64736a;
 }
 
+.checkout-installment-initial {
+  color: #475a50;
+  font-weight: 700;
+}
+
 .checkout-installment-grid {
   display: flex;
   flex-wrap: wrap;
@@ -2894,13 +2956,11 @@ onBeforeUnmount(() => {
 }
 
 .checkout-date-combo .checkout-date-input {
-  flex: 1 1 auto;
-  min-width: 0;
-  width: auto;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-  background: transparent;
+  width: 100%;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
   font-weight: 800;
   letter-spacing: 0.04em;
 }
@@ -2923,46 +2983,35 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
-.checkout-date-combo .checkout-date-picker-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 48px;
-  min-width: 48px;
-  min-height: 46px;
-  margin: 0;
-  border: none;
-  border-left: 1px solid #e3ebe5;
-  border-radius: 0;
-  background: #ffffff;
+.checkout-date-picker {
+  width: 100%;
+}
+
+.checkout-date-picker :deep(.dp__main) {
+  width: 100%;
+}
+
+.checkout-date-picker :deep(.dp__input_wrap) {
+  width: 100%;
+}
+
+.checkout-date-picker :deep(.dp__input_icon) {
+  left: auto;
+  right: 12px;
   color: #21442c;
-  padding: 0;
-  cursor: pointer;
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease;
 }
 
-.checkout-date-combo .checkout-date-picker-btn:hover {
-  background: #f2fbf5;
-  color: #1a3d24;
+.checkout-date-picker :deep(.dp__input) {
+  min-height: 46px;
+  padding-left: 14px;
+  padding-right: 40px;
+  font-size: 0.95rem;
 }
 
-.checkout-date-combo .checkout-date-picker-btn:focus-visible {
-  outline: none;
-  box-shadow: inset 0 0 0 2px rgba(47, 125, 70, 0.35);
-  z-index: 1;
-}
-
-.checkout-native-date-input {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
+.checkout-date-picker :deep(.dp__menu) {
+  border-radius: 12px;
+  border: 1px solid #d8e4dc;
+  box-shadow: 0 18px 38px rgba(17, 24, 39, 0.16);
 }
 
 .checkout-verified-box,
