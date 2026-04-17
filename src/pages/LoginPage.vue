@@ -6,6 +6,7 @@ import { apiClient, getApiErrorMessage } from "@/lib/api";
 import {
   ensureUzbekistanPhoneInput,
   formatUzbekistanPhoneInput,
+  storeCustomerAccessToken,
   storeCustomerSession,
 } from "@/lib/customerSession";
 
@@ -80,8 +81,9 @@ const handleIdentifierBlur = () => {
   }
 };
 
-const handleLoginSuccess = (customer) => {
+const handleLoginSuccess = (customer, accessToken = "") => {
   storeCustomerSession(customer);
+  storeCustomerAccessToken(accessToken);
   router.push("/");
 };
 
@@ -127,7 +129,7 @@ const pollTelegramLoginStatus = async () => {
       stopPolling();
       telegramSubmitting.value = false;
       telegramStatusMessage.value = t("auth.telegramLoginComplete");
-      handleLoginSuccess(payload.customer || null);
+      handleLoginSuccess(payload.customer || null, payload.access_token || "");
       return;
     }
 
@@ -211,7 +213,7 @@ const submitLogin = async () => {
       },
       { skipAuth: true }
     );
-    handleLoginSuccess(response.data?.customer || null);
+    handleLoginSuccess(response.data?.customer || null, response.data?.access_token || "");
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error, t("auth.loginFailed"));
   } finally {

@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { apiClient, getApiErrorMessage } from "@/lib/api";
-import { storeCustomerSession } from "@/lib/customerSession";
+import { storeCustomerAccessToken, storeCustomerSession } from "@/lib/customerSession";
 
 const router = useRouter();
 const { t } = useI18n();
@@ -85,6 +85,7 @@ const pollRegistrationStatus = async () => {
       stopPolling();
       statusMessage.value = t("auth.telegramVerificationComplete");
       storeCustomerSession(payload.customer || null);
+      storeCustomerAccessToken(payload.access_token || "");
       await router.replace("/");
       return;
     }

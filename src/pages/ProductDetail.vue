@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
 import { useProductsStore } from "../store/productsStore";
 import { useBasketStore } from "../store/basketStore";
-import { ShoppingCart, Check, X, CircleHelp } from "lucide-vue-next";
+import { ShoppingCart, Check, X, CircleHelp, Heart } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { useRoute, useRouter } from "vue-router";
@@ -16,8 +16,10 @@ import {
   ensureUzbekistanPhoneInput,
   formatCustomerPhone,
   formatUzbekistanPhoneInput,
+  getStoredCustomerAccessToken,
   getStoredCustomerSession,
   normalizeCustomerPhone,
+  storeCustomerSession,
 } from "@/lib/customerSession";
 import {
   calculateCreditPlan,
@@ -121,6 +123,10 @@ const getTodayIsoDate = () => {
 };
 
 const customerProfile = ref(getStoredCustomerSession());
+const favoriteProductIds = ref(
+  Array.isArray(customerProfile.value?.favorites) ? customerProfile.value.favorites : []
+);
+const favoriteLoading = ref(false);
 
 const normalizeImages = (images) => resolveAssetUrls(images);
 const formatPrice = (price) => formatPriceValue(price);
@@ -937,6 +943,85 @@ const isConfiguredProductInBasket = computed(() => {
   }
   return basketStore.basket.some((basketItem) => Number(basketItem?.id || 0) === productId);
 });
+const currentProductId = computed(() => Number(store.product?.id || route.params.id || 0));
+const isCurrentProductFavorite = computed(() =>
+  favoriteProductIds.value.includes(currentProductId.value)
+);
+
+const getCustomerAuthConfig = () => {
+  const accessToken = getStoredCustomerAccessToken();
+  if (!accessToken) {
+    return null;
+  }
+
+  return {
+    skipAuth: true,
+    skipAuthRefresh: true,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  };
+};
+
+const applyFavoriteResponse = (payload = {}) => {
+  const favorites = Array.isArray(payload?.favorites)
+    ? payload.favorites
+        .map((item) => Number(item))
+        .filter((item) => Number.isFinite(item) && item > 0)
+    : [];
+  favoriteProductIds.value = favorites;
+  if (payload?.customer) {
+    customerProfile.value = payload.customer;
+    storeCustomerSession(payload.customer);
+  }
+};
+
+const loadFavorites = async () => {
+  const authConfig = getCustomerAuthConfig();
+  if (!authConfig) {
+    favoriteProductIds.value = Array.isArray(customerProfile.value?.favorites)
+      ? customerProfile.value.favorites
+      : [];
+    return;
+  }
+
+  try {
+    const response = await apiClient.get("/customers/me/favorites", authConfig);
+    applyFavoriteResponse(response.data || {});
+  } catch {
+    favoriteProductIds.value = Array.isArray(customerProfile.value?.favorites)
+      ? customerProfile.value.favorites
+      : [];
+  }
+};
+
+const toggleFavorite = async () => {
+  const productId = currentProductId.value;
+  if (!Number.isFinite(productId) || productId <= 0 || favoriteLoading.value) {
+    return;
+  }
+
+  const authConfig = getCustomerAuthConfig();
+  if (!authConfig) {
+    router.push({ path: "/login", query: { redirect: route.fullPath } });
+    return;
+  }
+
+  favoriteLoading.value = true;
+  try {
+    const response = isCurrentProductFavorite.value
+      ? await apiClient.delete(`/customers/me/favorites/${productId}`, authConfig)
+      : await apiClient.post("/customers/me/favorites", { product_id: productId }, authConfig);
+    applyFavoriteResponse(response.data || {});
+  } catch (error) {
+    notification.value = {
+      show: true,
+      message: getApiErrorMessage(error, t("profile.loadError")),
+    };
+  } finally {
+    favoriteLoading.value = false;
+  }
+};
 const currentOrderTotal = computed(() => {
   const numericPrice = parseNumericPrice(combinedSelectedPrice.value);
   return numericPrice === null ? 0 : numericPrice;
@@ -1642,6 +1727,7 @@ watch(
 
 onMounted(async () => {
   await fetchProductData(Number(route.params.id));
+  await loadFavorites();
 });
 
 onMounted(() => {
@@ -2173,6 +2259,16 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="detail-primary-actions">
+              <button
+                type="button"
+                class="detail-favorite-btn"
+                :class="{ 'detail-favorite-btn-active': isCurrentProductFavorite }"
+                :disabled="favoriteLoading"
+                :aria-pressed="isCurrentProductFavorite"
+                @click="toggleFavorite"
+              >
+                <Heart class="h-5 w-5" :fill="isCurrentProductFavorite ? 'currentColor' : 'none'" />
+              </button>
               <button
                 type="button"
                 @click="handleAddToBasket"
@@ -3584,6 +3680,40 @@ onBeforeUnmount(() => {
   min-width: 220px;
 }
 
+.detail-favorite-btn {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  min-width: 56px;
+  min-height: 56px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #64748b;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.detail-favorite-btn:hover {
+  border-color: #fecaca;
+  color: #dc2626;
+  transform: translateY(-1px);
+}
+
+.detail-favorite-btn-active {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #dc2626;
+}
+
+.detail-favorite-btn:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .detail-add-btn:hover {
   background: #12263d;
   border-color: #12263d;
@@ -4190,9 +4320,13 @@ onBeforeUnmount(() => {
   }
 
   .detail-primary-actions,
-  .detail-add-btn,
   .detail-order-btn {
     width: 100%;
+  }
+
+  .detail-add-btn {
+    width: auto;
+    min-width: 0;
   }
 
   .order-modal-panel {
@@ -4303,9 +4437,13 @@ onBeforeUnmount(() => {
   }
 
   .detail-order-tools,
-  .detail-primary-actions,
   .order-type-switcher {
     flex-direction: column;
+  }
+
+  .detail-primary-actions {
+    flex-direction: row;
+    flex-wrap: nowrap;
   }
 
   .detail-order-head {

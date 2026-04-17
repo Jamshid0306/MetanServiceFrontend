@@ -1,4 +1,5 @@
 const CUSTOMER_SESSION_STORAGE_KEY = "customer_profile";
+const CUSTOMER_ACCESS_TOKEN_STORAGE_KEY = "customer_access_token";
 export const CUSTOMER_SESSION_EVENT = "customer-session-updated";
 
 export const normalizeCustomerPhone = (value = "") => {
@@ -65,6 +66,11 @@ export const toCustomerSession = (customer = {}) => {
     name,
     phone,
     address: String(customer?.address ?? "").trim(),
+    favorites: Array.isArray(customer?.favorites)
+      ? customer.favorites
+          .map((item) => Number(item))
+          .filter((item) => Number.isFinite(item) && item > 0)
+      : [],
     telegramUsername: String(
       customer?.telegram_username ?? customer?.telegramUsername ?? ""
     ).trim(),
@@ -93,6 +99,23 @@ export const getStoredCustomerSession = () => {
   }
 };
 
+export const getStoredCustomerAccessToken = () =>
+  getCustomerStorage()?.getItem(CUSTOMER_ACCESS_TOKEN_STORAGE_KEY) || "";
+
+export const storeCustomerAccessToken = (token = "") => {
+  const storage = getCustomerStorage();
+  if (!storage) {
+    return;
+  }
+
+  const normalizedToken = String(token || "").trim();
+  if (normalizedToken) {
+    storage.setItem(CUSTOMER_ACCESS_TOKEN_STORAGE_KEY, normalizedToken);
+  } else {
+    storage.removeItem(CUSTOMER_ACCESS_TOKEN_STORAGE_KEY);
+  }
+};
+
 export const storeCustomerSession = (customer = null) => {
   const storage = getCustomerStorage();
   if (!storage) {
@@ -112,7 +135,9 @@ export const storeCustomerSession = (customer = null) => {
 };
 
 export const clearCustomerSession = () => {
-  getCustomerStorage()?.removeItem(CUSTOMER_SESSION_STORAGE_KEY);
+  const storage = getCustomerStorage();
+  storage?.removeItem(CUSTOMER_SESSION_STORAGE_KEY);
+  storage?.removeItem(CUSTOMER_ACCESS_TOKEN_STORAGE_KEY);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(CUSTOMER_SESSION_EVENT));
   }

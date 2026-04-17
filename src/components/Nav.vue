@@ -209,35 +209,6 @@ watch(
               </div>
             </div>
 
-            <div class="mobile-lang-wrap relative z-40">
-              <button
-                @click="toggleLang"
-                class="lang-button mobile-lang-button flex items-center justify-center rounded-full text-sm font-semibold text-slate-700"
-                aria-label="Change language"
-              >
-                <img
-                  :src="activeLanguage.flag"
-                  class="h-5 w-5 rounded-sm ring-1 ring-slate-200"
-                  alt="Lang"
-                />
-              </button>
-
-              <div
-                v-if="langOpen"
-                class="lang-dropdown mobile-lang-dropdown absolute right-0 top-[calc(100%+6px)] w-36 rounded-2xl overflow-hidden"
-              >
-                <button
-                  v-for="lang in languages"
-                  :key="lang.code"
-                  @click="changeLanguage(lang.code)"
-                  class="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-slate-100"
-                  :class="locale === lang.code ? 'font-bold text-slate-900' : 'text-slate-700'"
-                >
-                  <img :src="lang.flag" class="w-4 h-4 rounded-sm" alt="Lang" />
-                  {{ lang.label }}
-                </button>
-              </div>
-            </div>
           </div>
 
           <!-- Desktop layout: center links/search, right actions (login to far right) -->
@@ -703,7 +674,7 @@ watch(
 .mobile-search-inline {
   flex: 1;
   min-width: 0;
-  max-width: min(52vw, 320px);
+  max-width: min(68vw, 420px);
 }
 
 .mobile-search-input {
@@ -735,7 +706,7 @@ watch(
   }
 
   .mobile-search-inline {
-    max-width: min(44vw, 220px);
+    max-width: min(62vw, 300px);
   }
 }
 

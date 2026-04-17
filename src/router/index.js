@@ -126,6 +126,15 @@ const routes = [
     },
   },
   {
+    path: "/profile/favorites",
+    name: "ProfileFavorites",
+    component: () => import("@/pages/ProfileFavoritesPage.vue"),
+    meta: {
+      title: "Urganch Metan Service - Sevimlilar",
+      robots: "noindex,nofollow",
+    },
+  },
+  {
     path: "/:pathMatch(.*)*",
     name: "NotFound",
     component: () => import("@/pages/NotFoundPage.vue"),

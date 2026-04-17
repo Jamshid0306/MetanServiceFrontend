@@ -353,8 +353,13 @@ onMounted(() => {
   <main class="profile-orders-page">
     <section class="profile-orders-hero">
       <div>
-        <p class="profile-orders-kicker">{{ t("profile.title") }}</p>
-        <h1>{{ t("profile.orders") }}</h1>
+        <div class="profile-orders-title-row">
+          <button type="button" class="profile-orders-back" @click="router.push('/profile')">
+            <span aria-hidden="true">‹</span>
+            {{ t("nav.back") }}
+          </button>
+          <h1>{{ t("profile.orders") }}</h1>
+        </div>
         <p>{{ t("profile.ordersSubtitle") }}</p>
       </div>
       <div v-if="customerSession" class="profile-orders-user">
@@ -516,15 +521,31 @@ onMounted(() => {
   margin-bottom: 1.5rem;
 }
 
-.profile-orders-kicker {
-  margin-bottom: 0.35rem;
-  color: #64748b;
-  font-size: 0.82rem;
-  font-weight: 800;
-  text-transform: uppercase;
+.profile-orders-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.profile-orders-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  min-height: 40px;
+  border: 0;
+  background: transparent;
+  color: #18304f;
+  padding: 0;
+  font-weight: 900;
+}
+
+.profile-orders-back span {
+  font-size: 2rem;
+  line-height: 1;
 }
 
 .profile-orders-hero h1 {
+  margin: 0;
   color: #142338;
   font-size: clamp(2rem, 4vw, 3.25rem);
   font-weight: 900;
@@ -853,19 +874,165 @@ onMounted(() => {
 
 @media (max-width: 720px) {
   .profile-orders-page {
-    padding-top: 6rem;
-    padding-bottom: 6.5rem;
+    padding: 5.75rem 0.75rem 6.5rem;
   }
 
-  .profile-orders-hero,
-  .profile-order-head,
-  .profile-order-product,
-  .profile-order-monthly-row {
+  .profile-orders-hero {
     align-items: flex-start;
     flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 0.85rem;
   }
 
-  .profile-orders-user,
+  .profile-orders-title-row {
+    gap: 0.55rem;
+  }
+
+  .profile-orders-back {
+    min-height: 34px;
+    font-size: 0.9rem;
+  }
+
+  .profile-orders-back span {
+    font-size: 1.7rem;
+  }
+
+  .profile-orders-hero h1 {
+    font-size: 1.45rem;
+  }
+
+  .profile-orders-hero > div > p {
+    display: none;
+  }
+
+  .profile-orders-user {
+    width: 100%;
+    padding: 0.7rem 0.85rem;
+  }
+
+  .profile-orders-user span:last-child {
+    display: none;
+  }
+
+  .profile-orders-list {
+    gap: 0.75rem;
+  }
+
+  .profile-order-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 0.75rem;
+    padding: 0.85rem;
+  }
+
+  .profile-order-head div,
+  .profile-order-status {
+    min-width: 0;
+  }
+
+  .profile-order-head span,
+  .profile-order-product-main p,
+  .profile-order-product-price span,
+  .profile-order-money-row span,
+  .profile-order-status small {
+    font-size: 0.76rem;
+  }
+
+  .profile-order-head strong {
+    font-size: 0.92rem;
+  }
+
+  .profile-order-status {
+    align-items: flex-end;
+    text-align: right;
+  }
+
+  .profile-order-status span {
+    padding: 0.28rem 0.5rem;
+    font-size: 0.76rem;
+    white-space: nowrap;
+  }
+
+  .profile-order-status small {
+    display: none;
+  }
+
+  .profile-order-product {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 0.75rem;
+    padding: 0.85rem;
+  }
+
+  .profile-order-product-main h2 {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 0.92rem;
+    line-height: 1.25;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .profile-order-options {
+    display: none;
+  }
+
+  .profile-order-product-price {
+    align-items: flex-end;
+    text-align: right;
+  }
+
+  .profile-order-product-price strong {
+    font-size: 0.88rem;
+    white-space: nowrap;
+  }
+
+  .profile-order-monthly {
+    padding: 0.75rem 0.85rem;
+  }
+
+  .profile-order-monthly-head {
+    margin-bottom: 0;
+  }
+
+  .profile-order-monthly-list {
+    display: none;
+  }
+
+  .profile-order-foot {
+    padding: 0.85rem;
+  }
+
+  .profile-order-money-row {
+    align-items: center;
+    flex-direction: row;
+    gap: 0.75rem;
+  }
+
+  .profile-order-pay-btn {
+    min-height: 42px;
+    font-size: 0.84rem;
+  }
+
+  .profile-order-payment-note {
+    padding: 0.65rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .profile-orders-state {
+    min-height: 220px;
+    padding: 1.25rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .profile-order-head,
+  .profile-order-product {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .profile-order-status,
   .profile-order-product-price {
     width: 100%;
@@ -873,10 +1040,14 @@ onMounted(() => {
     text-align: left;
   }
 
-  .profile-order-money-row {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.15rem;
+  .profile-order-product-price strong {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 720px) {
+  .profile-orders-page {
+    padding-bottom: 6.5rem;
   }
 
   .profile-order-monthly-status {

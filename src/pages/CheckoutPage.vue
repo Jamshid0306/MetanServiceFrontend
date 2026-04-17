@@ -60,6 +60,7 @@ const pageError = ref("");
 const clickSubmitLoading = ref(false);
 const myIdStartLoading = ref(false);
 const creditSubmitLoading = ref(false);
+const creditSuccessModalOpen = ref(false);
 const clickMeta = ref({ enabled: false });
 const myIdMeta = ref({ enabled: false });
 const orderStatus = ref(null);
@@ -1103,6 +1104,123 @@ const handleMyIdBirthDateTextInput = (event) => {
   myIdIdentityErrors.value.birthDate = false;
 };
 
+const handleMyIdBirthDateKeydown = (event) => {
+  if (event.ctrlKey || event.metaKey || event.altKey) {
+    return;
+  }
+
+  const allowedKeys = [
+    "Backspace",
+    "Delete",
+    "ArrowLeft",
+    "ArrowRight",
+    "ArrowUp",
+    "ArrowDown",
+    "Home",
+    "End",
+    "Tab",
+    "Enter",
+  ];
+
+  if (allowedKeys.includes(event.key)) {
+    return;
+  }
+
+  if (!/^\d$/.test(event.key)) {
+    event.preventDefault();
+    return;
+  }
+
+  const input = event.target;
+  const value = String(input.value || "");
+  const selectionStart = input.selectionStart ?? value.length;
+  const selectionEnd = input.selectionEnd ?? selectionStart;
+  const selectedDigits = value.slice(selectionStart, selectionEnd).replace(/\D/g, "").length;
+  const currentDigits = value.replace(/\D/g, "").length;
+
+  if (currentDigits - selectedDigits >= 8) {
+    event.preventDefault();
+  }
+};
+
+const handleMyIdBirthDatePaste = (event) => {
+  const pastedText = event.clipboardData?.getData("text") || "";
+  if (!pastedText) {
+    return;
+  }
+
+  event.preventDefault();
+
+  const input = event.target;
+  const value = String(input.value || "");
+  const selectionStart = input.selectionStart ?? value.length;
+  const selectionEnd = input.selectionEnd ?? selectionStart;
+  const nextValue = `${value.slice(0, selectionStart)}${pastedText}${value.slice(selectionEnd)}`;
+
+  checkoutForm.value.myIdBirthDate = normalizeMyIdBirthDateInput(nextValue);
+  myIdIdentityErrors.value.birthDate = false;
+};
+
+const handleUzbekPhoneKeydown = (event) => {
+  if (event.ctrlKey || event.metaKey || event.altKey) {
+    return;
+  }
+
+  const allowedKeys = [
+    "Backspace",
+    "Delete",
+    "ArrowLeft",
+    "ArrowRight",
+    "ArrowUp",
+    "ArrowDown",
+    "Home",
+    "End",
+    "Tab",
+    "Enter",
+  ];
+
+  if (allowedKeys.includes(event.key)) {
+    return;
+  }
+
+  if (!/^\d$/.test(event.key)) {
+    event.preventDefault();
+    return;
+  }
+
+  const input = event.target;
+  const value = String(input.value || "");
+  const selectionStart = input.selectionStart ?? value.length;
+  const selectionEnd = input.selectionEnd ?? selectionStart;
+  const selectedDigits = value.slice(selectionStart, selectionEnd).replace(/\D/g, "").length;
+  const currentDigits = value.replace(/\D/g, "").length;
+
+  if (currentDigits - selectedDigits >= 12) {
+    event.preventDefault();
+  }
+};
+
+const handleCreditExtraPhoneInput = (contact, event) => {
+  contact.phone = formatUzbekistanPhoneInput(event.target.value);
+};
+
+const handleCreditExtraPhonePaste = (contact, event) => {
+  const pastedText = event.clipboardData?.getData("text") || "";
+  if (!pastedText) {
+    return;
+  }
+
+  event.preventDefault();
+
+  const input = event.target;
+  const value = String(input.value || "");
+  const selectionStart = input.selectionStart ?? value.length;
+  const selectionEnd = input.selectionEnd ?? selectionStart;
+  const nextValue = `${value.slice(0, selectionStart)}${pastedText}${value.slice(selectionEnd)}`;
+
+  contact.phone = formatUzbekistanPhoneInput(nextValue);
+};
+
 const toMyIdBirthDatePayload = (value) => {
   const rawValue = String(value || "").trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
@@ -1629,11 +1747,17 @@ const submitInstallmentCredit = async () => {
     myIdResultNote.value = String(responseData?.result_note || "").trim();
     syncOrderStatusFromResponse(responseData);
     await fetchOrderStatus();
+    creditSuccessModalOpen.value = true;
   } catch (error) {
     pageError.value = getApiErrorMessage(error, t("send"));
   } finally {
     creditSubmitLoading.value = false;
   }
+};
+
+const goToOrdersFromCreditSuccess = () => {
+  creditSuccessModalOpen.value = false;
+  router.push("/profile/orders");
 };
 
 watch(
@@ -2127,14 +2251,35 @@ onBeforeUnmount(() => {
                         :clearable="false"
                         auto-apply
                         format="dd.MM.yyyy"
-                        text-input
                         :placeholder="t('checkoutPage.birthDateHint')"
                         :max-date="new Date()"
                         class="checkout-date-picker"
-                        :input-class-name="'checkout-input checkout-date-input'"
                       >
-                        <template #input-icon>
-                          <CalendarDays class="h-5 w-5" />
+                        <template #dp-input="{ closeMenu, isMenuOpen, openMenu }">
+                          <div class="checkout-date-picker-control" @click.stop>
+                            <input
+                              :value="checkoutForm.myIdBirthDate"
+                              type="tel"
+                              inputmode="numeric"
+                              pattern="[0-9]*"
+                              maxlength="10"
+                              autocomplete="off"
+                              class="checkout-input checkout-date-input"
+                              :placeholder="t('checkoutPage.birthDateHint')"
+                              @click.stop="isMenuOpen && closeMenu()"
+                              @input="handleMyIdBirthDateTextInput"
+                              @keydown="handleMyIdBirthDateKeydown"
+                              @paste="handleMyIdBirthDatePaste"
+                            />
+                            <button
+                              type="button"
+                              class="checkout-date-picker-btn"
+                              :aria-label="t('checkoutPage.birthDateCalendar')"
+                              @click.stop="openMenu"
+                            >
+                              <CalendarDays class="h-5 w-5" />
+                            </button>
+                          </div>
                         </template>
                       </VueDatePicker>
                     </div>
@@ -2241,9 +2386,15 @@ onBeforeUnmount(() => {
                   <input
                     :value="contact.phone"
                     type="tel"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    maxlength="17"
+                    autocomplete="off"
                     class="checkout-input"
                     :placeholder="locale === 'ru' ? '+998 XX XXX XX XX' : '+998 XX XXX XX XX'"
-                    @input="contact.phone = formatUzbekistanPhoneInput($event.target.value)"
+                    @input="handleCreditExtraPhoneInput(contact, $event)"
+                    @keydown="handleUzbekPhoneKeydown"
+                    @paste="handleCreditExtraPhonePaste(contact, $event)"
                   />
                   <select
                     v-model="contact.relation"
@@ -2399,6 +2550,29 @@ onBeforeUnmount(() => {
       <button type="button" class="checkout-primary-btn" @click="router.push('/profile/orders')">
         {{ t("profile.orders") }}
       </button>
+    </div>
+
+    <div
+      v-if="creditSuccessModalOpen"
+      class="checkout-success-modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="t('checkoutPage.creditSubmittedTitle')"
+    >
+      <div class="checkout-success-modal">
+        <div class="checkout-success-modal-icon" aria-hidden="true">
+          <CircleCheckBig :size="42" stroke-width="2.4" />
+        </div>
+        <h2>{{ t("checkoutPage.creditSubmittedTitle") }}</h2>
+        <p>{{ t("checkoutPage.creditSubmittedText") }}</p>
+        <button
+          type="button"
+          class="checkout-primary-btn checkout-success-modal-action"
+          @click="goToOrdersFromCreditSuccess"
+        >
+          {{ t("profile.orders") }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -2923,7 +3097,7 @@ onBeforeUnmount(() => {
   border: 1px solid #d8e4dc;
   border-radius: 8px;
   background: #fbfdfb;
-  overflow: hidden;
+  overflow: visible;
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease;
@@ -2995,6 +3169,38 @@ onBeforeUnmount(() => {
   width: 100%;
 }
 
+.checkout-date-picker-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 46px;
+  width: 100%;
+}
+
+.checkout-date-picker-btn {
+  display: grid;
+  place-items: center;
+  min-height: 46px;
+  width: 46px;
+  border: none;
+  border-left: 1px solid #d8e4dc;
+  border-radius: 0;
+  background: transparent;
+  color: #21442c;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.checkout-date-picker-btn:hover {
+  background: #edf8f0;
+  color: #1f6f37;
+}
+
+.checkout-date-picker-btn:focus-visible {
+  outline: 2px solid rgba(47, 125, 70, 0.35);
+  outline-offset: -2px;
+}
+
 .checkout-date-picker :deep(.dp__input_icon) {
   left: auto;
   right: 12px;
@@ -3009,6 +3215,7 @@ onBeforeUnmount(() => {
 }
 
 .checkout-date-picker :deep(.dp__menu) {
+  z-index: 40;
   border-radius: 12px;
   border: 1px solid #d8e4dc;
   box-shadow: 0 18px 38px rgba(17, 24, 39, 0.16);
@@ -3188,6 +3395,59 @@ onBeforeUnmount(() => {
 .checkout-flow-btn:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.checkout-success-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(15, 23, 42, 0.54);
+  backdrop-filter: blur(8px);
+}
+
+.checkout-success-modal {
+  width: min(420px, 100%);
+  padding: 28px 22px 22px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 8px;
+  background: #ffffff;
+  text-align: center;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+}
+
+.checkout-success-modal-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 16px;
+  border-radius: 50%;
+  background: #ecfdf3;
+  color: #16a34a;
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.16);
+}
+
+.checkout-success-modal h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 1.28rem;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.checkout-success-modal p {
+  margin: 10px 0 20px;
+  color: #64748b;
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
+.checkout-success-modal-action {
+  width: 100%;
 }
 
 .checkout-summary-panel {
