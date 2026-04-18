@@ -128,6 +128,16 @@ const getProductMonthlyPayment = (product = {}) => {
   return Number(creditPlan.monthly_payment || creditPlan.monthlyPayment || 0);
 };
 
+const getProductCreditMonths = (product = {}) => {
+  const months = Number(product?.credit_plan?.months || 0);
+  return Number.isFinite(months) && months > 0 ? months : 0;
+};
+
+const getProductCreditMonthsLabel = (product = {}) => {
+  const months = getProductCreditMonths(product);
+  return months ? `${months} ${t("credit.months")}` : "";
+};
+
 const getProductQuantity = (product = {}) => {
   const quantity = Number(product?.quantity || 1);
   return Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
@@ -411,6 +421,12 @@ onMounted(() => {
                 <p>
                   {{ Number(product.quantity || 1) }} x {{ formatMoney(product.price) }} {{ t("uzs") }}
                 </p>
+                <small
+                  v-if="getProductCreditMonths(product)"
+                  class="profile-order-credit-term"
+                >
+                  {{ t("credit.term") }}: {{ getProductCreditMonthsLabel(product) }}
+                </small>
                 <div v-if="product.selected_options?.length" class="profile-order-options">
                   <span
                     v-for="option in product.selected_options"
@@ -669,6 +685,20 @@ onMounted(() => {
 .profile-order-money-row strong,
 .profile-order-product-price strong {
   color: #142338;
+  font-weight: 900;
+}
+
+.profile-order-credit-term {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  border-radius: 999px;
+  background: #ecfdf3;
+  color: #166534;
+  margin-top: 0.45rem;
+  padding: 0.22rem 0.55rem;
+  font-size: 0.76rem;
   font-weight: 900;
 }
 

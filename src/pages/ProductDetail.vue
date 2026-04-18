@@ -8,6 +8,7 @@ import { Swiper, SwiperSlide } from "swiper/vue";
 import { useRoute, useRouter } from "vue-router";
 import "swiper/css";
 import LeftArrow from "@/components/icons/LeftArrow.vue";
+import clickLogo from "@/assets/images/click.png";
 import { useLoaderStore } from "@/store/loaderStore";
 import { useCreditTariffsStore } from "@/store/creditTariffsStore";
 import Notification from "@/components/Notification.vue";
@@ -88,6 +89,7 @@ const stickyPriceVisible = ref(false);
 /** Savatga bosilganda balon tanlanmagan bo‘lsa select atrofida qizil chegarа. */
 const cylinderVolumeSelectHighlighted = ref(false);
 const balloonProgramSelectHighlighted = ref(false);
+const transmissionSelectHighlighted = ref(false);
 const paymentModeSelectHighlighted = ref(false);
 const creditTariffSelectHighlighted = ref(false);
 let swiperInstance = null;
@@ -1200,6 +1202,7 @@ const handleAddToBasket = () => {
   }
 
   balloonProgramSelectHighlighted.value = false;
+  transmissionSelectHighlighted.value = false;
 
   if (
     !isProductOptionSelectionComplete.value &&
@@ -1212,19 +1215,35 @@ const handleAddToBasket = () => {
       requiredOptionGroupKeys.value.includes("cylinder_volume") &&
       !selectionHasValue(resolved, "cylinder_volume") &&
       !selectionHasValue(raw, "cylinder_volume");
+    const needsTransmission =
+      hasTransmissionGroup.value &&
+      balloonProgramEnabled.value === true &&
+      !selectionHasValue(resolved, "transmission") &&
+      !selectionHasValue(raw, "transmission");
     const cylGroup = orderedOptionGroups.value.find((g) => g.key === "cylinder_volume");
     const multiCylinder = Boolean(cylGroup && cylGroup.options.length > 1);
 
     if (needsCylinder && multiCylinder) {
       cylinderVolumeSelectHighlighted.value = true;
+      transmissionSelectHighlighted.value = false;
       nextTick(() => {
         document.getElementById("detail-cylinder-volume-select")?.scrollIntoView({
           behavior: "smooth",
           block: "center",
         });
       });
+    } else if (needsTransmission) {
+      cylinderVolumeSelectHighlighted.value = false;
+      transmissionSelectHighlighted.value = true;
+      nextTick(() => {
+        document.getElementById("detail-transmission-options")?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      });
     } else {
       cylinderVolumeSelectHighlighted.value = false;
+      transmissionSelectHighlighted.value = false;
       nextTick(() => {
         document.getElementById("detail-product-options")?.scrollIntoView({
           behavior: "smooth",
@@ -1479,6 +1498,7 @@ const fetchProductData = async (id) => {
 const setBalloonProgramEnabled = (enabled) => {
   balloonProgramEnabled.value = enabled === true ? true : false;
   balloonProgramSelectHighlighted.value = false;
+  transmissionSelectHighlighted.value = false;
 
   // Transmission tanlovi o'chirilsa, narx transmissionPrice qo'shilmasdan faqat balon hajmi narxidan hisoblanadi.
   const next = { ...(selectedOptions.value || {}) };
@@ -1543,6 +1563,10 @@ const selectOption = (groupKey, optionId) => {
     groupKey,
     optionId
   );
+
+  if (groupKey === "transmission" && optionId) {
+    transmissionSelectHighlighted.value = false;
+  }
 };
 
 const goToDetail = (id) => {
@@ -1914,7 +1938,12 @@ onBeforeUnmount(() => {
                     }"
                     @click="onFullPaymentModeClick"
                   >
-                    {{ t("credit.fullPayment") }}
+                    <img
+                      :src="clickLogo"
+                      alt="Click"
+                      class="detail-payment-click-logo"
+                    />
+                    <span>{{ t("credit.fullPayment") }}</span>
                   </button>
                 </div>
 
@@ -2178,6 +2207,7 @@ onBeforeUnmount(() => {
 
               <div
                 v-if="transmissionGroup && balloonProgramEnabled === true"
+                id="detail-transmission-options"
                 class="detail-services-transmission"
               >
                 <div class="detail-option-headline">
@@ -2203,11 +2233,13 @@ onBeforeUnmount(() => {
                     type="button"
                     @click="selectOption(transmissionGroup.key, option.id)"
                     class="detail-option"
-                    :class="
-                      selectedOptions[transmissionGroup.key] === option.id
-                        ? 'detail-option-active'
-                        : ''
-                    "
+                    :class="{
+                      'detail-option-active':
+                        selectedOptions[transmissionGroup.key] === option.id,
+                      'detail-option-unselected':
+                        transmissionSelectHighlighted &&
+                        !selectedOptions[transmissionGroup.key],
+                    }"
                   >
                     <span>{{ option.label }}</span>
                   </button>
@@ -2990,6 +3022,10 @@ onBeforeUnmount(() => {
 }
 
 .detail-payment-badge-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
   cursor: pointer;
   font: inherit;
   text-align: center;
@@ -2997,6 +3033,16 @@ onBeforeUnmount(() => {
     transform 0.15s ease,
     box-shadow 0.15s ease,
     border-color 0.15s ease;
+}
+
+.detail-payment-click-logo {
+  width: 3.25rem;
+  max-width: 3.25rem;
+  height: 1.25rem;
+  object-fit: contain;
+  flex: 0 0 auto;
+  border-radius: 5px;
+  padding: 0.08rem 0.18rem;
 }
 
 .detail-payment-badge-btn:hover {
@@ -3546,6 +3592,19 @@ onBeforeUnmount(() => {
   border-color: var(--detail-accent);
   background: var(--detail-accent);
   color: #ffffff;
+}
+
+.detail-option-unselected {
+  border-color: #dc2626;
+  background: linear-gradient(135deg, #fff7f7 0%, #fee2e2 100%);
+  box-shadow:
+    0 0 0 3px rgba(220, 38, 38, 0.14),
+    0 12px 24px rgba(220, 38, 38, 0.12);
+}
+
+.detail-option-unselected:hover {
+  border-color: #b91c1c;
+  background: linear-gradient(135deg, #fff1f2 0%, #fecaca 100%);
 }
 
 .detail-option-meta {

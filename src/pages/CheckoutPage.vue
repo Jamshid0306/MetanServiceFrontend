@@ -35,6 +35,7 @@ const creditTariffsStore = useCreditTariffsStore();
 const MYID_POPUP_QUERY_KEY = "myid_popup";
 const MYID_POPUP_MESSAGE_TYPE = "myid-checkout-result";
 const MYID_PAYMENT_URL_STORAGE_PREFIX = "checkout:myid-payment-url:";
+const MYID_CREDIT_PLAN_STORAGE_PREFIX = "checkout:myid-credit-plans:";
 
 basketStore.normalizeBasket();
 
@@ -48,10 +49,9 @@ const checkoutForm = ref({
 });
 const createEmptyCreditContact = () => ({
   phone: "+998",
-  relation: "relative",
+  relation: "",
 });
 const creditExtraContacts = ref([
-  createEmptyCreditContact(),
   createEmptyCreditContact(),
   createEmptyCreditContact(),
 ]);
@@ -74,6 +74,7 @@ const myIdProfileResult = ref(null);
 const myIdResultNote = ref("");
 const myIdJobId = ref("");
 const initialPaymentUrl = ref("");
+const myIdCreditPlanSnapshot = ref([]);
 const tariffStepConfirmed = ref(false);
 const myIdPassportNumberInput = ref(null);
 const createEmptyMyIdIdentityErrors = () => ({
@@ -85,6 +86,13 @@ const myIdIdentityErrors = ref(createEmptyMyIdIdentityErrors());
 let statusPollTimeoutId = null;
 
 const basketItems = computed(() => basketStore.basket);
+const checkoutSummaryItems = computed(() => {
+  const orderProducts = Array.isArray(orderStatus.value?.products)
+    ? orderStatus.value.products
+    : [];
+
+  return currentOrderId.value && orderProducts.length ? orderProducts : basketItems.value;
+});
 const readSingleQueryValue = (value) => (Array.isArray(value) ? value[0] : value);
 const selectedPaymentQuery = computed(() =>
   String(readSingleQueryValue(route.query.payment) || "")
@@ -258,6 +266,28 @@ const getItemCreditPlans = (item) =>
 const getDefaultCreditPlan = (plans = []) =>
   plans.find((plan) => plan.months === 12) || plans[0] || null;
 
+const buildPlanFromBasketCreditPlan = (creditPlan) => {
+  if (!creditPlan || typeof creditPlan !== "object") {
+    return null;
+  }
+
+  const months = Number(creditPlan.months || 0);
+  const percent = Number(creditPlan.percent || 0);
+  if (!Number.isFinite(months) || months <= 0 || !Number.isFinite(percent)) {
+    return null;
+  }
+
+  return {
+    id: Number(creditPlan.tariff_id || creditPlan.id || 0) || null,
+    name: String(creditPlan.name || "").trim(),
+    months,
+    percent,
+    monthlyPercent: Number(creditPlan.monthly_percent || creditPlan.monthlyPercent || 0) || null,
+    minAmount: null,
+    maxAmount: null,
+  };
+};
+
 const resolveSelectedCreditPlanForItem = (item, plans = getItemCreditPlans(item)) => {
   const currentTariffId = Number(item?.credit_plan?.tariff_id || item?.credit_plan?.id || 0);
   if (Number.isFinite(currentTariffId) && currentTariffId > 0) {
@@ -275,6 +305,11 @@ const resolveSelectedCreditPlanForItem = (item, plans = getItemCreditPlans(item)
     if (matchedPlan) {
       return matchedPlan;
     }
+  }
+
+  const persistedPlan = buildPlanFromBasketCreditPlan(item?.credit_plan);
+  if (persistedPlan) {
+    return persistedPlan;
   }
 
   return getDefaultCreditPlan(plans);
@@ -298,6 +333,19 @@ const buildBasketCreditPlan = (item, plan) => {
     monthly_payment: payment?.monthlyPayment || null,
     total: payment?.total || null,
   };
+};
+
+const getCheckoutProductCreditPlan = (item) => {
+  if (getItemCheckoutScheduleMode(item) !== "installment") {
+    return null;
+  }
+
+  const selection = getInstallmentSelectionForItem(item);
+  if (selection.selectedPlan) {
+    return buildBasketCreditPlan(item, selection.selectedPlan);
+  }
+
+  return item?.credit_plan || null;
 };
 
 const isSameBasketCreditPlan = (left, right) =>
@@ -392,7 +440,7 @@ const productsPayload = computed(() =>
     quantity: Number(item?.quantity || 1),
     price: Number(parseNumericPrice(getBasketPrice(item, locale.value)) || 0),
     selected_options: Array.isArray(item?.selected_options) ? item.selected_options : [],
-    credit_plan: item?.credit_plan || null,
+    credit_plan: getCheckoutProductCreditPlan(item),
     initial_payment_enabled: Boolean(item?.initial_payment_enabled),
     initial_payment_amount: getBasketItemInitialPaymentAmount(item),
   }))
@@ -417,12 +465,32 @@ const totalInitialPayment = computed(() =>
 const basketItemCount = computed(() =>
   basketItems.value.reduce((sum, item) => sum + Number(item?.quantity || 1), 0)
 );
-const totalMonthlyInstallment = computed(() =>
-  basketItems.value.reduce((sum, item) => {
+const totalMonthlyInstallment = computed(() => {
+  const snapshotMonthlyPayment = myIdCreditPlanSnapshot.value.reduce(
+    (sum, item) =>
+      sum +
+      Number(item?.credit_plan?.monthly_payment || item?.credit_plan?.monthlyPayment || 0) *
+        Number(item?.quantity || 1),
+    0
+  );
+  if (
+    currentOrderId.value &&
+    Number.isFinite(snapshotMonthlyPayment) &&
+    snapshotMonthlyPayment > 0
+  ) {
+    return snapshotMonthlyPayment;
+  }
+
+  const orderMonthlyPayment = Number(orderStatus.value?.monthly_payment_amount || 0);
+  if (currentOrderId.value && Number.isFinite(orderMonthlyPayment) && orderMonthlyPayment > 0) {
+    return orderMonthlyPayment;
+  }
+
+  return basketItems.value.reduce((sum, item) => {
     const selection = getInstallmentSelectionForItem(item);
     return sum + Number(selection.selectedPayment?.monthlyPayment || 0) * Number(item?.quantity || 1);
-  }, 0)
-);
+  }, 0);
+});
 const totalAmountFormatted = computed(() => formatPriceValue(totalAmount.value));
 const totalInitialPaymentFormatted = computed(() => formatPriceValue(totalInitialPayment.value));
 const totalMonthlyInstallmentFormatted = computed(() =>
@@ -432,14 +500,17 @@ const totalMonthlyInstallmentFormatted = computed(() =>
 const summaryInstallmentMonthsDisplay = computed(() => {
   locale.value;
 
-  if (!basketItems.value.length) {
+  if (!checkoutSummaryItems.value.length) {
     return "";
   }
 
   const monthsList = [];
-  basketItems.value.forEach((item) => {
+  checkoutSummaryItems.value.forEach((item, index) => {
     const selection = getInstallmentSelectionForItem(item);
-    const months = Number(selection.selectedPlan?.months || item?.credit_plan?.months || 0);
+    const snapshotPlan = getSnapshotCreditPlanForItem(item, index);
+    const months = Number(
+      snapshotPlan?.months || item?.credit_plan?.months || selection.selectedPlan?.months || 0
+    );
     if (!Number.isFinite(months) || months <= 0) {
       return;
     }
@@ -559,10 +630,6 @@ const purchaseActionLabel = computed(() =>
 );
 const creditContactRelationOptions = computed(() => [
   {
-    value: "relative",
-    label: locale.value === "ru" ? "Член семьи" : "Oila a'zosi",
-  },
-  {
     value: "spouse",
     label: locale.value === "ru" ? "Супруг(а)" : "Turmush o'rtog'i",
   },
@@ -573,6 +640,14 @@ const creditContactRelationOptions = computed(() => [
   {
     value: "sibling",
     label: locale.value === "ru" ? "Брат / сестра" : "Aka-uka / opa-singil",
+  },
+  {
+    value: "son",
+    label: locale.value === "ru" ? "Сын" : "O'g'il",
+  },
+  {
+    value: "daughter",
+    label: locale.value === "ru" ? "Дочь" : "Qiz",
   },
 ]);
 const creditExtraPhonesPayload = computed(() => {
@@ -586,10 +661,22 @@ const creditExtraPhonesPayload = computed(() => {
     seen.add(normalized);
     values.push(normalized);
   }
-  return values.slice(0, 3);
+  return values.slice(0, 2);
 });
 const areCreditExtraPhonesComplete = computed(
-  () => creditExtraPhonesPayload.value.length === 3
+  () => creditExtraPhonesPayload.value.length === 2
+);
+const areCreditExtraRelationsComplete = computed(() => {
+  const allowedRelations = new Set(
+    creditContactRelationOptions.value.map((option) => option.value)
+  );
+
+  return creditExtraContacts.value.every((contact) =>
+    allowedRelations.has(String(contact.relation || "").trim())
+  );
+});
+const areCreditExtraContactsComplete = computed(
+  () => areCreditExtraPhonesComplete.value && areCreditExtraRelationsComplete.value
 );
 
 const verifiedProfileSummary = computed(() => {
@@ -842,6 +929,11 @@ const getInitialPaymentStorageKey = (orderId) =>
     ? `${MYID_PAYMENT_URL_STORAGE_PREFIX}${Number(orderId)}`
     : "";
 
+const getMyIdCreditPlanStorageKey = (orderId) =>
+  Number.isFinite(Number(orderId)) && Number(orderId) > 0
+    ? `${MYID_CREDIT_PLAN_STORAGE_PREFIX}${Number(orderId)}`
+    : "";
+
 const storeInitialPaymentUrl = (orderId, paymentUrl) => {
   if (typeof window === "undefined") return;
   const storageKey = getInitialPaymentStorageKey(orderId);
@@ -861,6 +953,57 @@ const clearInitialPaymentUrl = (orderId) => {
   const storageKey = getInitialPaymentStorageKey(orderId);
   if (!storageKey) return;
   window.sessionStorage.removeItem(storageKey);
+};
+
+const createMyIdCreditPlanSnapshot = (products = []) =>
+  (Array.isArray(products) ? products : []).map((product) => ({
+    id: Number(product?.id || 0) || null,
+    quantity: Number(product?.quantity || 1) || 1,
+    credit_plan:
+      product?.credit_plan && typeof product.credit_plan === "object"
+        ? { ...product.credit_plan }
+        : null,
+  }));
+
+const storeMyIdCreditPlanSnapshot = (orderId, products = []) => {
+  if (typeof window === "undefined") return;
+  const storageKey = getMyIdCreditPlanStorageKey(orderId);
+  if (!storageKey) return;
+
+  const snapshot = createMyIdCreditPlanSnapshot(products).filter((item) =>
+    Number(item?.credit_plan?.months || 0) > 0
+  );
+  myIdCreditPlanSnapshot.value = snapshot;
+  window.sessionStorage.setItem(storageKey, JSON.stringify(snapshot));
+};
+
+const readMyIdCreditPlanSnapshot = (orderId) => {
+  if (typeof window === "undefined") return [];
+  const storageKey = getMyIdCreditPlanStorageKey(orderId);
+  if (!storageKey) return [];
+
+  try {
+    const parsed = JSON.parse(window.sessionStorage.getItem(storageKey) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const getSnapshotCreditPlanForItem = (item, index = 0) => {
+  const snapshot = myIdCreditPlanSnapshot.value;
+  if (!snapshot.length) {
+    return null;
+  }
+
+  const productId = Number(item?.id || 0);
+  const sameIndex = snapshot[index];
+  if (sameIndex && (!productId || Number(sameIndex.id || 0) === productId)) {
+    return sameIndex.credit_plan || null;
+  }
+
+  const byProductId = snapshot.find((entry) => Number(entry?.id || 0) === productId);
+  return byProductId?.credit_plan || null;
 };
 
 const applyStoredCustomerSession = () => {
@@ -1626,6 +1769,7 @@ const startInstallmentVerification = async () => {
     }
 
     if (orderId) {
+      storeMyIdCreditPlanSnapshot(orderId, payload.products);
       await replaceCheckoutQuery(
         getPersistentCheckoutQuery({
           orderId,
@@ -1727,11 +1871,11 @@ const submitInstallmentCredit = async () => {
     return;
   }
 
-  if (!areCreditExtraPhonesComplete.value) {
+  if (!areCreditExtraContactsComplete.value) {
     pageError.value =
       locale.value === "ru"
-        ? "Заполните 3 дополнительных номера телефона."
-        : "3 ta qo'shimcha telefon raqamini to'ldiring.";
+        ? "Заполните 2 дополнительных номера телефона и выберите степень родства."
+        : "2 ta qo'shimcha telefon raqamini to'ldiring va qarindoshlik turini tanlang.";
     return;
   }
 
@@ -1773,9 +1917,11 @@ watch(
       stopStatusPolling();
       orderStatus.value = null;
       orderStatusError.value = "";
+      myIdCreditPlanSnapshot.value = [];
       return;
     }
 
+    myIdCreditPlanSnapshot.value = readMyIdCreditPlanSnapshot(currentOrderId.value);
     fetchOrderStatus();
   },
   { immediate: true }
@@ -1933,6 +2079,10 @@ watch(
 watch(
   installmentSelectionsByKey,
   (selectionMap) => {
+    if (currentOrderId.value || String(myIdReturnSessionId.value || "").trim()) {
+      return;
+    }
+
     basketItems.value.forEach((item) => {
       const itemKey = getBasketItemKey(item);
       const selection = selectionMap[itemKey];
@@ -2365,7 +2515,7 @@ onBeforeUnmount(() => {
                 :disabled="
                   !installmentReadyToSubmitCredit ||
                   creditSubmitLoading ||
-                  !areCreditExtraPhonesComplete
+                  !areCreditExtraContactsComplete
                 "
                 @click="submitInstallmentCredit"
               >
@@ -2375,7 +2525,7 @@ onBeforeUnmount(() => {
 
             <div class="checkout-credit-phones">
               <p class="checkout-credit-phones-title">
-                {{ locale === "ru" ? "Дополнительные телефоны (до 3)" : "Qo'shimcha telefonlar (3 tagacha)" }}
+                {{ locale === "ru" ? "Дополнительные телефоны (2)" : "Qo'shimcha telefonlar (2 ta)" }}
               </p>
               <div class="checkout-credit-phones-list">
                 <div
@@ -2400,6 +2550,9 @@ onBeforeUnmount(() => {
                     v-model="contact.relation"
                     class="checkout-input checkout-credit-relation"
                   >
+                    <option value="" disabled>
+                      {{ locale === "ru" ? "Выберите" : "Tanlang" }}
+                    </option>
                     <option
                       v-for="option in creditContactRelationOptions"
                       :key="option.value"
