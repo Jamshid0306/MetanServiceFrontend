@@ -4,13 +4,19 @@ import { ref } from "vue";
 
 export const isLoading = ref(false);
 
+const SITE_URL = "https://urganch-metan-servis.uz";
+const SITE_NAME = "Urganch Metan Service";
+const DEFAULT_IMAGE = `${SITE_URL}/site-logo.png`;
+
 const DEFAULT_SEO = {
   title: "Urganch Metan Service - Metan Uskunalari va Servis",
   description:
-    "Urganch Metan Service - O'zbekistonda metan uskunalari, texnik servis va ehtiyot qismlar bo'yicha ishonchli hamkor.",
+    "Urganch Metan Service - Xorazm va O'zbekistonda metan uskunalari, CNG ehtiyot qismlar, o'rnatish va texnik servis bo'yicha ishonchli hamkor.",
   keywords:
-    "Urganch Metan Service, metan service, metan uskunalari, metan servis, gaz uskunalari, CNG service, O'zbekiston",
+    "Urganch Metan Service, metan service, metan uskunalari, metan servis, gaz uskunalari, CNG service, CNG ehtiyot qismlar, metan o'rnatish, Xorazm, Urganch, O'zbekiston",
   robots: "index,follow",
+  image: DEFAULT_IMAGE,
+  type: "website",
 };
 
 const routes = [
@@ -21,9 +27,10 @@ const routes = [
     meta: {
       title: "Urganch Metan Service - Bosh Sahifa",
       description:
-        "Urganch Metan Service - metan uskunalari, texnik servis va ehtiyot qismlar bo'yicha professional xizmat.",
+        "Urganch Metan Service - Urganchda metan uskunalari, CNG ehtiyot qismlar, texnik servis, o'rnatish va qo'llab-quvvatlash xizmatlari.",
       keywords:
-        "Urganch Metan Service, metan uskunalari, metan servis, gaz uskunalari",
+        "Urganch Metan Service, Urganch metan servis, metan uskunalari, CNG servis, gaz uskunalari, metan o'rnatish",
+      canonicalPath: "/",
     },
   },
   {
@@ -32,6 +39,7 @@ const routes = [
     component: () => import("@/pages/AdminPage.vue"),
     meta: {
       title: "Urganch Metan Service - Admin",
+      description: "Urganch Metan Service admin paneli.",
       robots: "noindex,nofollow",
     },
   },
@@ -41,6 +49,7 @@ const routes = [
     component: () => import("@/pages/LoginPage.vue"),
     meta: {
       title: "Urganch Metan Service - Login",
+      description: "Urganch Metan Service mijoz kabinetiga kirish sahifasi.",
       robots: "noindex,nofollow",
       disableGlobalLoader: true,
     },
@@ -51,6 +60,7 @@ const routes = [
     component: () => import("@/pages/RegisterPage.vue"),
     meta: {
       title: "Urganch Metan Service - Register",
+      description: "Urganch Metan Service mijoz kabineti uchun ro'yxatdan o'tish sahifasi.",
       robots: "noindex,nofollow",
       disableGlobalLoader: true,
     },
@@ -61,6 +71,7 @@ const routes = [
     component: () => import("@/pages/ForgotPasswordPage.vue"),
     meta: {
       title: "Urganch Metan Service - Parolni tiklash",
+      description: "Urganch Metan Service akkaunti parolini tiklash sahifasi.",
       robots: "noindex,nofollow",
       disableGlobalLoader: true,
     },
@@ -72,9 +83,10 @@ const routes = [
     meta: {
       title: "Urganch Metan Service - Mahsulotlar",
       description:
-        "Urganch Metan Service mahsulotlari: metan uskunalari, ehtiyot qismlar va servis uchun kerakli yechimlar.",
+        "Urganch Metan Service katalogi: metan uskunalari, CNG ehtiyot qismlar, gaz ballon tizimlari va servis uchun kerakli mahsulotlar.",
       keywords:
-        "metan mahsulotlari, metan uskunalari narxi, CNG qismlar, Urganch Metan Service",
+        "metan mahsulotlari, metan uskunalari narxi, CNG qismlar, gaz ballon uskunalari, metan ehtiyot qismlar, Urganch Metan Service",
+      canonicalPath: "/products",
     },
   },
   {
@@ -84,9 +96,10 @@ const routes = [
     meta: {
       title: "Urganch Metan Service - Mahsulot Tafsiloti",
       description:
-        "Urganch Metan Service mahsulot tafsilotlari va texnik ma'lumotlari.",
+        "Urganch Metan Service mahsulot tafsilotlari: narx, xususiyatlar, muddatli to'lov va buyurtma ma'lumotlari.",
       keywords:
-        "metan mahsulot tafsiloti, metan uskunasi, Urganch Metan Service",
+        "metan mahsulot tafsiloti, metan uskunasi, CNG ehtiyot qism, gaz uskunasi, Urganch Metan Service",
+      type: "product",
     },
   },
   {
@@ -95,6 +108,7 @@ const routes = [
     component: () => import("@/pages/BasketPage.vue"),
     meta: {
       title: "Urganch Metan Service - Savat",
+      description: "Urganch Metan Service savati: tanlangan mahsulotlarni ko'rish va buyurtmaga o'tish.",
       robots: "noindex,nofollow",
     },
   },
@@ -104,6 +118,7 @@ const routes = [
     component: () => import("@/pages/CheckoutPage.vue"),
     meta: {
       title: "Urganch Metan Service - Buyurtmani rasmiylashtirish",
+      description: "Urganch Metan Service buyurtmani rasmiylashtirish va CLICK yoki muddatli to'lov orqali xarid qilish sahifasi.",
       robots: "noindex,nofollow",
     },
   },
@@ -113,6 +128,7 @@ const routes = [
     component: () => import("@/pages/ProfilePage.vue"),
     meta: {
       title: "Urganch Metan Service - Profil",
+      description: "Urganch Metan Service mijoz profili.",
       robots: "noindex,nofollow",
     },
   },
@@ -122,6 +138,7 @@ const routes = [
     component: () => import("@/pages/ProfileOrdersPage.vue"),
     meta: {
       title: "Urganch Metan Service - Buyurtmalarim",
+      description: "Urganch Metan Service mijoz buyurtmalari va to'lov holatlari sahifasi.",
       robots: "noindex,nofollow",
     },
   },
@@ -131,6 +148,7 @@ const routes = [
     component: () => import("@/pages/ProfileFavoritesPage.vue"),
     meta: {
       title: "Urganch Metan Service - Sevimlilar",
+      description: "Urganch Metan Service sevimli mahsulotlar ro'yxati.",
       robots: "noindex,nofollow",
     },
   },
@@ -140,6 +158,7 @@ const routes = [
     component: () => import("@/pages/NotFoundPage.vue"),
     meta: {
       title: "Urganch Metan Service - Sahifa Topilmadi",
+      description: "So'ralgan sahifa topilmadi.",
       robots: "noindex,nofollow",
     },
   },
@@ -179,15 +198,75 @@ const upsertMeta = (attr, key, content) => {
   metaTag.setAttribute("content", content);
 };
 
-const applySeo = (seo) => {
+const upsertLink = (rel, href) => {
+  if (!href) return;
+  let linkTag = document.head.querySelector(`link[rel="${rel}"]`);
+  if (!linkTag) {
+    linkTag = document.createElement("link");
+    linkTag.setAttribute("rel", rel);
+    document.head.appendChild(linkTag);
+  }
+  linkTag.setAttribute("href", href);
+};
+
+const removeMeta = (attr, key) => {
+  const metaTag = document.head.querySelector(`meta[${attr}="${key}"]`);
+  if (metaTag) metaTag.remove();
+};
+
+const normalizePathForCanonical = (to, seo) => {
+  const explicitPath = seo.canonicalPath;
+  if (typeof explicitPath === "function") {
+    return explicitPath(to);
+  }
+  if (typeof explicitPath === "string") {
+    return explicitPath;
+  }
+  return to.path || "/";
+};
+
+const buildCanonicalUrl = (to, seo) => {
+  const path = normalizePathForCanonical(to, seo);
+  if (!path || path === "/") return SITE_URL;
+  return `${SITE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+};
+
+const applySeo = (seo, to) => {
+  const canonicalUrl = buildCanonicalUrl(to, seo);
+  const imageUrl = seo.image || DEFAULT_IMAGE;
+  const localeCode = String(localStorage.getItem("lang") || "uz").toLowerCase();
+
+  document.documentElement.setAttribute("lang", localeCode === "ru" ? "ru" : "uz");
   document.title = seo.title;
   upsertMeta("name", "description", seo.description);
   upsertMeta("name", "keywords", seo.keywords);
   upsertMeta("name", "robots", seo.robots);
+  upsertMeta("name", "author", SITE_NAME);
+  upsertMeta("name", "application-name", SITE_NAME);
+  upsertMeta("name", "theme-color", "#18304f");
+
+  upsertMeta("property", "og:site_name", SITE_NAME);
+  upsertMeta("property", "og:locale", localeCode === "ru" ? "ru_RU" : "uz_UZ");
+  upsertMeta("property", "og:type", seo.type || "website");
+  upsertMeta("property", "og:url", canonicalUrl);
   upsertMeta("property", "og:title", seo.title);
   upsertMeta("property", "og:description", seo.description);
+  upsertMeta("property", "og:image", imageUrl);
+  upsertMeta("property", "og:image:alt", seo.imageAlt || seo.title);
+
+  upsertMeta("name", "twitter:card", "summary_large_image");
   upsertMeta("name", "twitter:title", seo.title);
   upsertMeta("name", "twitter:description", seo.description);
+  upsertMeta("name", "twitter:image", imageUrl);
+  upsertMeta("name", "twitter:image:alt", seo.imageAlt || seo.title);
+
+  if (seo.robots === "noindex,nofollow") {
+    removeMeta("name", "googlebot");
+  } else {
+    upsertMeta("name", "googlebot", "index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1");
+  }
+
+  upsertLink("canonical", canonicalUrl);
 };
 
 router.afterEach((to) => {
@@ -195,7 +274,7 @@ router.afterEach((to) => {
     ...DEFAULT_SEO,
     ...(to.meta || {}),
   };
-  applySeo(seo);
+  applySeo(seo, to);
 
   // Keyingi tick’da ishlasin → import yuklanib bo‘ladi
   setTimeout(() => {

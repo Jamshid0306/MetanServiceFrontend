@@ -549,17 +549,28 @@ const allInstallmentPlansSelected = computed(
 const showStatusCard = computed(() => Boolean(currentOrderId.value && orderStatus.value));
 const hasVerifiedMyId = computed(() => Boolean(myIdProfileResult.value) || currentOrderMyIdCode.value === 1);
 const needsInitialPayment = computed(() => totalInitialPayment.value > 0);
+const initialPaymentCompleted = computed(
+  () =>
+    needsInitialPayment.value &&
+    hasVerifiedMyId.value &&
+    currentStatusPaymentMethod.value === "click" &&
+    currentOrderStatus.value === "completed"
+);
+const installmentCreditSubmitted = computed(
+  () =>
+    Boolean(orderStatus.value?.credit_submitted || orderStatus.value?.can_pay_monthly) ||
+    (currentStatusPaymentMethod.value === "myid" && currentOrderStatus.value === "completed")
+);
 const installmentCompleted = computed(() => {
-  if (!hasVerifiedMyId.value || currentOrderStatus.value !== "completed") {
+  if (!hasVerifiedMyId.value) {
     return false;
   }
 
-  // For flows with initial payment, completion means Click payment succeeded.
   if (needsInitialPayment.value) {
-    return currentStatusPaymentMethod.value === "click";
+    return initialPaymentCompleted.value && installmentCreditSubmitted.value;
   }
 
-  return true;
+  return installmentCreditSubmitted.value;
 });
 const tariffStepCompleted = computed(
   () =>
@@ -581,10 +592,10 @@ const showCheckoutInstallmentTariffStep = computed(
 );
 const installmentReadyToSubmitCredit = computed(
   () =>
-    !needsInitialPayment.value &&
     hasVerifiedMyId.value &&
     !installmentCompleted.value &&
-    Boolean(currentOrderId.value)
+    Boolean(currentOrderId.value) &&
+    (!needsInitialPayment.value || initialPaymentCompleted.value)
 );
 const installmentWaitingInitialPayment = computed(
   () =>
@@ -724,11 +735,11 @@ const activeInstallmentStepKey = computed(() => {
     return "myid";
   }
 
-  if (needsInitialPayment.value && !installmentCompleted.value) {
+  if (needsInitialPayment.value && !initialPaymentCompleted.value) {
     return "initial-payment";
   }
 
-  if (!needsInitialPayment.value && !installmentCompleted.value) {
+  if (!installmentCreditSubmitted.value) {
     return "purchase";
   }
 
@@ -764,19 +775,20 @@ const installmentStepItems = computed(() => {
       ? {
           key: "initial-payment",
           label: t("checkoutPage.stepInitialPayment"),
-          done: installmentCompleted.value,
+          done: initialPaymentCompleted.value,
         }
-      : {
-          key: "purchase",
-          label: t("checkoutPage.stepPurchase"),
-          done: installmentCompleted.value,
-        },
+      : null,
+    {
+      key: "purchase",
+      label: t("checkoutPage.stepPurchase"),
+      done: installmentCreditSubmitted.value,
+    },
     {
       key: "complete",
       label: t("checkoutPage.stepComplete"),
       done: installmentCompleted.value,
     },
-  ];
+  ].filter(Boolean);
 
   const firstPendingIndex = steps.findIndex((step) => !step.done);
   return steps.map((step, index) => ({
@@ -1134,6 +1146,7 @@ const syncOrderStatusFromResponse = (payload = {}) => {
     ).trim(),
     status_note: String(payload?.result_note || orderStatus.value?.status_note || "").trim(),
     click_error_note: String(payload?.result_note || orderStatus.value?.click_error_note || "").trim(),
+    credit_submitted: Boolean(payload?.credit_submitted || orderStatus.value?.credit_submitted),
   };
 };
 
@@ -2494,10 +2507,7 @@ onBeforeUnmount(() => {
             </div>
           </section>
 
-          <section
-            v-if="activeInstallmentStepKey === 'purchase' && !needsInitialPayment"
-            class="checkout-band checkout-step-panel"
-          >
+          <section v-if="activeInstallmentStepKey === 'purchase'" class="checkout-band checkout-step-panel">
             <div class="checkout-section-head">
               <h2>{{ t("checkoutPage.purchaseTitle") }}</h2>
               <p>{{ t("checkoutPage.purchaseHelp") }}</p>
@@ -2640,59 +2650,6 @@ onBeforeUnmount(() => {
         </section>
       </main>
 
-      <aside class="checkout-sidebar">
-        <section class="checkout-summary-panel">
-          <div class="checkout-section-head compact">
-            <h2>{{ t("checkoutPage.summaryTitle") }}</h2>
-            <p>
-              {{
-                isInstallmentJourney
-                  ? t("checkoutPage.installmentOption")
-                  : t("checkoutPage.oneTimeOption")
-              }}
-            </p>
-          </div>
-
-          <div
-            v-if="isInstallmentJourney && needsInitialPayment"
-            class="checkout-summary-row"
-          >
-            <span>{{ t("checkoutPage.initialPayment") }}</span>
-            <strong>{{ totalInitialPaymentFormatted }}</strong>
-          </div>
-
-          <div v-if="isInstallmentJourney" class="checkout-summary-row">
-            <span>{{ t("checkoutPage.monthlyPaymentTotal") }}</span>
-            <strong>{{ totalMonthlyInstallmentFormatted }}</strong>
-          </div>
-
-          <div
-            v-if="isInstallmentJourney && summaryInstallmentMonthsDisplay"
-            class="checkout-summary-row"
-          >
-            <span>{{ t("credit.term") }}</span>
-            <strong>{{ summaryInstallmentMonthsDisplay }}</strong>
-          </div>
-
-          <div class="checkout-summary-row">
-            <span>{{ t("checkoutPage.productsCount") }}</span>
-            <strong>{{ basketItemCount }}</strong>
-          </div>
-
-          <div class="checkout-summary-row">
-            <span>{{ t("allBasket") }}</span>
-            <strong>{{ totalAmountFormatted }}</strong>
-          </div>
-
-          <p class="checkout-summary-note">
-            {{
-              isInstallmentJourney
-                ? currentStatusHint || t("checkoutPage.purchaseHelp")
-                : t("checkoutPage.clickDescription")
-            }}
-          </p>
-        </section>
-      </aside>
     </div>
 
     <div v-else class="checkout-empty-state">
@@ -2798,7 +2755,7 @@ onBeforeUnmount(() => {
 
 .checkout-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+  grid-template-columns: minmax(0, 1fr);
   gap: 24px;
   align-items: start;
 }

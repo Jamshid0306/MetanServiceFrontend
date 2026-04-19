@@ -94,6 +94,7 @@ const isProductsRoute = computed(
 );
 const isBasketRoute = computed(() => route.path.startsWith("/basket"));
 const isProfileRoute = computed(() => route.path.startsWith("/profile"));
+const isCheckoutRoute = computed(() => route.path.startsWith("/checkout"));
 const basketCount = computed(() => basketStore.basket.length);
 const isAuthRoute = computed(() =>
   ["Login", "Register", "ForgotPassword"].includes(String(route.name || ""))
@@ -103,7 +104,7 @@ const showPublicLayout = computed(
   () => route.path !== "/admin" && !isAuthRoute.value
 );
 const showPublicExtras = computed(
-  () => showPublicLayout.value && !isAuthRoute.value
+  () => showPublicLayout.value && !isAuthRoute.value && !isCheckoutRoute.value
 );
 const showLoader = computed(
   () => loaderStore.loader && !isAuthRoute.value && !isLoaderDisabledRoute.value
@@ -121,7 +122,13 @@ watch(
 
 <template>
   <div>
-    <Nav v-if="showPublicLayout" />
+    <div
+      v-if="showPublicLayout"
+      class="app-nav-shell"
+      :class="{ 'app-nav-shell-mobile-hidden': !isHomeRoute }"
+    >
+      <Nav />
+    </div>
     <RouterView />
     <Footer v-if="showPublicExtras" />
     <Loader v-if="showLoader" />
@@ -300,6 +307,12 @@ watch(
 </template>
 
 <style scoped>
+@media (max-width: 1023px) {
+  .app-nav-shell-mobile-hidden {
+    display: none;
+  }
+}
+
 .app-mobile-dock {
   position: fixed;
   left: 0;

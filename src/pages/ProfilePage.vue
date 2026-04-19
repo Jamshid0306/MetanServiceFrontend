@@ -416,7 +416,7 @@ onUnmounted(() => {
 
 @media (max-width: 720px) {
   .profile-page {
-    padding-top: 122px;
+    padding-top: 14px;
   }
 }
 </style>

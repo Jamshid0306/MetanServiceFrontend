@@ -193,7 +193,7 @@
     "monthlyPayment": "Oyiga",
     "appliedRate": "ustama qo'llandi",
     "installment": "Muddatli to'lov",
-    "fullPayment": "100% to'lov",
+    "fullPayment": "CLICK orqali to'lov",
     "tariffs": "Tariflar",
     "downPaymentAvailable": "Bosh to'lov mavjud"
   },
@@ -265,7 +265,7 @@
   "checkoutPage": {
     "title": "Buyurtmani yakunlash",
     "formHelp": "Kontakt ma'lumotlaringizni kiriting va to'lov usulini tanlang.",
-    "oneTimeOption": "Bir yo'la to'lov",
+    "oneTimeOption": "CLICK orqali to'lov",
     "oneTimeDescription": "Buyurtmani Click orqali to'lab yakunlaysiz.",
     "nameHint": "Ismingizni kiriting",
     "phoneHint": "+998 XX XXX XX XX",
@@ -373,7 +373,7 @@
     "emptyOrdersTitle": "Hali buyurtma yo'q",
     "emptyOrdersText": "Mahsulot tanlab xaridni yakunlaganingizdan keyin u shu yerda ko'rinadi.",
     "orderNumber": "Buyurtma",
-    "oneTimePayment": "Bir yo'la to'lov",
+    "oneTimePayment": "CLICK orqali to'lov",
     "cashPayment": "Naqd to'lov",
     "installmentPayment": "Nasiyaga",
     "monthlyPayment": "Oylik to'lov",

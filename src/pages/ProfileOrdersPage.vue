@@ -123,6 +123,25 @@ const formatDate = (value) => {
   }).format(date);
 };
 
+const formatOrderCreatedDate = (value) => {
+  if (!value) {
+    return "";
+  }
+
+  const normalizedValue = String(value).includes("T")
+    ? String(value)
+    : String(value).replace(" ", "T");
+  const date = new Date(normalizedValue);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}.${month}.${year}`;
+};
+
 const getProductMonthlyPayment = (product = {}) => {
   const creditPlan = product?.credit_plan || {};
   return Number(creditPlan.monthly_payment || creditPlan.monthlyPayment || 0);
@@ -400,13 +419,15 @@ onMounted(() => {
       <div v-else class="profile-orders-list">
         <article v-for="order in orders" :key="order.id" class="profile-order">
           <header class="profile-order-head">
-            <div>
-              <span>{{ t("profile.orderNumber") }} #{{ order.id }}</span>
+            <div class="profile-order-head-main">
+              <span v-if="formatOrderCreatedDate(order.created_at)" class="profile-order-created">
+                {{ formatOrderCreatedDate(order.created_at) }}
+              </span>
               <strong>{{ paymentLabel(order) }}</strong>
             </div>
             <div class="profile-order-status">
               <span>{{ statusLabel(order.status) }}</span>
-              <small v-if="formatDate(order.created_at)">{{ formatDate(order.created_at) }}</small>
+              <small class="profile-order-id-badge">{{ t("profile.orderNumber") }} #{{ order.id }}</small>
             </div>
           </header>
 
@@ -663,7 +684,7 @@ onMounted(() => {
   border-bottom: 1px solid rgba(20, 35, 56, 0.08);
 }
 
-.profile-order-head div,
+.profile-order-head-main,
 .profile-order-status,
 .profile-order-product-price {
   display: flex;
@@ -706,11 +727,32 @@ onMounted(() => {
   align-items: flex-end;
 }
 
+.profile-order-created {
+  width: max-content;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #42546d;
+  padding: 0.28rem 0.62rem;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
 .profile-order-status span {
   border-radius: 999px;
   background: #eef2f6;
   color: #18304f;
   padding: 0.35rem 0.65rem;
+}
+
+.profile-order-id-badge {
+  border-radius: 999px;
+  background: #142338;
+  color: #ffffff;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 900;
+  white-space: nowrap;
+  box-shadow: 0 8px 18px rgba(20, 35, 56, 0.12);
 }
 
 .profile-order-products {
@@ -904,7 +946,7 @@ onMounted(() => {
 
 @media (max-width: 720px) {
   .profile-orders-page {
-    padding: 5.75rem 0.75rem 6.5rem;
+    padding: 0.75rem 0.75rem 6.5rem;
   }
 
   .profile-orders-hero {
@@ -986,6 +1028,12 @@ onMounted(() => {
 
   .profile-order-status small {
     display: none;
+  }
+
+  .profile-order-id-badge {
+    display: inline-flex;
+    padding: 0.3rem 0.58rem;
+    font-size: 0.72rem;
   }
 
   .profile-order-product {

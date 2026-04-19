@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
 import { useProductsStore } from "../store/productsStore";
 import { useBasketStore } from "../store/basketStore";
-import { ShoppingCart, Check, X, CircleHelp, Heart } from "lucide-vue-next";
+import { ArrowRight, ShoppingCart, Check, X, CircleHelp, Heart } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { useRoute, useRouter } from "vue-router";
@@ -61,8 +61,6 @@ const { t, locale, tm } = useI18n();
 const route = useRoute();
 const detailAnimating = ref(false);
 const detailShowCheck = ref(false);
-const animating = ref({});
-const showCheck = ref({});
 const activeTab = ref("description");
 const relatedProductRefs = ref([]);
 const swiperRef = ref(null);
@@ -94,6 +92,72 @@ const paymentModeSelectHighlighted = ref(false);
 const creditTariffSelectHighlighted = ref(false);
 let swiperInstance = null;
 let priceSummaryObserver = null;
+const SITE_URL = "https://urganch-metan-servis.uz";
+
+const upsertSeoMeta = (attr, key, content) => {
+  if (!content || typeof document === "undefined") return;
+  let metaTag = document.head.querySelector(`meta[${attr}="${key}"]`);
+  if (!metaTag) {
+    metaTag = document.createElement("meta");
+    metaTag.setAttribute(attr, key);
+    document.head.appendChild(metaTag);
+  }
+  metaTag.setAttribute("content", content);
+};
+
+const upsertSeoLink = (rel, href) => {
+  if (!href || typeof document === "undefined") return;
+  let linkTag = document.head.querySelector(`link[rel="${rel}"]`);
+  if (!linkTag) {
+    linkTag = document.createElement("link");
+    linkTag.setAttribute("rel", rel);
+    document.head.appendChild(linkTag);
+  }
+  linkTag.setAttribute("href", href);
+};
+
+const stripSeoText = (value = "") =>
+  String(value)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const truncateSeoText = (value = "", maxLength = 155) => {
+  const text = stripSeoText(value);
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength - 1).trim()}…`;
+};
+
+const applyProductSeo = () => {
+  const product = store.product;
+  if (!product?.id || typeof document === "undefined") return;
+
+  const productName = String(product[`name_${locale.value}`] || product.name_uz || product.name_ru || "").trim();
+  if (!productName) return;
+
+  const title = `${productName} - Urganch Metan Service`;
+  const description =
+    truncateSeoText(product[`description_${locale.value}`] || product.description_uz || product.characteristic_uz) ||
+    `${productName} narxi, xususiyatlari va buyurtma ma'lumotlari. Urganch Metan Service metan uskunalari va CNG ehtiyot qismlari.`;
+  const canonicalUrl = `${SITE_URL}/product/${product.id}`;
+  const image = resolveAssetUrls(product.images || [])[0] || `${SITE_URL}/site-logo.png`;
+
+  document.title = title;
+  upsertSeoMeta("name", "description", description);
+  upsertSeoMeta("name", "keywords", `${productName}, metan uskunasi, CNG ehtiyot qism, Urganch Metan Service`);
+  upsertSeoMeta("name", "robots", "index,follow");
+  upsertSeoMeta("property", "og:type", "product");
+  upsertSeoMeta("property", "og:title", title);
+  upsertSeoMeta("property", "og:description", description);
+  upsertSeoMeta("property", "og:url", canonicalUrl);
+  upsertSeoMeta("property", "og:image", image);
+  upsertSeoMeta("property", "og:image:alt", productName);
+  upsertSeoMeta("name", "twitter:card", "summary_large_image");
+  upsertSeoMeta("name", "twitter:title", title);
+  upsertSeoMeta("name", "twitter:description", description);
+  upsertSeoMeta("name", "twitter:image", image);
+  upsertSeoLink("canonical", canonicalUrl);
+};
 
 function createEmptyOrderForm(orderType = "standard") {
   return {
@@ -1574,21 +1638,6 @@ const goToDetail = (id) => {
   router.push({ name: "ProductDetail", params: { id } });
 };
 
-const handleClick = (product) => {
-  const id = product.id;
-  if (animating.value[id]) return;
-  animating.value = { ...animating.value, [id]: true };
-  setTimeout(() => (showCheck.value = { ...showCheck.value, [id]: true }), 400);
-  setTimeout(() => {
-    showCheck.value = { ...showCheck.value, [id]: false };
-    animating.value = { ...animating.value, [id]: false };
-  }, 1600);
-  basketStore.addToBasket({
-    ...buildConfiguredBasketItem(product, {}, 1, { useFallbackPath: false }),
-    payment_schedule_mode: null,
-  });
-};
-
 const toggleExtraService = (serviceId) => {
   const next = new Set(selectedExtraServiceIds.value);
   if (next.has(serviceId)) {
@@ -1613,8 +1662,6 @@ const handleEscape = (event) => {
     closeOrderModal();
   }
 };
-
-const relatedActionLabel = () => t("add_to_cart");
 
 watch(
   () => route.params.id,
@@ -1662,8 +1709,13 @@ watch(
     paymentModeSelectHighlighted.value = false;
     creditTariffSelectHighlighted.value = false;
     paymentScheduleMode.value = "";
+    applyProductSeo();
   }
 );
+
+watch(locale, () => {
+  applyProductSeo();
+});
 
 watch(
   () => selectedCreditConfig.value?.months || null,
@@ -2426,34 +2478,14 @@ onBeforeUnmount(() => {
 
           <div class="flex gap-2">
             <button
-              @click="handleClick(product)"
+              @click="goToDetail(product.id)"
               class="relative flex-1 cursor-pointer flex items-center justify-center gap-2 buttonShop related-btn text-white py-2.5 rounded-xl font-medium overflow-hidden"
             >
-              <span
-                class="transition-all duration-300"
-                :class="
-                  animating[product.id]
-                    ? 'opacity-0 scale-0'
-                    : 'opacity-100 scale-100'
-                "
-              >
-                {{ relatedActionLabel(product) }}
+              <span class="transition-all duration-300">
+                {{ t("header.more") }}
               </span>
-              <ShoppingCart
+              <ArrowRight
                 class="related-cart-icon absolute w-5 h-5 transition-all duration-500"
-                :class="
-                  animating[product.id]
-                    ? 'translate-x-44 opacity-0'
-                    : 'translate-x-0 opacity-100'
-                "
-              />
-              <Check
-                class="absolute w-6 h-6 text-white transition-all duration-500"
-                :class="
-                  showCheck[product.id]
-                    ? 'opacity-100 scale-100'
-                    : 'opacity-0 scale-0'
-                "
               />
             </button>
           </div>
@@ -4354,6 +4386,14 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 1024px) {
+  .detail-page {
+    margin-top: 0;
+  }
+
+  .detail-topbar {
+    margin-bottom: 0.5rem;
+  }
+
   .detail-copy-section-desktop {
     display: none;
   }
@@ -4409,16 +4449,32 @@ onBeforeUnmount(() => {
 
 @media (max-width: 640px) {
   .detail-service-option {
+    grid-template-columns: auto minmax(0, 1fr) 60px;
     gap: 0.7rem;
   }
 
+  .detail-service-price {
+    grid-column: 2 / 4;
+    grid-row: 2;
+    width: 100%;
+    justify-self: stretch;
+    align-self: start;
+    text-align: right;
+    white-space: normal;
+    font-size: 0.82rem;
+    line-height: 1.2;
+  }
+
   .detail-service-media {
+    grid-column: 3;
+    grid-row: 1;
     width: 60px;
     flex-basis: 60px;
     border-radius: 12px;
   }
 
   .detail-page {
+    margin-top: 0;
     padding-left: 0.8rem;
     padding-right: 0.8rem;
   }

@@ -5,7 +5,9 @@ import { useI18n } from "vue-i18n";
 import { useProductsStore } from "../store/productsStore";
 import { useBasketStore } from "../store/basketStore";
 import { useLoaderStore } from "@/store/loaderStore";
-import { resolveAssetUrl } from "@/lib/api";
+import { useFilterStore } from "@/store/filterStore";
+import { resolveAssetUrl, resolveAssetUrls } from "@/lib/api";
+import { formatPriceValue, getProductDefaultPrice } from "@/lib/productOptions";
 import {
   CUSTOMER_SESSION_EVENT,
   clearCustomerSession,
@@ -24,6 +26,7 @@ const { t, locale } = useI18n();
 const productsStore = useProductsStore();
 const basketStore = useBasketStore();
 const loaderStore = useLoaderStore();
+const filterStore = useFilterStore();
 
 const langOpen = ref(false);
 const isSticky = ref(false);
@@ -65,18 +68,23 @@ const getProductOrder = (product) => {
 };
 
 const filteredProducts = computed(() => {
-  if (!searchQuery.value || searchQuery.value.length < 2) return [];
+  const query = searchQuery.value.trim();
+  if (!query) return [];
 
-  return (productsStore.products || [])
-    .filter((product) => matchesProductSearch(product, searchQuery.value))
+  const sourceProducts = filterStore.products.length
+    ? filterStore.products
+    : productsStore.products;
+
+  return (sourceProducts || [])
+    .filter((product) => matchesProductSearch(product, query))
     .sort(
       (a, b) =>
-        scoreProductSearch(b, searchQuery.value, locale.value) -
-          scoreProductSearch(a, searchQuery.value, locale.value) ||
+        scoreProductSearch(b, query, locale.value) -
+          scoreProductSearch(a, query, locale.value) ||
         getProductOrder(a) - getProductOrder(b) ||
         Number(a?.id ?? 0) - Number(b?.id ?? 0)
     )
-    .slice(0, 12);
+    .slice(0, 10);
 });
 
 const selectProduct = (product) => {
@@ -85,8 +93,16 @@ const selectProduct = (product) => {
   router.push({ name: "ProductDetail", params: { id: product.id } });
 };
 
-const getProductImage = (product) =>
-  resolveAssetUrl(product?.images?.[0]) || "/placeholder.png";
+const getProductImage = (product) => {
+  const images = Array.isArray(product?.images)
+    ? resolveAssetUrls(product.images)
+    : [resolveAssetUrl(product?.images)].filter(Boolean);
+  return images[0] || "/placeholder.png";
+};
+const formatProductPrice = (product) => {
+  const price = getProductDefaultPrice(product, locale.value);
+  return price ? formatPriceValue(price) : "";
+};
 
 const toggleLang = () => {
   langOpen.value = !langOpen.value;
@@ -107,8 +123,8 @@ onMounted(async () => {
   if (savedLang) locale.value = savedLang;
   syncCustomerProfile();
 
-  if (!productsStore.products.length) {
-    await productsStore.fetchProducts(1000, 0);
+  if (!filterStore.products.length) {
+    await filterStore.fetchProducts();
   }
 
   window.addEventListener("scroll", handleScroll);
@@ -163,10 +179,10 @@ watch(
                 v-model="searchQuery"
                 type="search"
                 :placeholder="t('nav.search_products') + '...'"
-                class="search-input mobile-search-input w-full pl-10 pr-3 py-2 text-sm"
+                class="search-input mobile-search-input w-full"
               />
               <svg
-                class="absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-500"
+                class="search-icon"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -178,10 +194,18 @@ watch(
                   d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                 />
               </svg>
+              <button
+                v-if="searchQuery"
+                type="button"
+                class="search-clear"
+                @click="searchQuery = ''"
+              >
+                ×
+              </button>
 
               <div
                 v-if="filteredProducts.length"
-                class="absolute top-full left-0 mt-2 w-full search-dropdown max-h-80 overflow-y-auto"
+                class="absolute top-full left-0 mt-2 w-full search-dropdown max-h-96 overflow-y-auto"
               >
                 <div
                   v-for="product in filteredProducts"
@@ -192,17 +216,17 @@ watch(
                   <img
                     :src="getProductImage(product)"
                     alt="Product"
-                    class="w-12 h-12 object-cover rounded-xl border border-gray-200"
+                    class="search-product-image"
                   />
                   <div class="min-w-0">
-                    <p class="text-sm font-semibold text-slate-800 truncate">{{ product[`name_${locale}`] }}</p>
-                    <p class="text-xs font-bold text-slate-700">{{ product[`price_${locale}`] || product.price_uz }} so'm</p>
+                    <p class="search-product-name">{{ product[`name_${locale}`] }}</p>
+                    <p class="search-product-price">{{ formatProductPrice(product) }}</p>
                   </div>
                 </div>
               </div>
 
               <div
-                v-else-if="searchQuery.length > 1"
+                v-else-if="searchQuery.trim().length"
                 class="absolute top-full left-0 mt-2 w-full search-dropdown p-4 text-center text-sm text-slate-500"
               >
                 {{ t("nav.no_results") }}
@@ -219,15 +243,15 @@ watch(
               <RouterLink :to="{ path: '/', hash: '#contact' }" class="nav-link">{{ t("nav.contact") }}</RouterLink>
               <RouterLink to="/products" class="products-pill">{{ t("products.allProducts") }}</RouterLink>
 
-              <div class="hidden lg:flex items-center flex-1 max-w-[260px] xl:max-w-md relative z-40">
+              <div class="hidden lg:flex items-center flex-1 max-w-[420px] xl:max-w-[560px] relative z-40">
                 <input
                   v-model="searchQuery"
                   type="search"
                   :placeholder="t('nav.search_products') + '...'"
-                  class="search-input w-full pl-11 pr-4 py-2.5 text-sm"
+                  class="search-input w-full"
                 />
                 <svg
-                  class="absolute left-3.5 h-5 w-5 text-slate-500"
+                  class="search-icon"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -239,10 +263,18 @@ watch(
                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                   />
                 </svg>
+                <button
+                  v-if="searchQuery"
+                  type="button"
+                  class="search-clear"
+                  @click="searchQuery = ''"
+                >
+                  ×
+                </button>
 
                 <div
                   v-if="filteredProducts.length"
-                  class="absolute top-full left-0 mt-2 w-full search-dropdown max-h-80 overflow-y-auto"
+                  class="absolute top-full left-0 mt-2 w-full search-dropdown max-h-96 overflow-y-auto"
                 >
                   <div
                     v-for="product in filteredProducts"
@@ -253,19 +285,17 @@ watch(
                     <img
                       :src="getProductImage(product)"
                       alt="Product"
-                      class="w-12 h-12 object-cover rounded-xl border border-gray-200"
+                      class="search-product-image"
                     />
                     <div class="min-w-0">
-                      <p class="text-sm font-semibold text-slate-800 truncate">{{ product[`name_${locale}`] }}</p>
-                      <p class="text-xs font-bold text-slate-700">
-                        {{ product[`price_${locale}`] || product.price_uz }} so'm
-                      </p>
+                      <p class="search-product-name">{{ product[`name_${locale}`] }}</p>
+                      <p class="search-product-price">{{ formatProductPrice(product) }}</p>
                     </div>
                   </div>
                 </div>
 
                 <div
-                  v-else-if="searchQuery.length > 1"
+                  v-else-if="searchQuery.trim().length"
                   class="absolute top-full left-0 mt-2 w-full search-dropdown p-4 text-center text-sm text-slate-500"
                 >
                   {{ t("nav.no_results") }}
@@ -459,35 +489,99 @@ watch(
 }
 
 .search-input {
-  border-radius: 999px;
-  border: 1px solid rgba(20, 35, 56, 0.12);
-  background: rgba(255, 255, 255, 0.86);
+  min-height: 52px;
+  border-radius: 18px;
+  border: 1px solid rgba(20, 35, 56, 0.1);
+  background: rgba(255, 255, 255, 0.96);
+  color: #18304f;
+  padding: 0.95rem 3rem 0.95rem 2.9rem;
+  outline: none;
   transition:
     border-color 0.2s ease,
-    box-shadow 0.2s ease;
+    box-shadow 0.2s ease,
+    background 0.2s ease;
 }
 
 .search-input:focus {
   outline: none;
-  border-color: rgba(36, 70, 111, 0.34);
-  box-shadow: 0 0 0 3px rgba(36, 70, 111, 0.08);
+  border-color: rgba(24, 48, 79, 0.2);
+  box-shadow: 0 0 0 4px rgba(24, 48, 79, 0.08);
+  background: #ffffff;
+}
+
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  width: 1.05rem;
+  height: 1.05rem;
+  transform: translateY(-50%);
+  color: #64748b;
+  pointer-events: none;
+}
+
+.search-clear {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: none;
+  background: #eef2f6;
+  color: #42546d;
+  font-size: 1.15rem;
+  line-height: 1;
+  transform: translateY(-50%);
 }
 
 .search-dropdown,
 .lang-dropdown {
-  border-radius: 14px;
-  border: 1px solid rgba(20, 35, 56, 0.12);
+  border-radius: 18px;
+  border: 1px solid rgba(20, 35, 56, 0.1);
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(12px);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.1);
 }
 
 .search-row {
-  transition: background-color 0.2s ease;
+  min-height: 76px;
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease;
 }
 
 .search-row:hover {
   background-color: rgba(20, 35, 56, 0.04);
+}
+
+.search-product-image {
+  width: 58px;
+  height: 58px;
+  flex: 0 0 58px;
+  border: 1px solid rgba(20, 35, 56, 0.1);
+  border-radius: 14px;
+  background: #f8fafc;
+  object-fit: contain;
+}
+
+.search-product-name {
+  margin: 0;
+  color: #18304f;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.search-product-price {
+  margin: 0.25rem 0 0;
+  color: #42546d;
+  font-size: 0.82rem;
+  font-weight: 800;
 }
 
 .contact-chip {
@@ -678,7 +772,10 @@ watch(
 }
 
 .mobile-search-input {
-  min-height: 42px;
+  min-height: 48px;
+  border-radius: 16px;
+  padding-top: 0.78rem;
+  padding-bottom: 0.78rem;
 }
 
 .mobile-actions {
@@ -706,7 +803,7 @@ watch(
   }
 
   .mobile-search-inline {
-    max-width: min(62vw, 300px);
+    max-width: min(66vw, 360px);
   }
 }
 

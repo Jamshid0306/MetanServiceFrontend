@@ -214,6 +214,12 @@ onMounted(() => {
   line-height: 1;
 }
 
+@media (max-width: 720px) {
+  .favorites-page {
+    padding-top: 14px;
+  }
+}
+
 .favorites-empty {
   display: grid;
   justify-items: center;

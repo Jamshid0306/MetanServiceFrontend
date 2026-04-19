@@ -196,7 +196,7 @@
     "monthlyPayment": "Платёж в месяц",
     "appliedRate": "наценка по сроку",
     "installment": "Рассрочка",
-    "fullPayment": "100% оплата",
+    "fullPayment": "Оплата через CLICK",
     "tariffs": "Тарифы",
     "downPaymentAvailable": "Предусмотрен первоначальный взнос"
   },
@@ -265,7 +265,7 @@
   "checkoutPage": {
     "title": "Завершение заказа",
     "formHelp": "Введите контактные данные и выберите способ оплаты.",
-    "oneTimeOption": "Разовый платеж",
+    "oneTimeOption": "Оплата через CLICK",
     "oneTimeDescription": "Заказ завершается оплатой через Click.",
     "nameHint": "Введите имя",
     "phoneHint": "+998 XX XXX XX XX",
@@ -373,7 +373,7 @@
     "emptyOrdersTitle": "Заказов пока нет",
     "emptyOrdersText": "После завершения покупки выбранный товар появится здесь.",
     "orderNumber": "Заказ",
-    "oneTimePayment": "Разовый платеж",
+    "oneTimePayment": "Оплата через CLICK",
     "cashPayment": "Оплата наличными",
     "installmentPayment": "В рассрочку",
     "monthlyPayment": "Ежемесячный платеж",
