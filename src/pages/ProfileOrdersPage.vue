@@ -42,6 +42,7 @@ const statusLabel = (status = "") => {
     pending: t("checkoutPage.statusPending"),
     prepared: t("checkoutPage.statusPrepared"),
     completed: t("checkoutPage.statusCompleted"),
+    canceled: t("checkoutPage.statusCancelled"),
     cancelled: t("checkoutPage.statusCancelled"),
   };
 
@@ -140,6 +141,36 @@ const getIcanCreditReason = (order = {}) => {
   }
 
   return String(order?.ican_credit?.comment || "").trim();
+};
+
+const getOrderStatusValue = (order = {}) => {
+  if (orderIsInstallment(order) && getIcanCreditStatusValue(order)) {
+    return getIcanCreditStatusValue(order);
+  }
+
+  return String(order?.status || "").trim().toLowerCase();
+};
+
+const getOrderStatusLabel = (order = {}) => {
+  if (orderIsInstallment(order) && getIcanCreditStatusValue(order)) {
+    return getIcanCreditStatusLabel(order);
+  }
+
+  return statusLabel(order?.status);
+};
+
+const getOrderStatusClass = (order = {}) => {
+  const status = getOrderStatusValue(order);
+  if (["active", "approved", "completed"].includes(status)) {
+    return "is-success";
+  }
+  if (["canceled", "cancelled"].includes(status)) {
+    return "is-error";
+  }
+  if (["pending", "prepared", "draft", "new"].includes(status)) {
+    return "is-warning";
+  }
+  return "is-muted";
 };
 
 const formatMoney = (value) => {
@@ -478,7 +509,7 @@ onMounted(() => {
               <strong>{{ paymentLabel(order) }}</strong>
             </div>
             <div class="profile-order-status">
-              <span>{{ statusLabel(order.status) }}</span>
+              <span :class="getOrderStatusClass(order)">{{ getOrderStatusLabel(order) }}</span>
               <small class="profile-order-id-badge">{{ t("profile.orderNumber") }} #{{ order.id }}</small>
             </div>
           </header>
@@ -815,6 +846,26 @@ onMounted(() => {
   background: #eef2f6;
   color: #18304f;
   padding: 0.35rem 0.65rem;
+}
+
+.profile-order-status .is-success {
+  background: #dcfce7;
+  color: #14532d;
+}
+
+.profile-order-status .is-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.profile-order-status .is-error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.profile-order-status .is-muted {
+  background: #eef2f6;
+  color: #18304f;
 }
 
 .profile-order-id-badge {
