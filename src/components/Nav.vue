@@ -40,6 +40,7 @@ const languages = [
 const activeLanguage = computed(
   () => languages.find((lang) => lang.code === locale.value) || languages[0]
 );
+const isHomeRoute = computed(() => route.path === "/");
 const customerInitial = computed(
   () => String(customerProfile.value?.name || "U").trim().charAt(0).toUpperCase() || "U"
 );
@@ -69,7 +70,7 @@ const getProductOrder = (product) => {
 
 const filteredProducts = computed(() => {
   const query = searchQuery.value.trim();
-  if (!query) return [];
+  if (!query || isHomeRoute.value) return [];
 
   const sourceProducts = filterStore.products.length
     ? filterStore.products
@@ -122,6 +123,7 @@ onMounted(async () => {
   const savedLang = localStorage.getItem("lang");
   if (savedLang) locale.value = savedLang;
   syncCustomerProfile();
+  searchQuery.value = isHomeRoute.value ? String(route.query.search || "") : "";
 
   if (!filterStore.products.length) {
     await filterStore.fetchProducts();
@@ -147,11 +149,45 @@ const logoutCustomer = () => {
   router.push("/login");
 };
 
+const syncHomeSearchQuery = async (value) => {
+  if (!isHomeRoute.value) {
+    return;
+  }
+
+  const normalizedQuery = String(value || "").trim();
+  const currentQuery = String(route.query.search || "").trim();
+  if (normalizedQuery === currentQuery) {
+    return;
+  }
+
+  const nextQuery = { ...route.query };
+  if (normalizedQuery) {
+    nextQuery.search = normalizedQuery;
+  } else {
+    delete nextQuery.search;
+  }
+
+  await router.replace({
+    path: route.path,
+    query: nextQuery,
+    hash: route.hash,
+  });
+};
+
 watch(
   () => route.fullPath,
   () => {
-    searchQuery.value = "";
     langOpen.value = false;
+    searchQuery.value = isHomeRoute.value
+      ? String(route.query.search || "")
+      : "";
+  }
+);
+
+watch(
+  () => searchQuery.value,
+  (value) => {
+    syncHomeSearchQuery(value);
   }
 );
 </script>

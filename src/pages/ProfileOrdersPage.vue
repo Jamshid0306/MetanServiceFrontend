@@ -109,15 +109,24 @@ const getIcanCreditStatusLabel = (order = {}) => {
     pending: t("profile.creditStatusPending"),
   };
 
+  if (!status && (order?.credit_submitted || orderIsInstallment(order))) {
+    return t("profile.creditStatusPending");
+  }
+
   return (
     labels[status] ||
     String(order?.ican_credit?.status_label || "").trim() ||
+    ((order?.credit_submitted || orderIsInstallment(order)) &&
+    t("profile.creditStatusPending")) ||
     t("checkoutPage.statusUnknown")
   );
 };
 
 const getIcanCreditStatusClass = (order = {}) => {
   const status = getIcanCreditStatusValue(order);
+  if (!status && (order?.credit_submitted || orderIsInstallment(order))) {
+    return "is-warning";
+  }
   if (["active", "approved", "completed"].includes(status)) {
     return "is-success";
   }
@@ -147,6 +156,10 @@ const getIcanCreditReason = (order = {}) => {
 const getOrderStatusValue = (order = {}) => {
   if (orderIsInstallment(order) && getIcanCreditStatusValue(order)) {
     return getIcanCreditStatusValue(order);
+  }
+
+   if (orderIsInstallment(order) && order?.credit_submitted) {
+    return "pending";
   }
 
   return String(order?.status || "").trim().toLowerCase();

@@ -398,7 +398,7 @@
     "creditApplication": "Заявка ICAN",
     "creditNumber": "Номер кредита",
     "creditCancelReason": "Причина отмены",
-    "creditStatusPending": "На рассмотрении",
+    "creditStatusPending": "В процессе",
     "creditStatusApproved": "Одобрен",
     "creditStatusActive": "Активен",
     "creditStatusCancelled": "Отменён",

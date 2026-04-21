@@ -3,7 +3,7 @@ import { computed, ref, onMounted, nextTick } from "vue";
 import { useProductsStore } from "../../store/productsStore";
 import { ArrowRight } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useLoaderStore } from "@/store/loaderStore";
 import { useCreditTariffsStore } from "@/store/creditTariffsStore";
 import { resolveAssetUrls } from "@/lib/api";
@@ -12,7 +12,9 @@ import {
   getProductDefaultPrice,
   getInstallmentPlan,
 } from "@/lib/productOptions";
+import { matchesProductSearch, scoreProductSearch } from "@/lib/productSearch";
 
+const route = useRoute();
 const router = useRouter();
 const { t, locale } = useI18n();
 const productsStore = useProductsStore();
@@ -101,6 +103,27 @@ const sortedProducts = computed(() => {
 
   return list;
 });
+
+const homeSearchQuery = computed(() => String(route.query.search || "").trim());
+
+const filteredProducts = computed(() => {
+  const query = homeSearchQuery.value;
+  const list = [...sortedProducts.value];
+
+  if (!query) {
+    return list;
+  }
+
+  return list
+    .filter((product) => matchesProductSearch(product, query))
+    .sort(
+      (a, b) =>
+        scoreProductSearch(b, query, locale.value) -
+          scoreProductSearch(a, query, locale.value) ||
+        getProductOrder(a) - getProductOrder(b) ||
+        Number(a?.id ?? 0) - Number(b?.id ?? 0)
+    );
+});
 </script>
 
 <template>
@@ -113,7 +136,7 @@ const sortedProducts = computed(() => {
         class="grid grid-cols-4 max-lg:grid-cols-3 max-sm:grid-cols-2 max-sm:gap-4 gap-6"
       >
         <div
-          v-for="(product, index) in sortedProducts"
+          v-for="(product, index) in filteredProducts"
           :key="product.id"
           :ref="(el) => (productRefs[index] = el)"
           :style="{ 'transition-delay': `${Math.min(index, 20) * 50}ms` }"
@@ -155,6 +178,12 @@ const sortedProducts = computed(() => {
             </button>
           </div>
         </div>
+      </div>
+      <div
+        v-if="homeSearchQuery && !filteredProducts.length"
+        class="home-products-empty"
+      >
+        {{ t("nav.no_results") }}
       </div>
       <div class="text-center mt-6">
         <RouterLink
@@ -210,6 +239,18 @@ const sortedProducts = computed(() => {
 
 .section-link:hover::after {
   transform: translateX(2px);
+}
+
+.home-products-empty {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  border-radius: 24px;
+  border: 1px dashed rgba(20, 35, 56, 0.16);
+  background: rgba(255, 255, 255, 0.74);
+  color: #52647c;
+  font-size: 1rem;
+  font-weight: 700;
 }
 
 .product-card {
