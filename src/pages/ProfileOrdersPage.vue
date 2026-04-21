@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
@@ -18,6 +18,9 @@ const orders = ref([]);
 const loading = ref(false);
 const errorMessage = ref("");
 const monthlyPaymentLoadingByOrderId = ref({});
+const ORDERS_POLL_INTERVAL_MS = 4000;
+let ordersPollIntervalId = null;
+let inFlightOrdersPromise = null;
 
 const customerPhone = computed(() => normalizeCustomerPhone(customerSession.value?.phone));
 const resolvedCustomerAddress = computed(() => {
@@ -427,27 +430,69 @@ const formatOption = (option = {}) => {
   return label || value;
 };
 
-const loadOrders = async () => {
+const stopOrdersPolling = () => {
+  if (ordersPollIntervalId) {
+    clearInterval(ordersPollIntervalId);
+    ordersPollIntervalId = null;
+  }
+};
+
+const startOrdersPolling = () => {
+  stopOrdersPolling();
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  ordersPollIntervalId = window.setInterval(() => {
+    loadOrders({ silent: true });
+  }, ORDERS_POLL_INTERVAL_MS);
+};
+
+const loadOrders = async ({ silent = false } = {}) => {
+  if (inFlightOrdersPromise) {
+    return inFlightOrdersPromise;
+  }
+
   if (!customerPhone.value) {
     router.push("/login");
     return;
   }
 
-  loading.value = true;
-  errorMessage.value = "";
+  const shouldShowLoader = !silent && !orders.value.length;
+  if (shouldShowLoader) {
+    loading.value = true;
+  }
+  if (!silent) {
+    errorMessage.value = "";
+  }
 
-  try {
-    const response = await apiClient.get("/payments/orders", {
+  inFlightOrdersPromise = apiClient
+    .get("/payments/orders", {
       params: { phone: customerPhone.value },
       skipAuth: true,
+    })
+    .then((response) => {
+      orders.value = Array.isArray(response.data?.orders) ? response.data.orders : [];
+      errorMessage.value = "";
+    })
+    .catch((error) => {
+      if (silent && orders.value.length) {
+        return;
+      }
+
+      errorMessage.value = getApiErrorMessage(error, t("profile.ordersLoadError"));
+      if (!silent) {
+        orders.value = [];
+      }
+    })
+    .finally(() => {
+      if (shouldShowLoader) {
+        loading.value = false;
+      }
+      inFlightOrdersPromise = null;
     });
-    orders.value = Array.isArray(response.data?.orders) ? response.data.orders : [];
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, t("profile.ordersLoadError"));
-    orders.value = [];
-  } finally {
-    loading.value = false;
-  }
+
+  return inFlightOrdersPromise;
 };
 
 onMounted(() => {
@@ -458,6 +503,11 @@ onMounted(() => {
   }
 
   loadOrders();
+  startOrdersPolling();
+});
+
+onBeforeUnmount(() => {
+  stopOrdersPolling();
 });
 </script>
 
