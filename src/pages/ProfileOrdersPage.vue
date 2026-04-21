@@ -153,6 +153,23 @@ const getIcanCreditReason = (order = {}) => {
   return String(order?.ican_credit?.comment || "").trim();
 };
 
+const shouldShowIcanCreditStatus = (order = {}) => {
+  const icanStatus = getIcanCreditStatusValue(order);
+  if (!icanStatus) {
+    return false;
+  }
+
+  const orderStatus = String(order?.status || "").trim().toLowerCase();
+  return icanStatus !== orderStatus;
+};
+
+const shouldShowIcanCreditSection = (order = {}) =>
+  Boolean(
+    order?.ican_credit?.number ||
+      getIcanCreditReason(order) ||
+      shouldShowIcanCreditStatus(order)
+  );
+
 const getOrderStatusValue = (order = {}) => {
   if (orderIsInstallment(order) && getIcanCreditStatusValue(order)) {
     return getIcanCreditStatusValue(order);
@@ -357,8 +374,7 @@ const getOrderRemainingAmount = (order = {}) => {
   return Math.max(getOrderDisplayTotal(order) - getOrderPaidAmount(order), 0);
 };
 
-const getOrderTotalLabel = (order = {}) =>
-  orderIsInstallment(order) ? t("profile.totalWithPercent") : t("profile.totalAmount");
+const getOrderTotalLabel = () => t("profile.totalAmount");
 
 const isOrderCancelled = (order = {}) =>
   ["canceled", "cancelled"].includes(getOrderStatusValue(order));
@@ -591,7 +607,7 @@ onMounted(() => {
           </div>
 
           <section
-            v-if="order.ican_credit?.status || order.ican_credit?.number || getIcanCreditReason(order)"
+            v-if="shouldShowIcanCreditSection(order)"
             class="profile-order-credit-state"
           >
             <div class="profile-order-credit-state-head">
@@ -602,7 +618,10 @@ onMounted(() => {
             </div>
 
             <div class="profile-order-credit-state-body">
-              <span :class="getIcanCreditStatusClass(order)">
+              <span
+                v-if="shouldShowIcanCreditStatus(order)"
+                :class="getIcanCreditStatusClass(order)"
+              >
                 {{ getIcanCreditStatusLabel(order) }}
               </span>
               <small v-if="getIcanCreditReason(order)">

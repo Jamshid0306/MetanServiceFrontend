@@ -240,7 +240,7 @@ watch(
               </button>
 
               <div
-                v-if="filteredProducts.length"
+                v-if="!isHomeRoute && filteredProducts.length"
                 class="absolute top-full left-0 mt-2 w-full search-dropdown max-h-96 overflow-y-auto"
               >
                 <div
@@ -262,7 +262,7 @@ watch(
               </div>
 
               <div
-                v-else-if="searchQuery.trim().length"
+                v-else-if="!isHomeRoute && searchQuery.trim().length"
                 class="absolute top-full left-0 mt-2 w-full search-dropdown p-4 text-center text-sm text-slate-500"
               >
                 {{ t("nav.no_results") }}
@@ -309,7 +309,7 @@ watch(
                 </button>
 
                 <div
-                  v-if="filteredProducts.length"
+                  v-if="!isHomeRoute && filteredProducts.length"
                   class="absolute top-full left-0 mt-2 w-full search-dropdown max-h-96 overflow-y-auto"
                 >
                   <div
@@ -331,7 +331,7 @@ watch(
                 </div>
 
                 <div
-                  v-else-if="searchQuery.trim().length"
+                  v-else-if="!isHomeRoute && searchQuery.trim().length"
                   class="absolute top-full left-0 mt-2 w-full search-dropdown p-4 text-center text-sm text-slate-500"
                 >
                   {{ t("nav.no_results") }}

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted, nextTick } from "vue";
+import { computed, onMounted } from "vue";
 import { useProductsStore } from "../../store/productsStore";
 import { ArrowRight } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
@@ -20,7 +20,6 @@ const { t, locale } = useI18n();
 const productsStore = useProductsStore();
 const creditTariffsStore = useCreditTariffsStore();
 const loaderStore = useLoaderStore();
-const productRefs = ref([]);
 const normalizeImages = (images) => resolveAssetUrls(images);
 const formatPrice = (price) => formatPriceValue(price);
 const getProductDisplayPrice = (product) =>
@@ -49,29 +48,13 @@ onMounted(async () => {
   }
 
   await Promise.all([
-    productsStore.products.length ? Promise.resolve() : productsStore.fetchProducts(200, 0),
+    productsStore.fetchProducts(1000, 0),
     creditTariffsStore.fetchTariffs(),
   ]);
 
   if (shouldShowLoader) {
     loaderStore.loader = false;
   }
-
-  await nextTick();
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("animate-show");
-          observer.unobserve(entry.target);
-        }
-      });
-    },
-    { threshold: 0.5 }
-  );
-  productRefs.value.forEach((el) => {
-    if (el) observer.observe(el);
-  });
 });
 const handleClick = (product) => {
   // Product card ichidagi tugma bosilganda: faqat detailga kirish.
@@ -136,10 +119,8 @@ const filteredProducts = computed(() => {
         class="grid grid-cols-4 max-lg:grid-cols-3 max-sm:grid-cols-2 max-sm:gap-4 gap-6"
       >
         <div
-          v-for="(product, index) in filteredProducts"
+          v-for="product in filteredProducts"
           :key="product.id"
-          :ref="(el) => (productRefs[index] = el)"
-          :style="{ 'transition-delay': `${Math.min(index, 20) * 50}ms` }"
           class="product-card group"
         >
           <div @click="goToDetail(product.id)" class="card-body cursor-pointer">
@@ -262,22 +243,14 @@ const filteredProducts = computed(() => {
   border: 1px solid rgba(20, 35, 56, 0.1);
   background: #ffffff;
   padding: 12px;
-  opacity: 0;
-  transform: translateY(40px) scale(0.9);
   transition:
-    opacity 0.5s ease,
-    transform 0.5s ease,
+    transform 0.2s ease,
     border-color 0.3s ease;
 }
 
 .product-card:hover {
   transform: translateY(-2px);
   border-color: rgba(20, 35, 56, 0.18);
-}
-
-.product-card.animate-show {
-  opacity: 1;
-  transform: translateY(0) scale(1);
 }
 
 .card-body {
