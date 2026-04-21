@@ -360,8 +360,12 @@ const getOrderRemainingAmount = (order = {}) => {
 const getOrderTotalLabel = (order = {}) =>
   orderIsInstallment(order) ? t("profile.totalWithPercent") : t("profile.totalAmount");
 
+const isOrderCancelled = (order = {}) =>
+  ["canceled", "cancelled"].includes(getOrderStatusValue(order));
+
 const hasMonthlyPaymentBalance = (order = {}) =>
   orderIsInstallment(order) &&
+  !isOrderCancelled(order) &&
   getOrderMonthlyPaymentAmount(order) > 0 &&
   getOrderRemainingAmount(order) > 0;
 
