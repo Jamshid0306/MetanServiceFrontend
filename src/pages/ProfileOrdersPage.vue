@@ -448,6 +448,7 @@ const loadOrders = async () => {
     .get("/payments/orders", {
       params: { phone: customerPhone.value },
       skipAuth: true,
+      skipRetry: true,
     })
     .then((response) => {
       orders.value = Array.isArray(response.data?.orders) ? response.data.orders : [];

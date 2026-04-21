@@ -210,11 +210,13 @@ const shouldRetryRequest = (error) => {
   const method = String(error.config?.method || "get").toLowerCase();
   const status = error.response?.status;
   const retryCount = Number(error.config?.metadata?.retryCount || 0);
+  const skipRetry = Boolean(error.config?.skipRetry);
   const isNetworkError = !error.response;
   const isTimeout = error.code === "ECONNABORTED";
   const isServerError = typeof status === "number" && status >= 500;
 
   return (
+    !skipRetry &&
     RETRYABLE_METHODS.has(method) &&
     retryCount < MAX_GET_RETRIES &&
     (isNetworkError || isTimeout || isServerError)
@@ -262,6 +264,29 @@ apiClient.interceptors.response.use(
 );
 
 export const getApiErrorMessage = (error, fallback = "So'rov bajarilmadi.") => {
+  const responseErrors = error?.response?.data?.errors;
+  if (Array.isArray(responseErrors) && responseErrors.length) {
+    return responseErrors
+      .map((item) => (typeof item === "string" ? item : JSON.stringify(item)))
+      .join("; ");
+  }
+
+  if (responseErrors && typeof responseErrors === "object") {
+    return Object.entries(responseErrors)
+      .flatMap(([field, fieldValue]) => {
+        if (Array.isArray(fieldValue)) {
+          return fieldValue
+            .map((item) => String(item || "").trim())
+            .filter(Boolean)
+            .map((item) => `${field}: ${item}`);
+        }
+
+        const normalizedValue = String(fieldValue || "").trim();
+        return normalizedValue ? [`${field}: ${normalizedValue}`] : [];
+      })
+      .join("; ");
+  }
+
   const responseMessage =
     error?.response?.data?.detail ||
     error?.response?.data?.message ||
