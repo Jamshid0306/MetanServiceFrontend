@@ -197,6 +197,7 @@
     "appliedRate": "наценка по сроку",
     "installment": "Рассрочка",
     "fullPayment": "Оплата через CLICK",
+    "fullPaymentBadge": "через",
     "tariffs": "Тарифы",
     "downPaymentAvailable": "Предусмотрен первоначальный взнос"
   },
@@ -393,7 +394,16 @@
     "monthlyPaymentClickPaid": "Click оплачен, ICAN ожидается",
     "monthlyPaymentPrepared": "Click подтверждается",
     "monthlyPaymentCancelled": "Платеж отменен",
-    "monthlyPaymentPending": "Ожидается оплата"
+    "monthlyPaymentPending": "Ожидается оплата",
+    "creditApplication": "Заявка ICAN",
+    "creditNumber": "Номер кредита",
+    "creditCancelReason": "Причина отмены",
+    "creditStatusPending": "На рассмотрении",
+    "creditStatusApproved": "Одобрен",
+    "creditStatusActive": "Активен",
+    "creditStatusCancelled": "Отменён",
+    "creditStatusClosed": "Закрыт",
+    "creditStatusCompleted": "Завершён"
   },
   "related_products": "Похожие товары",
   "success": "Заказ успешно отправлен!"

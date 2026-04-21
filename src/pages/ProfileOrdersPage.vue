@@ -90,6 +90,58 @@ const paymentLabel = (order = {}) => {
   return t("profile.cashPayment");
 };
 
+const getIcanCreditStatusValue = (order = {}) =>
+  String(order?.ican_credit?.status || "").trim().toLowerCase();
+
+const getIcanCreditStatusLabel = (order = {}) => {
+  const status = getIcanCreditStatusValue(order);
+  const labels = {
+    active: t("profile.creditStatusActive"),
+    approved: t("profile.creditStatusApproved"),
+    canceled: t("profile.creditStatusCancelled"),
+    cancelled: t("profile.creditStatusCancelled"),
+    closed: t("profile.creditStatusClosed"),
+    completed: t("profile.creditStatusCompleted"),
+    draft: t("profile.creditStatusPending"),
+    new: t("profile.creditStatusPending"),
+    pending: t("profile.creditStatusPending"),
+  };
+
+  return (
+    labels[status] ||
+    String(order?.ican_credit?.status_label || "").trim() ||
+    t("checkoutPage.statusUnknown")
+  );
+};
+
+const getIcanCreditStatusClass = (order = {}) => {
+  const status = getIcanCreditStatusValue(order);
+  if (["active", "approved", "completed"].includes(status)) {
+    return "is-success";
+  }
+  if (["canceled", "cancelled"].includes(status)) {
+    return "is-error";
+  }
+  if (["draft", "new", "pending"].includes(status)) {
+    return "is-warning";
+  }
+  return "is-muted";
+};
+
+const getIcanCreditReason = (order = {}) => {
+  const cancelReason = String(order?.ican_credit?.cancel_reason || "").trim();
+  if (cancelReason) {
+    return cancelReason;
+  }
+
+  const status = getIcanCreditStatusValue(order);
+  if (!["canceled", "cancelled"].includes(status)) {
+    return "";
+  }
+
+  return String(order?.ican_credit?.comment || "").trim();
+};
+
 const formatMoney = (value) => {
   const numericValue = Number(value || 0);
   if (!Number.isFinite(numericValue)) {
@@ -473,6 +525,27 @@ onMounted(() => {
           </div>
 
           <section
+            v-if="order.ican_credit?.status || order.ican_credit?.number || getIcanCreditReason(order)"
+            class="profile-order-credit-state"
+          >
+            <div class="profile-order-credit-state-head">
+              <strong>{{ t("profile.creditApplication") }}</strong>
+              <small v-if="order.ican_credit?.number">
+                {{ t("profile.creditNumber") }} #{{ order.ican_credit.number }}
+              </small>
+            </div>
+
+            <div class="profile-order-credit-state-body">
+              <span :class="getIcanCreditStatusClass(order)">
+                {{ getIcanCreditStatusLabel(order) }}
+              </span>
+              <small v-if="getIcanCreditReason(order)">
+                {{ t("profile.creditCancelReason") }}: {{ getIcanCreditReason(order) }}
+              </small>
+            </div>
+          </section>
+
+          <section
             v-if="order.monthly_payments?.length"
             class="profile-order-monthly"
           >
@@ -762,6 +835,71 @@ onMounted(() => {
 .profile-order-monthly {
   border-top: 1px solid rgba(20, 35, 56, 0.08);
   padding: 1rem 1.15rem;
+}
+
+.profile-order-credit-state {
+  display: grid;
+  gap: 0.65rem;
+  border-top: 1px solid rgba(20, 35, 56, 0.08);
+  padding: 1rem 1.15rem;
+  background: #fcfdff;
+}
+
+.profile-order-credit-state-head,
+.profile-order-credit-state-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.profile-order-credit-state-head {
+  flex-wrap: wrap;
+}
+
+.profile-order-credit-state-head strong {
+  color: #142338;
+  font-size: 0.95rem;
+  font-weight: 900;
+}
+
+.profile-order-credit-state-head small,
+.profile-order-credit-state-body small {
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.profile-order-credit-state-body {
+  align-items: flex-start;
+}
+
+.profile-order-credit-state-body span {
+  border-radius: 999px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.profile-order-credit-state .is-success {
+  background: #dcfce7;
+  color: #14532d;
+}
+
+.profile-order-credit-state .is-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.profile-order-credit-state .is-error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.profile-order-credit-state .is-muted {
+  background: #eef2f6;
+  color: #18304f;
 }
 
 .profile-order-monthly-head {
@@ -1069,6 +1207,16 @@ onMounted(() => {
 
   .profile-order-monthly {
     padding: 0.75rem 0.85rem;
+  }
+
+  .profile-order-credit-state {
+    padding: 0.75rem 0.85rem;
+  }
+
+  .profile-order-credit-state-head,
+  .profile-order-credit-state-body {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .profile-order-monthly-head {

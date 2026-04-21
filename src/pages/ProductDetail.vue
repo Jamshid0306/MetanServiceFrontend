@@ -1995,7 +1995,7 @@ onBeforeUnmount(() => {
                       alt="Click"
                       class="detail-payment-click-logo"
                     />
-                    <span>{{ t("credit.fullPayment") }}</span>
+                    <span>{{ t("credit.fullPaymentBadge") }}</span>
                   </button>
                 </div>
 

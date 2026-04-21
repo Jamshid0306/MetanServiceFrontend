@@ -194,6 +194,7 @@
     "appliedRate": "ustama qo'llandi",
     "installment": "Muddatli to'lov",
     "fullPayment": "CLICK orqali to'lov",
+    "fullPaymentBadge": "orqali",
     "tariffs": "Tariflar",
     "downPaymentAvailable": "Bosh to'lov mavjud"
   },
@@ -393,7 +394,16 @@
     "monthlyPaymentClickPaid": "Click to'langan, ICAN kutilmoqda",
     "monthlyPaymentPrepared": "Click tasdiqlanmoqda",
     "monthlyPaymentCancelled": "To'lov bekor qilingan",
-    "monthlyPaymentPending": "To'lov kutilmoqda"
+    "monthlyPaymentPending": "To'lov kutilmoqda",
+    "creditApplication": "ICAN kredit arizasi",
+    "creditNumber": "Kredit raqami",
+    "creditCancelReason": "Bekor qilish sababi",
+    "creditStatusPending": "Ko'rib chiqilmoqda",
+    "creditStatusApproved": "Tasdiqlangan",
+    "creditStatusActive": "Faol",
+    "creditStatusCancelled": "Bekor qilingan",
+    "creditStatusClosed": "Yopilgan",
+    "creditStatusCompleted": "Yakunlangan"
   },
   "related_products": "O'xshash mahsulotlar",
   "success": "Buyurtma muvaffaqiyatli yuborildi!"
