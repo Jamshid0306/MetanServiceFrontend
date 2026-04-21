@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
@@ -18,8 +18,6 @@ const orders = ref([]);
 const loading = ref(false);
 const errorMessage = ref("");
 const monthlyPaymentLoadingByOrderId = ref({});
-const ORDERS_POLL_INTERVAL_MS = 4000;
-let ordersPollIntervalId = null;
 let inFlightOrdersPromise = null;
 
 const customerPhone = computed(() => normalizeCustomerPhone(customerSession.value?.phone));
@@ -430,25 +428,7 @@ const formatOption = (option = {}) => {
   return label || value;
 };
 
-const stopOrdersPolling = () => {
-  if (ordersPollIntervalId) {
-    clearInterval(ordersPollIntervalId);
-    ordersPollIntervalId = null;
-  }
-};
-
-const startOrdersPolling = () => {
-  stopOrdersPolling();
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  ordersPollIntervalId = window.setInterval(() => {
-    loadOrders({ silent: true });
-  }, ORDERS_POLL_INTERVAL_MS);
-};
-
-const loadOrders = async ({ silent = false } = {}) => {
+const loadOrders = async () => {
   if (inFlightOrdersPromise) {
     return inFlightOrdersPromise;
   }
@@ -458,13 +438,11 @@ const loadOrders = async ({ silent = false } = {}) => {
     return;
   }
 
-  const shouldShowLoader = !silent && !orders.value.length;
+  const shouldShowLoader = !orders.value.length;
   if (shouldShowLoader) {
     loading.value = true;
   }
-  if (!silent) {
-    errorMessage.value = "";
-  }
+  errorMessage.value = "";
 
   inFlightOrdersPromise = apiClient
     .get("/payments/orders", {
@@ -476,14 +454,8 @@ const loadOrders = async ({ silent = false } = {}) => {
       errorMessage.value = "";
     })
     .catch((error) => {
-      if (silent && orders.value.length) {
-        return;
-      }
-
       errorMessage.value = getApiErrorMessage(error, t("profile.ordersLoadError"));
-      if (!silent) {
-        orders.value = [];
-      }
+      orders.value = [];
     })
     .finally(() => {
       if (shouldShowLoader) {
@@ -503,11 +475,6 @@ onMounted(() => {
   }
 
   loadOrders();
-  startOrdersPolling();
-});
-
-onBeforeUnmount(() => {
-  stopOrdersPolling();
 });
 </script>
 
