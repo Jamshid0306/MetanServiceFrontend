@@ -804,14 +804,22 @@ watch(
 .mobile-search-inline {
   flex: 1;
   min-width: 0;
-  max-width: min(68vw, 420px);
+  max-width: min(74vw, 520px);
 }
 
 .mobile-search-input {
   min-height: 48px;
   border-radius: 16px;
+  font-size: 0.95rem;
+  padding-left: 2.7rem;
+  padding-right: 2.6rem;
   padding-top: 0.78rem;
   padding-bottom: 0.78rem;
+}
+
+.mobile-search-input::placeholder {
+  font-size: 0.9rem;
+  letter-spacing: -0.01em;
 }
 
 .mobile-actions {
@@ -839,7 +847,7 @@ watch(
   }
 
   .mobile-search-inline {
-    max-width: min(66vw, 360px);
+    max-width: min(76vw, 440px);
   }
 }
 
