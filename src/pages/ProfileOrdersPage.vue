@@ -95,6 +95,26 @@ const paymentLabel = (order = {}) => {
 const getIcanCreditStatusValue = (order = {}) =>
   String(order?.ican_credit?.status || "").trim().toLowerCase();
 
+const approvedCreditStatuses = new Set(["active", "approved"]);
+const successfulCreditStatuses = new Set(["active", "approved", "completed"]);
+const cancelledCreditStatuses = new Set([
+  "canceled",
+  "cancelled",
+  "rejected",
+  "refused",
+]);
+const pendingCreditStatuses = new Set([
+  "created",
+  "draft",
+  "in_process",
+  "in_progress",
+  "new",
+  "on_review",
+  "pending",
+  "review",
+  "under_review",
+]);
+
 const getIcanCreditStatusLabel = (order = {}) => {
   const status = getIcanCreditStatusValue(order);
   const labels = {
@@ -104,11 +124,17 @@ const getIcanCreditStatusLabel = (order = {}) => {
     cancelled: t("profile.creditStatusCancelled"),
     closed: t("profile.creditStatusClosed"),
     completed: t("profile.creditStatusCompleted"),
+    created: t("profile.creditStatusPending"),
     draft: t("profile.creditStatusPending"),
+    in_process: t("profile.creditStatusPending"),
+    in_progress: t("profile.creditStatusPending"),
     new: t("profile.creditStatusPending"),
+    on_review: t("profile.creditStatusPending"),
     pending: t("profile.creditStatusPending"),
     rejected: t("profile.creditStatusCancelled"),
     refused: t("profile.creditStatusCancelled"),
+    review: t("profile.creditStatusPending"),
+    under_review: t("profile.creditStatusPending"),
   };
 
   if (!status && (order?.credit_submitted || orderIsInstallment(order))) {
@@ -129,13 +155,13 @@ const getIcanCreditStatusClass = (order = {}) => {
   if (!status && (order?.credit_submitted || orderIsInstallment(order))) {
     return "is-warning";
   }
-  if (["active", "approved", "completed"].includes(status)) {
+  if (successfulCreditStatuses.has(status)) {
     return "is-success";
   }
-  if (["canceled", "cancelled", "rejected", "refused"].includes(status)) {
+  if (cancelledCreditStatuses.has(status)) {
     return "is-error";
   }
-  if (["draft", "new", "pending"].includes(status)) {
+  if (pendingCreditStatuses.has(status) || order?.credit_submitted) {
     return "is-warning";
   }
   return "is-muted";
@@ -148,7 +174,7 @@ const getIcanCreditReason = (order = {}) => {
   }
 
   const status = getIcanCreditStatusValue(order);
-  if (!["canceled", "cancelled", "rejected", "refused"].includes(status)) {
+  if (!cancelledCreditStatuses.has(status)) {
     return "";
   }
 
@@ -198,13 +224,17 @@ const getOrderStatusLabel = (order = {}) => {
 
 const getOrderStatusClass = (order = {}) => {
   const status = getOrderStatusValue(order);
-  if (["active", "approved", "completed"].includes(status)) {
+  if (successfulCreditStatuses.has(status)) {
     return "is-success";
   }
-  if (["canceled", "cancelled", "rejected", "refused"].includes(status)) {
+  if (cancelledCreditStatuses.has(status)) {
     return "is-error";
   }
-  if (["pending", "prepared", "draft", "new"].includes(status)) {
+  if (
+    ["pending", "prepared"].includes(status) ||
+    pendingCreditStatuses.has(status) ||
+    (orderIsInstallment(order) && order?.credit_submitted)
+  ) {
     return "is-warning";
   }
   return "is-muted";
@@ -383,7 +413,15 @@ const getOrderRemainingAmount = (order = {}) => {
 const getOrderTotalLabel = () => t("profile.totalAmount");
 
 const isOrderCancelled = (order = {}) =>
-  ["canceled", "cancelled"].includes(getOrderStatusValue(order));
+  cancelledCreditStatuses.has(getOrderStatusValue(order));
+
+const hasApprovedCreditForMonthlyPayment = (order = {}) => {
+  if (!orderIsInstallment(order)) {
+    return false;
+  }
+
+  return approvedCreditStatuses.has(getIcanCreditStatusValue(order));
+};
 
 const hasMonthlyPaymentBalance = (order = {}) =>
   orderIsInstallment(order) &&
@@ -392,10 +430,14 @@ const hasMonthlyPaymentBalance = (order = {}) =>
   getOrderRemainingAmount(order) > 0;
 
 const shouldShowMonthlyPaymentButton = (order = {}) =>
-  hasMonthlyPaymentBalance(order) && Boolean(order?.can_pay_monthly);
+  hasMonthlyPaymentBalance(order) &&
+  hasApprovedCreditForMonthlyPayment(order) &&
+  Boolean(order?.can_pay_monthly);
 
 const shouldShowMonthlyPaymentNotice = (order = {}) =>
-  hasMonthlyPaymentBalance(order) && !order?.can_pay_monthly;
+  hasMonthlyPaymentBalance(order) &&
+  hasApprovedCreditForMonthlyPayment(order) &&
+  !order?.can_pay_monthly;
 
 const canPayMonthly = (order = {}) =>
   shouldShowMonthlyPaymentButton(order) &&
@@ -919,9 +961,9 @@ onMounted(() => {
 }
 
 .profile-order-status .is-warning {
-  border-color: #f59e0b;
-  background: #fef3c7;
-  color: #92400e;
+  border-color: #f59e0b !important;
+  background: #fef3c7 !important;
+  color: #92400e !important;
 }
 
 .profile-order-status .is-error {
@@ -1008,9 +1050,9 @@ onMounted(() => {
 }
 
 .profile-order-credit-state .is-warning {
-  border-color: #f59e0b;
-  background: #fef3c7;
-  color: #92400e;
+  border-color: #f59e0b !important;
+  background: #fef3c7 !important;
+  color: #92400e !important;
 }
 
 .profile-order-credit-state .is-error {
