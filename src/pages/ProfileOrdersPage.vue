@@ -919,7 +919,7 @@ onMounted(() => {
 }
 
 .profile-order-status .is-warning {
-  border-color: #facc15;
+  border-color: #f59e0b;
   background: #fef3c7;
   color: #92400e;
 }
@@ -1008,7 +1008,7 @@ onMounted(() => {
 }
 
 .profile-order-credit-state .is-warning {
-  border-color: #facc15;
+  border-color: #f59e0b;
   background: #fef3c7;
   color: #92400e;
 }
