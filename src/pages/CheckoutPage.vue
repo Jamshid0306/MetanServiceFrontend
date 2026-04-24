@@ -51,9 +51,17 @@ const createEmptyCreditContact = () => ({
   phone: "+998",
   relation: "",
 });
+const createEmptyCreditContactError = () => ({
+  phone: false,
+  relation: false,
+});
 const creditExtraContacts = ref([
   createEmptyCreditContact(),
   createEmptyCreditContact(),
+]);
+const creditExtraContactErrors = ref([
+  createEmptyCreditContactError(),
+  createEmptyCreditContactError(),
 ]);
 
 const pageError = ref("");
@@ -1358,6 +1366,10 @@ const handleUzbekPhoneKeydown = (event) => {
 
 const handleCreditExtraPhoneInput = (contact, event) => {
   contact.phone = formatUzbekistanPhoneInput(event.target.value);
+  creditExtraContactErrors.value = creditExtraContactErrors.value.map((error) => ({
+    ...(error || createEmptyCreditContactError()),
+    phone: false,
+  }));
 };
 
 const handleCreditExtraPhonePaste = (contact, event) => {
@@ -1375,6 +1387,21 @@ const handleCreditExtraPhonePaste = (contact, event) => {
   const nextValue = `${value.slice(0, selectionStart)}${pastedText}${value.slice(selectionEnd)}`;
 
   contact.phone = formatUzbekistanPhoneInput(nextValue);
+  creditExtraContactErrors.value = creditExtraContactErrors.value.map((error) => ({
+    ...(error || createEmptyCreditContactError()),
+    phone: false,
+  }));
+};
+
+const handleCreditExtraRelationChange = (index) => {
+  if (index < 0) {
+    return;
+  }
+
+  creditExtraContactErrors.value[index] = {
+    ...(creditExtraContactErrors.value[index] || createEmptyCreditContactError()),
+    relation: false,
+  };
 };
 
 const toMyIdBirthDatePayload = (value) => {
@@ -1484,6 +1511,70 @@ const scrollToFirstMyIdIdentityError = () => {
       focusTarget.focus({ preventScroll: true });
     }
   });
+};
+
+const clearCreditExtraContactErrors = () => {
+  creditExtraContactErrors.value = creditExtraContacts.value.map(() =>
+    createEmptyCreditContactError()
+  );
+};
+
+const scrollToFirstCreditExtraContactError = () => {
+  nextTick(() => {
+    const firstInvalid = document.querySelector(".checkout-credit-contact-invalid");
+    if (!firstInvalid) {
+      return;
+    }
+
+    firstInvalid.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+
+    const focusTarget =
+      firstInvalid.matches("input, select, textarea, button")
+        ? firstInvalid
+        : firstInvalid.querySelector("input, select, textarea, button");
+
+    if (focusTarget && typeof focusTarget.focus === "function") {
+      focusTarget.focus({ preventScroll: true });
+    }
+  });
+};
+
+const validateCreditExtraContacts = () => {
+  const allowedRelations = new Set(
+    creditContactRelationOptions.value.map((option) => option.value)
+  );
+  const phoneCounts = new Map();
+
+  creditExtraContacts.value.forEach((contact) => {
+    const normalized = normalizeCustomerPhone(contact.phone);
+    if (normalized.length === 12) {
+      phoneCounts.set(normalized, (phoneCounts.get(normalized) || 0) + 1);
+    }
+  });
+
+  let ok = true;
+  creditExtraContactErrors.value = creditExtraContacts.value.map((contact) => {
+    const normalized = normalizeCustomerPhone(contact.phone);
+    const phoneInvalid =
+      normalized.length !== 12 || Number(phoneCounts.get(normalized) || 0) > 1;
+    const relationInvalid = !allowedRelations.has(
+      String(contact.relation || "").trim()
+    );
+
+    if (phoneInvalid || relationInvalid) {
+      ok = false;
+    }
+
+    return {
+      phone: phoneInvalid,
+      relation: relationInvalid,
+    };
+  });
+
+  return ok;
 };
 
 const replaceCheckoutQuery = async (nextQuery = {}) => {
@@ -1884,15 +1975,17 @@ const submitInstallmentCredit = async () => {
     return;
   }
 
-  if (!areCreditExtraContactsComplete.value) {
+  if (!validateCreditExtraContacts()) {
     pageError.value =
       locale.value === "ru"
         ? "Заполните 2 дополнительных номера телефона и выберите степень родства."
         : "2 ta qo'shimcha telefon raqamini to'ldiring va qarindoshlik turini tanlang.";
+    scrollToFirstCreditExtraContactError();
     return;
   }
 
   pageError.value = "";
+  clearCreditExtraContactErrors();
   creditSubmitLoading.value = true;
 
   try {
@@ -2522,11 +2615,7 @@ onBeforeUnmount(() => {
               <button
                 type="button"
                 class="checkout-primary-btn"
-                :disabled="
-                  !installmentReadyToSubmitCredit ||
-                  creditSubmitLoading ||
-                  !areCreditExtraContactsComplete
-                "
+                :disabled="creditSubmitLoading"
                 @click="submitInstallmentCredit"
               >
                 {{ purchaseActionLabel }}
@@ -2551,6 +2640,10 @@ onBeforeUnmount(() => {
                     maxlength="17"
                     autocomplete="off"
                     class="checkout-input"
+                    :class="{
+                      'checkout-input-invalid checkout-credit-contact-invalid':
+                        creditExtraContactErrors[index]?.phone,
+                    }"
                     :placeholder="locale === 'ru' ? '+998 XX XXX XX XX' : '+998 XX XXX XX XX'"
                     @input="handleCreditExtraPhoneInput(contact, $event)"
                     @keydown="handleUzbekPhoneKeydown"
@@ -2559,6 +2652,11 @@ onBeforeUnmount(() => {
                   <select
                     v-model="contact.relation"
                     class="checkout-input checkout-credit-relation"
+                    :class="{
+                      'checkout-input-invalid checkout-credit-contact-invalid':
+                        creditExtraContactErrors[index]?.relation,
+                    }"
+                    @change="handleCreditExtraRelationChange(index)"
                   >
                     <option value="" disabled>
                       {{ locale === "ru" ? "Выберите" : "Tanlang" }}
@@ -3231,6 +3329,7 @@ onBeforeUnmount(() => {
 
 .checkout-input.checkout-input-invalid {
   border-color: #dc2626 !important;
+  background: #fef2f2 !important;
   box-shadow: none !important;
 }
 

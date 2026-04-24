@@ -183,6 +183,10 @@ onMounted(async () => {
     min-height: 170px;
   }
 
+  .hero-image {
+    object-fit: fill;
+  }
+
   .hero-empty {
     min-height: 190px;
   }

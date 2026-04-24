@@ -107,6 +107,8 @@ const getIcanCreditStatusLabel = (order = {}) => {
     draft: t("profile.creditStatusPending"),
     new: t("profile.creditStatusPending"),
     pending: t("profile.creditStatusPending"),
+    rejected: t("profile.creditStatusCancelled"),
+    refused: t("profile.creditStatusCancelled"),
   };
 
   if (!status && (order?.credit_submitted || orderIsInstallment(order))) {
@@ -130,7 +132,7 @@ const getIcanCreditStatusClass = (order = {}) => {
   if (["active", "approved", "completed"].includes(status)) {
     return "is-success";
   }
-  if (["canceled", "cancelled"].includes(status)) {
+  if (["canceled", "cancelled", "rejected", "refused"].includes(status)) {
     return "is-error";
   }
   if (["draft", "new", "pending"].includes(status)) {
@@ -146,7 +148,7 @@ const getIcanCreditReason = (order = {}) => {
   }
 
   const status = getIcanCreditStatusValue(order);
-  if (!["canceled", "cancelled"].includes(status)) {
+  if (!["canceled", "cancelled", "rejected", "refused"].includes(status)) {
     return "";
   }
 
@@ -187,6 +189,10 @@ const getOrderStatusLabel = (order = {}) => {
     return getIcanCreditStatusLabel(order);
   }
 
+  if (orderIsInstallment(order) && order?.credit_submitted) {
+    return t("profile.creditStatusPending");
+  }
+
   return statusLabel(order?.status);
 };
 
@@ -195,7 +201,7 @@ const getOrderStatusClass = (order = {}) => {
   if (["active", "approved", "completed"].includes(status)) {
     return "is-success";
   }
-  if (["canceled", "cancelled"].includes(status)) {
+  if (["canceled", "cancelled", "rejected", "refused"].includes(status)) {
     return "is-error";
   }
   if (["pending", "prepared", "draft", "new"].includes(status)) {
@@ -624,7 +630,10 @@ onMounted(() => {
               >
                 {{ getIcanCreditStatusLabel(order) }}
               </span>
-              <small v-if="getIcanCreditReason(order)">
+              <small
+                v-if="getIcanCreditReason(order)"
+                class="profile-order-credit-cancel-reason"
+              >
                 {{ t("profile.creditCancelReason") }}: {{ getIcanCreditReason(order) }}
               </small>
             </div>
@@ -897,22 +906,26 @@ onMounted(() => {
 
 .profile-order-status span {
   border-radius: 999px;
+  border: 1px solid rgba(20, 35, 56, 0.12);
   background: #eef2f6;
   color: #18304f;
   padding: 0.35rem 0.65rem;
 }
 
 .profile-order-status .is-success {
+  border-color: #86efac;
   background: #dcfce7;
   color: #14532d;
 }
 
 .profile-order-status .is-warning {
+  border-color: #facc15;
   background: #fef3c7;
   color: #92400e;
 }
 
 .profile-order-status .is-error {
+  border-color: #fca5a5;
   background: #fee2e2;
   color: #991b1b;
 }
@@ -981,6 +994,7 @@ onMounted(() => {
 
 .profile-order-credit-state-body span {
   border-radius: 999px;
+  border: 1px solid rgba(20, 35, 56, 0.12);
   padding: 0.3rem 0.6rem;
   font-size: 0.78rem;
   font-weight: 900;
@@ -988,16 +1002,19 @@ onMounted(() => {
 }
 
 .profile-order-credit-state .is-success {
+  border-color: #86efac;
   background: #dcfce7;
   color: #14532d;
 }
 
 .profile-order-credit-state .is-warning {
+  border-color: #facc15;
   background: #fef3c7;
   color: #92400e;
 }
 
 .profile-order-credit-state .is-error {
+  border-color: #fca5a5;
   background: #fee2e2;
   color: #991b1b;
 }
@@ -1005,6 +1022,17 @@ onMounted(() => {
 .profile-order-credit-state .is-muted {
   background: #eef2f6;
   color: #18304f;
+}
+
+.profile-order-credit-state-body .profile-order-credit-cancel-reason {
+  border-radius: 8px;
+  border: 1px solid #fca5a5;
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 900;
+  line-height: 1.35;
 }
 
 .profile-order-monthly-head {

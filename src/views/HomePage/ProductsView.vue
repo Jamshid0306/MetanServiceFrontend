@@ -273,7 +273,10 @@ const filteredProducts = computed(() => {
   .product-media {
     height: 100px;
   }
-  
+
+  .product-image {
+    object-fit: fill;
+  }
 }
 
 .product-chip {
