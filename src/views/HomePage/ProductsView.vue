@@ -262,7 +262,6 @@ const filteredProducts = computed(() => {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  height: 150px;
   border-radius: 16px;
   border: 1px solid rgba(20, 35, 56, 0.08);
   background: #f3f5f7;
@@ -270,12 +269,8 @@ const filteredProducts = computed(() => {
 }
 
 @media screen and (max-width: 640px) {
-  .product-media {
-    height: 100px;
-  }
-
   .product-image {
-    object-fit: fill;
+    object-fit: cover;
   }
 }
 
@@ -295,7 +290,7 @@ const filteredProducts = computed(() => {
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
   transition: transform 0.45s ease;
 }

@@ -1868,7 +1868,7 @@ onBeforeUnmount(() => {
             <div class="detail-gallery-stage">
               <Swiper
                 ref="swiperRef"
-                class="detail-swiper h-[450px] w-full rounded-2xl bg-white"
+                class="detail-swiper w-full rounded-2xl bg-white"
                 space-between="10"
                 slides-per-view="1"
                 :onSwiper="(swiper) => (swiperInstance = swiper)"
@@ -1877,7 +1877,7 @@ onBeforeUnmount(() => {
                   <img
                     :src="img"
                     alt="Product"
-                    class="detail-slide-image h-[450px] w-full rounded-2xl object-contain transition-transform duration-500"
+                    class="detail-slide-image w-full rounded-2xl transition-transform duration-500"
                   />
                 </SwiperSlide>
               </Swiper>
@@ -1887,7 +1887,7 @@ onBeforeUnmount(() => {
                 v-for="(img, index) in images"
                 :key="index"
                 :src="img"
-                class="detail-thumb h-24 w-24 cursor-pointer rounded-xl border object-contain transition-all duration-300"
+                class="detail-thumb cursor-pointer rounded-xl border transition-all duration-300"
                 @click="goToSlide(index)"
               />
             </div>
@@ -2924,20 +2924,34 @@ onBeforeUnmount(() => {
 
 .detail-gallery-stage {
   width: 100%;
+  aspect-ratio: 16 / 9;
   padding: 0;
   border-radius: 30px;
   border: 1px solid var(--detail-border);
   background: var(--detail-surface-muted);
+  overflow: hidden;
 }
 
 .detail-swiper {
+  width: 100%;
+  height: 100%;
   border: none;
   background: transparent;
 }
 
+.detail-swiper :deep(.swiper-wrapper),
+.detail-swiper :deep(.swiper-slide) {
+  height: 100%;
+}
+
 .detail-slide-image {
+  width: 100%;
+  height: 100%;
+  display: block;
   border: 1px solid rgba(20, 35, 56, 0.06);
   background: var(--detail-surface);
+  object-fit: cover;
+  object-position: center;
 }
 
 .detail-thumbs {
@@ -2946,11 +2960,13 @@ onBeforeUnmount(() => {
 }
 
 .detail-thumb {
+  width: 112px;
+  aspect-ratio: 16 / 9;
   border-color: var(--detail-border);
   background: var(--detail-surface);
   flex-shrink: 0;
   opacity: 0.82;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
 }
 
@@ -4310,7 +4326,8 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center;
   transition: transform 0.45s ease;
 }
 
@@ -4659,9 +4676,5 @@ onBeforeUnmount(() => {
     grid-column: auto;
   }
 
-  .detail-swiper,
-  .detail-slide-image {
-    height: 320px;
-  }
 }
 </style>
