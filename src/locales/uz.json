@@ -193,8 +193,10 @@
     "monthlyPayment": "Oyiga",
     "appliedRate": "ustama qo'llandi",
     "installment": "Muddatli to'lov",
+    "installmentHint": "Tarifni tanlab, oyma-oy to'lovni ko'ring",
     "fullPayment": "CLICK orqali to'lov",
     "fullPaymentBadge": "orqali",
+    "fullPaymentHint": "Mahsulotni to'liq narxda rasmiylashtirish",
     "tariffs": "Tariflar",
     "downPaymentAvailable": "Bosh to'lov mavjud"
   },

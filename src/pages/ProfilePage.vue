@@ -8,6 +8,7 @@ import { apiClient, getApiErrorMessage } from "@/lib/api";
 
 import {
   CUSTOMER_SESSION_EVENT,
+  clearCustomerSession,
   formatCustomerPhone,
   getStoredCustomerAccessToken,
   getStoredCustomerSession,
@@ -64,6 +65,12 @@ const changeLanguage = (lang) => {
   if (typeof window !== "undefined") {
     window.localStorage.setItem("lang", lang);
   }
+};
+
+const logoutCustomer = () => {
+  clearCustomerSession();
+  customerSession.value = null;
+  router.push("/login");
 };
 
 const loadCustomerProfile = async () => {
@@ -193,6 +200,19 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
+      <button
+        type="button"
+        class="profile-menu-row profile-logout-row"
+        @click="logoutCustomer"
+      >
+        <span class="profile-menu-icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M10 3h9v18h-9v-2h7V5h-7V3Zm1.3 5.3 1.4 1.4L10.4 12l2.3 2.3-1.4 1.4L6.6 11l4.7-4.7ZM5 11h5v2H5v-2Z" />
+          </svg>
+        </span>
+        <span>{{ t("nav.logout") }}</span>
+        <span class="profile-menu-chevron">›</span>
+      </button>
     </section>
   </main>
 </template>
@@ -316,6 +336,22 @@ onUnmounted(() => {
 
 .profile-menu-row:hover {
   background: #eef2f7;
+}
+
+.profile-logout-row {
+  margin-top: 10px;
+  border-radius: 8px;
+  background: #fff1f2;
+  color: #b91c1c;
+}
+
+.profile-logout-row:hover {
+  background: #ffe4e6;
+}
+
+.profile-logout-row .profile-menu-icon,
+.profile-logout-row .profile-menu-chevron {
+  color: #ef4444;
 }
 
 .profile-menu-row-static {

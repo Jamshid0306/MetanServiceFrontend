@@ -196,8 +196,10 @@
     "monthlyPayment": "Платёж в месяц",
     "appliedRate": "наценка по сроку",
     "installment": "Рассрочка",
+    "installmentHint": "Выберите тариф и посмотрите платёж в месяц",
     "fullPayment": "Оплата через CLICK",
     "fullPaymentBadge": "через",
+    "fullPaymentHint": "Оформить товар по полной стоимости",
     "tariffs": "Тарифы",
     "downPaymentAvailable": "Предусмотрен первоначальный взнос"
   },

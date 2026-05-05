@@ -2,7 +2,17 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
 import { useProductsStore } from "../store/productsStore";
 import { useBasketStore } from "../store/basketStore";
-import { ArrowRight, ShoppingCart, Check, X, CircleHelp, Heart } from "lucide-vue-next";
+import {
+  ArrowRight,
+  ShoppingCart,
+  Check,
+  X,
+  CircleHelp,
+  Heart,
+  CalendarClock,
+  CreditCard,
+  WalletCards,
+} from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
 import { Swiper, SwiperSlide } from "swiper/vue";
 import { useRoute, useRouter } from "vue-router";
@@ -196,6 +206,8 @@ const favoriteLoading = ref(false);
 
 const normalizeImages = (images) => resolveAssetUrls(images);
 const formatPrice = (price) => formatPriceValue(price);
+const formatProductRichText = (value = "") =>
+  String(value || "").replace(/\r\n/g, "\n").replace(/\n/g, "<br>");
 const getProductDisplayPrice = (product) =>
   getProductDefaultPrice(product, locale.value);
 const toCreditAmountInputValue = (value) => {
@@ -1920,14 +1932,12 @@ onBeforeUnmount(() => {
             <div class="detail-copy-body">
               <span
                 v-if="activeTab !== 'characteristic'"
-                v-html="store.product[`description_${locale}`]"
+                v-html="formatProductRichText(store.product[`description_${locale}`])"
                 class="detail-content animate-fade-in"
               ></span>
               <span
                 v-if="activeTab === 'characteristic'"
-                v-html="
-                  store.product[`characteristic_${locale}`]?.replace(/\r?\n/g, '<br>')
-                "
+                v-html="formatProductRichText(store.product[`characteristic_${locale}`])"
                 class="detail-content animate-fade-in"
               ></span>
             </div>
@@ -1962,40 +1972,54 @@ onBeforeUnmount(() => {
               >
                 <div
                   v-if="hasInstallmentTariffs"
-                  class="detail-payment-badges"
+                  class="detail-payment-options"
                   role="group"
                   :aria-label="t('credit.installment') + ', ' + t('credit.fullPayment')"
                 >
                   <div id="detail-payment-mode" class="detail-payment-mode-anchor"></div>
                   <button
                     type="button"
-                    class="detail-payment-badge detail-payment-badge-btn"
+                    class="detail-payment-option"
                     :class="{
-                      'detail-payment-badge-active':
+                      'detail-payment-option-active':
                         paymentScheduleMode === 'installment',
-                      'detail-payment-badge-unselected':
+                      'detail-payment-option-unselected':
                         paymentModeSelectHighlighted && !paymentScheduleMode,
                     }"
                     @click="onInstallmentModeClick"
                   >
-                    {{ t("credit.installment") }}
+                    <span class="detail-payment-option-icon">
+                      <CalendarClock class="h-5 w-5" />
+                    </span>
+                    <span class="detail-payment-option-content">
+                      <strong>{{ t("credit.installment") }}</strong>
+                      <small>{{ t("credit.installmentHint") }}</small>
+                    </span>
                   </button>
                   <button
                     type="button"
-                    class="detail-payment-badge detail-payment-badge-btn"
+                    class="detail-payment-option detail-payment-option-click"
                     :class="{
-                      'detail-payment-badge-active': paymentScheduleMode === 'full',
-                      'detail-payment-badge-unselected':
+                      'detail-payment-option-active': paymentScheduleMode === 'full',
+                      'detail-payment-option-unselected':
                         paymentModeSelectHighlighted && !paymentScheduleMode,
                     }"
                     @click="onFullPaymentModeClick"
                   >
-                    <img
-                      :src="clickLogo"
-                      alt="Click"
-                      class="detail-payment-click-logo"
-                    />
-                    <span>{{ t("credit.fullPaymentBadge") }}</span>
+                    <span class="detail-payment-option-icon">
+                      <CreditCard class="h-5 w-5" />
+                    </span>
+                    <span class="detail-payment-option-content">
+                      <strong>
+                        <img
+                          :src="clickLogo"
+                          alt="Click"
+                          class="detail-payment-click-logo"
+                        />
+                        <span>{{ t("credit.fullPaymentBadge") }}</span>
+                      </strong>
+                      <small>{{ t("credit.fullPaymentHint") }}</small>
+                    </span>
                   </button>
                 </div>
 
@@ -2041,15 +2065,15 @@ onBeforeUnmount(() => {
                     v-if="selectedCreditPlan"
                     class="detail-credit-payment"
                   >
+                    <span class="detail-credit-payment-icon">
+                      <WalletCards class="h-5 w-5" />
+                    </span>
                     <strong class="detail-credit-inline-value">
-                      <span>{{ previewCreditConfig?.months }} {{ t("credit.months") }}</span>
-                      <span
-                        class="detail-credit-inline-separator"
-                        aria-hidden="true"
-                      >
-                        •
+                      <span class="detail-credit-inline-label">
+                        {{ previewCreditConfig?.months }} {{ t("credit.months") }}
                       </span>
                       <span>{{ formatPrice(selectedCreditPlan.monthlyPayment) }}</span>
+                      <small>{{ t("credit.monthlyPayment") }}</small>
                     </strong>
                   </div>
                 </div>
@@ -2423,14 +2447,12 @@ onBeforeUnmount(() => {
       <div class="detail-copy-body">
         <span
           v-if="activeTab !== 'characteristic'"
-          v-html="store.product[`description_${locale}`]"
+          v-html="formatProductRichText(store.product[`description_${locale}`])"
           class="detail-content animate-fade-in"
         ></span>
         <span
           v-if="activeTab === 'characteristic'"
-          v-html="
-            store.product[`characteristic_${locale}`]?.replace(/\r?\n/g, '<br>')
-          "
+          v-html="formatProductRichText(store.product[`characteristic_${locale}`])"
           class="detail-content animate-fade-in"
         ></span>
       </div>
@@ -2915,6 +2937,7 @@ onBeforeUnmount(() => {
 }
 
 .detail-gallery {
+  container-type: inline-size;
   width: 100%;
   min-width: 0;
   justify-content: flex-start;
@@ -2925,6 +2948,7 @@ onBeforeUnmount(() => {
 .detail-gallery-stage {
   width: 100%;
   aspect-ratio: 16 / 9;
+  height: calc(100cqw * 9 / 16 + 70px);
   padding: 0;
   border-radius: 30px;
   border: 1px solid var(--detail-border);
@@ -3051,88 +3075,119 @@ onBeforeUnmount(() => {
   border-top: 1px solid var(--detail-border);
 }
 
-.detail-payment-badges {
-  display: flex;
-  flex-wrap: wrap;
+.detail-payment-options {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  align-items: stretch;
+}
+
+.detail-payment-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
   gap: 0.5rem;
-  align-items: center;
-}
-
-.detail-payment-badge {
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 0.38rem 0.72rem;
-  border-radius: 999px;
-  border: 1px solid rgba(72, 122, 93, 0.22);
-  background: rgba(243, 250, 245, 0.96);
-  color: #2f5d45;
-}
-
-.detail-payment-badge-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.42rem;
+  min-height: 58px;
+  border: 1px solid rgba(20, 35, 56, 0.12);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f6f8fb 100%);
+  color: var(--detail-ink);
+  padding: 0.62rem 0.7rem;
+  text-align: left;
   cursor: pointer;
-  font: inherit;
-  text-align: center;
   transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease,
-    border-color 0.15s ease;
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
 }
 
-.detail-payment-click-logo {
-  width: 3.25rem;
-  max-width: 3.25rem;
-  height: 1.25rem;
-  object-fit: contain;
-  flex: 0 0 auto;
-  border-radius: 5px;
-  padding: 0.08rem 0.18rem;
+.detail-payment-option:hover {
+  transform: translateY(-1px);
+  border-color: rgba(20, 35, 56, 0.22);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
 }
 
-.detail-payment-badge-btn:hover {
-  border-color: rgba(24, 75, 51, 0.35);
-  box-shadow: 0 2px 10px rgba(24, 75, 51, 0.08);
-}
-
-.detail-payment-badge-btn:focus-visible {
-  outline: 2px solid rgba(24, 75, 51, 0.45);
+.detail-payment-option:focus-visible {
+  outline: 2px solid rgba(37, 87, 164, 0.45);
   outline-offset: 2px;
 }
 
-.detail-payment-badge-btn:active {
-  transform: scale(0.98);
+.detail-payment-option:active {
+  transform: translateY(0);
 }
 
-.detail-payment-badge-active {
+.detail-payment-option-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: rgba(37, 87, 164, 0.1);
+  color: #1c4684;
+  flex: 0 0 auto;
+}
+
+.detail-payment-option-content {
+  display: grid;
+  min-width: 0;
+}
+
+.detail-payment-option-content strong {
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  color: inherit;
+  font-size: 0.84rem;
+  font-weight: 850;
+  line-height: 1.12;
+  white-space: nowrap;
+}
+
+.detail-payment-option-content small {
+  display: none;
+}
+
+.detail-payment-click-logo {
+  width: 3rem;
+  max-width: 3rem;
+  height: 1.1rem;
+  object-fit: contain;
+  flex: 0 0 auto;
+  border-radius: 5px;
+}
+
+.detail-payment-option-active {
+  border-color: rgba(31, 101, 70, 0.42);
+  background: linear-gradient(135deg, #f3fbf6 0%, #e3f4ea 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(31, 101, 70, 0.12),
+    0 16px 30px rgba(31, 101, 70, 0.12);
+  color: #184b33;
+}
+
+.detail-payment-option-active .detail-payment-option-icon {
   background: linear-gradient(135deg, #2f7a57 0%, #1f6546 100%);
   color: #ffffff;
-  border-color: #245f42;
-  box-shadow: 0 8px 20px rgba(31, 101, 70, 0.2);
 }
 
-.detail-payment-badge-active:hover {
-  background: linear-gradient(135deg, #2f7a57 0%, #1f6546 100%);
-  color: #ffffff;
-  border-color: #245f42;
-}
-
-.detail-payment-badge-unselected {
+.detail-payment-option-unselected {
   border-color: #ef4444;
-  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+  background: linear-gradient(135deg, #fff7f7 0%, #ffe8eb 100%);
   box-shadow:
     0 0 0 1px rgba(239, 68, 68, 0.16),
     0 8px 18px rgba(239, 68, 68, 0.14);
 }
 
 .detail-payment-mode-anchor {
-  position: relative;
+  position: absolute;
   top: -10px;
+  left: 0;
   width: 0;
   height: 0;
+  pointer-events: none;
 }
 
 .detail-credit-tariffs-label {
@@ -3228,32 +3283,104 @@ onBeforeUnmount(() => {
 }
 
 .detail-credit-payment {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  justify-content: center;
+  gap: 0.75rem;
   min-width: 0;
-  padding: 0.82rem 1rem;
-  border-radius: 18px;
+  padding: 0.92rem 1rem;
+  border-radius: 20px;
   border: 1px solid rgba(72, 122, 93, 0.2);
   background: linear-gradient(135deg, #eef8f1 0%, #d8efe1 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.84),
+    0 10px 22px rgba(31, 101, 70, 0.08);
+}
+
+.detail-credit-payment-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #1f6546;
+  box-shadow: inset 0 0 0 1px rgba(31, 101, 70, 0.12);
 }
 
 .detail-credit-inline-value {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.42rem;
-  white-space: nowrap;
-  font-size: clamp(0.95rem, 1.8vw, 1.12rem);
-  line-height: 1;
+  display: grid;
+  gap: 0.16rem;
+  min-width: 0;
+  font-size: clamp(1.05rem, 2vw, 1.22rem);
+  line-height: 1.08;
   font-weight: 800;
   color: #184b33;
   font-variant-numeric: tabular-nums;
 }
 
-.detail-credit-inline-separator {
-  color: rgba(24, 75, 51, 0.48);
+.detail-credit-inline-value small {
+  color: rgba(24, 75, 51, 0.7);
+  font-size: 0.74rem;
   font-weight: 700;
+}
+
+.detail-credit-inline-value .detail-credit-inline-label {
+  color: rgba(24, 75, 51, 0.72);
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.detail-full-payment-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.92rem 1rem;
+  border: 1px solid rgba(37, 87, 164, 0.18);
+  border-radius: 20px;
+  background: linear-gradient(135deg, #f4f8ff 0%, #e8f0fb 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 10px 22px rgba(37, 87, 164, 0.08);
+}
+
+.detail-full-payment-logo-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 44px;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(37, 87, 164, 0.1);
+}
+
+.detail-full-payment-logo {
+  width: 3.8rem;
+  height: 1.45rem;
+  object-fit: contain;
+}
+
+.detail-full-payment-card span:last-child {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.detail-full-payment-card small {
+  color: #4b6382;
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.detail-full-payment-card strong {
+  color: #14315f;
+  font-size: clamp(1.05rem, 2vw, 1.22rem);
+  line-height: 1.1;
+  font-weight: 850;
 }
 
 .detail-credit-inline-note {
@@ -4537,9 +4664,35 @@ onBeforeUnmount(() => {
     gap: 0.75rem;
   }
 
+  .detail-payment-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .detail-payment-option {
+    gap: 0.38rem;
+    min-height: 54px;
+    padding: 0.55rem 0.48rem;
+  }
+
+  .detail-payment-option-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+  }
+
+  .detail-payment-option-content strong {
+    font-size: 0.72rem;
+  }
+
+  .detail-payment-click-logo {
+    width: 2.45rem;
+    max-width: 2.45rem;
+    height: 0.95rem;
+  }
+
   .detail-credit-inline-value {
     gap: 0.34rem;
-    font-size: 0.88rem;
+    font-size: 1rem;
   }
 
   .detail-credit-plan-switcher {

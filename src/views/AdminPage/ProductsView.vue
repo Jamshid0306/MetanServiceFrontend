@@ -93,6 +93,8 @@ const createInitialProduct = () => ({
 const newProduct = ref(createInitialProduct());
 
 const imagePreviews = ref([]);
+const imageItems = ref([]);
+const draggedImageIndex = ref(null);
 const selectedServiceIds = ref([]);
 
 const showNotification = (msg) => {
@@ -100,23 +102,76 @@ const showNotification = (msg) => {
   notifShow.value = true;
 };
 
+const syncImagesFromItems = () => {
+  newProduct.value.oldImages = imageItems.value
+    .filter((item) => item.type === "old")
+    .map((item) => item.path);
+  newProduct.value.images = imageItems.value
+    .filter((item) => item.type === "new")
+    .map((item) => item.file);
+  imagePreviews.value = imageItems.value.map((item) => item.preview).filter(Boolean);
+};
+
+const revokeImageItemPreview = (item) => {
+  if (item?.type === "new" && item.preview?.startsWith("blob:")) {
+    URL.revokeObjectURL(item.preview);
+  }
+};
+
+const resetImageItems = () => {
+  imageItems.value.forEach(revokeImageItemPreview);
+  imageItems.value = [];
+  draggedImageIndex.value = null;
+  syncImagesFromItems();
+};
+
 const handleFileChange = (e) => {
   const files = Array.from(e.target.files);
-  newProduct.value.images.push(...files);
-  imagePreviews.value.push(...files.map((f) => URL.createObjectURL(f)));
+  const nextItems = files.map((file) => ({
+    type: "new",
+    file,
+    preview: URL.createObjectURL(file),
+    key: `new-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  }));
+  imageItems.value.push(...nextItems);
+  syncImagesFromItems();
+  e.target.value = "";
 };
 
 const removeImage = (i) => {
-  if (i < newProduct.value.oldImages.length) {
-    newProduct.value.oldImages.splice(i, 1);
-  } else {
-    const idx = i - newProduct.value.oldImages.length;
-    newProduct.value.images.splice(idx, 1);
+  const [removed] = imageItems.value.splice(i, 1);
+  revokeImageItemPreview(removed);
+  syncImagesFromItems();
+};
+
+const handleImageDragStart = (index) => {
+  draggedImageIndex.value = index;
+};
+
+const handleImageDragOver = (event) => {
+  event.preventDefault();
+};
+
+const handleImageDrop = (targetIndex) => {
+  const sourceIndex = draggedImageIndex.value;
+  draggedImageIndex.value = null;
+
+  if (
+    sourceIndex === null ||
+    sourceIndex === targetIndex ||
+    sourceIndex < 0 ||
+    targetIndex < 0 ||
+    sourceIndex >= imageItems.value.length ||
+    targetIndex >= imageItems.value.length
+  ) {
+    return;
   }
-  imagePreviews.value = [
-    ...newProduct.value.oldImages.map(resolveAssetUrl).filter(Boolean),
-    ...newProduct.value.images.map((f) => URL.createObjectURL(f)),
-  ];
+
+  const nextItems = [...imageItems.value];
+  const [movedItem] = nextItems.splice(sourceIndex, 1);
+  nextItems.splice(targetIndex, 0, movedItem);
+  imageItems.value = nextItems;
+  syncImagesFromItems();
 };
 
 const changeLanguage = (lang) => {
@@ -328,7 +383,15 @@ const openUpdateModal = (product) => {
       : product.images.split(",")
     : [];
 
-  imagePreviews.value = oldImages.map(resolveAssetUrl).filter(Boolean);
+  resetImageItems();
+  imageItems.value = oldImages
+    .map((path) => ({
+      type: "old",
+      path,
+      preview: resolveAssetUrl(path),
+      key: `old-${path}`,
+    }))
+    .filter((item) => item.preview);
 
   newProduct.value = {
     credit_enabled: Boolean(product.credit_enabled),
@@ -353,6 +416,7 @@ const openUpdateModal = (product) => {
     oldImages: oldImages,
     options: mapOptionsForForm(product, product.config_options),
   };
+  syncImagesFromItems();
   selectedServiceIds.value = Array.isArray(product?.extra_services)
     ? product.extra_services
         .map((service) => Number(service?.id || 0))
@@ -363,6 +427,7 @@ const openUpdateModal = (product) => {
 };
 
 const resetForm = () => {
+  resetImageItems();
   newProduct.value = createInitialProduct();
   imagePreviews.value = [];
   selectedServiceIds.value = [];
@@ -659,11 +724,25 @@ const addOrUpdateProduct = async () => {
     JSON.stringify(serializedOptions)
   );
 
-  newProduct.value.images.forEach((file) => {
-    formData.append("files", file);
+  const orderedNewItems = imageItems.value.filter((item) => item.type === "new");
+  const newFileIndexes = new Map();
+  orderedNewItems.forEach((item, index) => {
+    formData.append("files", item.file);
+    newFileIndexes.set(item, index);
   });
-  newProduct.value.oldImages.forEach((img) => {
-    formData.append("oldImages", img);
+
+  imageItems.value
+    .filter((item) => item.type === "old")
+    .forEach((item) => {
+      formData.append("oldImages", item.path);
+    });
+
+  imageItems.value.forEach((item) => {
+    if (item.type === "old") {
+      formData.append("image_order", `old:${item.path}`);
+      return;
+    }
+    formData.append("image_order", `new:${newFileIndexes.get(item)}`);
   });
 
   try {
@@ -1359,18 +1438,26 @@ const toggleProductActive = async (product) => {
               />
               <div class="editor-image-grid">
                 <div
-                  v-for="(src, i) in imagePreviews"
-                  :key="i"
+                  v-for="(item, i) in imageItems"
+                  :key="item.key || i"
                   class="editor-image-card"
+                  :class="{ 'editor-image-card-dragging': draggedImageIndex === i }"
+                  draggable="true"
+                  @dragstart="handleImageDragStart(i)"
+                  @dragover="handleImageDragOver"
+                  @drop="handleImageDrop(i)"
+                  @dragend="draggedImageIndex = null"
                 >
                   <img
-                    :src="src"
+                    :src="item.preview"
                     class="editor-image"
                     alt="image"
                   />
+                  <span class="editor-image-order">{{ i + 1 }}</span>
                   <button
                     @click="removeImage(i)"
                     class="editor-image-remove"
+                    type="button"
                   >
                     ×
                   </button>
@@ -2188,12 +2275,47 @@ const toggleProductActive = async (product) => {
   border-radius: 18px;
   border: 1px solid rgba(20, 54, 108, 0.1);
   background: linear-gradient(180deg, #fbfdff, #f0f6ff);
+  cursor: grab;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.editor-image-card:active {
+  cursor: grabbing;
+}
+
+.editor-image-card-dragging {
+  opacity: 0.55;
+  transform: scale(0.96);
+  border-color: rgba(23, 60, 116, 0.38);
+  box-shadow: 0 12px 24px rgba(8, 30, 72, 0.14);
 }
 
 .editor-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  pointer-events: none;
+}
+
+.editor-image-order {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #173c74;
+  font-size: 0.78rem;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(8, 30, 72, 0.12);
 }
 
 .editor-image-remove {

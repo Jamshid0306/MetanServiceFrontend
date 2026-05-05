@@ -15,12 +15,14 @@ const previousBodyOverflow = ref("");
 
 const createForm = reactive({
   durationDays: "5",
+  productLink: "",
   file: null,
   preview: "",
 });
 
 const editForm = reactive({
   durationDays: "5",
+  productLink: "",
   file: null,
   preview: "",
 });
@@ -46,6 +48,7 @@ const setStatus = (message, type = "success") => {
 const resetCreateForm = () => {
   revokePreview(createForm.preview);
   createForm.durationDays = "5";
+  createForm.productLink = "";
   createForm.file = null;
   createForm.preview = "";
 };
@@ -53,6 +56,7 @@ const resetCreateForm = () => {
 const resetEditForm = () => {
   revokePreview(editForm.preview);
   editForm.durationDays = "5";
+  editForm.productLink = "";
   editForm.file = null;
   editForm.preview = "";
   editingSlideId.value = null;
@@ -107,6 +111,7 @@ const submitCreate = async () => {
   const formData = new FormData();
   formData.append("file", createForm.file);
   formData.append("duration_days", createForm.durationDays);
+  formData.append("product_link", createForm.productLink);
 
   const isSuccess = await store.createHeroSlide(formData);
   if (isSuccess) {
@@ -121,6 +126,7 @@ const submitCreate = async () => {
 const startEditing = (slide) => {
   editingSlideId.value = slide.id;
   editForm.durationDays = String(slide.duration_days || 1);
+  editForm.productLink = slide.product_link || "";
   editForm.file = null;
   setPreview(editForm, null, resolveAssetUrl(slide.image_path));
 };
@@ -129,6 +135,7 @@ const saveEdit = async (slideId) => {
   saving.value = true;
   const formData = new FormData();
   formData.append("duration_days", editForm.durationDays);
+  formData.append("product_link", editForm.productLink);
   if (editForm.file) {
     formData.append("file", editForm.file);
   }
@@ -264,6 +271,15 @@ onBeforeUnmount(() => {
               <input type="file" accept="image/*" @change="handleCreateFileChange" />
             </label>
 
+            <label class="hero-admin-field">
+              <span>Product silkasi</span>
+              <input
+                v-model.trim="createForm.productLink"
+                type="text"
+                placeholder="/product/1"
+              />
+            </label>
+
             <label class="hero-admin-field hero-admin-days">
               <span>Necha kun</span>
               <input v-model="createForm.durationDays" type="number" min="1" step="1" />
@@ -317,10 +333,23 @@ onBeforeUnmount(() => {
                 </div>
               </div>
 
+              <p v-if="slide.product_link" class="hero-admin-link">
+                {{ slide.product_link }}
+              </p>
+
               <div v-if="editingSlideId === slide.id" class="hero-admin-editor">
                 <label class="hero-admin-field">
                   <span>Yangi rasm</span>
                   <input type="file" accept="image/*" @change="handleEditFileChange" />
+                </label>
+
+                <label class="hero-admin-field">
+                  <span>Product silkasi</span>
+                  <input
+                    v-model.trim="editForm.productLink"
+                    type="text"
+                    placeholder="/product/1"
+                  />
                 </label>
 
                 <label class="hero-admin-field hero-admin-days">
@@ -514,7 +543,7 @@ onBeforeUnmount(() => {
 
 .hero-admin-create {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(120px, 180px) auto;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.25fr) minmax(120px, 180px) auto;
   gap: 0.9rem;
   align-items: end;
 }
@@ -635,6 +664,16 @@ onBeforeUnmount(() => {
   margin-bottom: 0.2rem;
   font-size: 0.78rem;
   color: #6d8098;
+}
+
+.hero-admin-link {
+  overflow-wrap: anywhere;
+  border-radius: 16px;
+  background: rgba(37, 87, 164, 0.08);
+  padding: 0.75rem;
+  color: #1c4684;
+  font-size: 0.88rem;
+  font-weight: 700;
 }
 
 .hero-admin-editor {
