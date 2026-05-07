@@ -60,8 +60,12 @@ const handleClick = (product) => {
   // Product card ichidagi tugma bosilganda: faqat detailga kirish.
   goToDetail(product.id);
 };
-const goToDetail = (id) => {
-  router.push({ name: "ProductDetail", params: { id } });
+const goToDetail = (id, options = {}) => {
+  router.push({
+    name: "ProductDetail",
+    params: { id },
+    query: options.openImage ? { image: "0" } : {},
+  });
   productsStore.fetchProductDetail(id);
 };
 const actionLabel = () => t("header.more");
@@ -116,7 +120,7 @@ const filteredProducts = computed(() => {
         {{ t("products.title") }}
       </h2>
       <div
-        class="grid grid-cols-4 max-lg:grid-cols-3 max-sm:grid-cols-2 max-sm:gap-4 gap-6"
+        class="products-grid grid grid-cols-4 max-lg:grid-cols-3 max-sm:grid-cols-2 max-sm:gap-4 gap-6"
       >
         <div
           v-for="product in filteredProducts"
@@ -131,11 +135,9 @@ const filteredProducts = computed(() => {
                 alt="Image"
                 loading="lazy"
                 class="product-image"
+                @click.stop="goToDetail(product.id, { openImage: true })"
               />
             </div>
-            <h3 class="product-title">
-              {{ product[`name_${locale}`] }}
-            </h3>
           </div>
           <div class="card-footer">
             <p class="product-price">
@@ -261,7 +263,7 @@ const filteredProducts = computed(() => {
 .product-media {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 4 / 3;
   border-radius: 16px;
   border: 1px solid rgba(20, 35, 56, 0.08);
   background: #f3f5f7;
@@ -398,11 +400,34 @@ const filteredProducts = computed(() => {
   }
 
   .card-footer {
-    padding-top: 12px;
+    padding-top: 8px;
+  }
+
+  /* Mobil ko‘rinishda narx / oylik tolov / batafsil tugmasini yaqinlashtirish */
+  .product-price {
+    margin-bottom: 0.25rem;
+  }
+
+  .product-installment {
+    margin-bottom: 0.35rem;
   }
 
   .add-btn {
-    margin-top: 0.25rem;
+    margin-top: 0.1rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .home-products-section {
+    padding-top: 0;
+  }
+
+  .section-title {
+    margin-bottom: 0;
+  }
+
+  .products-grid {
+    row-gap: 0;
   }
 }
 </style>

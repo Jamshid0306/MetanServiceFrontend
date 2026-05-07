@@ -9,6 +9,10 @@ import { apiClient, resolveAssetUrl } from "@/lib/api";
 import heroProducts from "@/assets/images/hero-products.jpg";
 import heroService from "@/assets/images/hero-service.jpg";
 import heroSupport from "@/assets/images/hero-support.jpg";
+import imageOne from "@/assets/images/1.png";
+import imageTwo from "@/assets/images/2.png";
+import imageThree from "@/assets/images/3.png";
+import logoImage from "@/assets/images/logo.jpg";
 import "swiper/css";
 import "swiper/css/pagination";
 
@@ -99,6 +103,13 @@ onMounted(async () => {
       <div class="hero-payment-note reveal-up">
         <span>Mahsulotlarni muddatli to‘lov yoki 100% to‘lov orqali xarid qilishingiz mumkin.</span>
       </div>
+
+      <div class="hero-brand-strip reveal-up" aria-label="Brend rasmlari">
+        <img :src="imageOne" alt="Brend rasm 1" class="hero-brand-image" />
+        <img :src="imageTwo" alt="Brend rasm 2" class="hero-brand-image" />
+        <img :src="imageThree" alt="Brend rasm 3" class="hero-brand-image" />
+        <img :src="logoImage" alt="Metan Service logo" class="hero-brand-image" />
+      </div>
     </section>
   </div>
 </template>
@@ -186,6 +197,26 @@ onMounted(async () => {
   font-weight: 700;
 }
 
+.hero-brand-strip {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.hero-brand-image {
+  flex: 0 0 88px;
+  width: 88px;
+  height: 88px;
+  aspect-ratio: 1 / 1;
+  border-radius: 14px;
+  border: 1px solid rgba(20, 35, 56, 0.08);
+  background: #f6f8fb;
+  object-fit: contain;
+  padding: 0.35rem;
+}
+
 .reveal-up {
   animation: riseIn 0.6s ease-out both;
 }
@@ -233,6 +264,18 @@ onMounted(async () => {
     border-radius: 16px;
     padding: 0.75rem 0.8rem;
     font-size: 0.86rem;
+  }
+
+  .hero-brand-strip {
+    gap: 0.35rem;
+  }
+
+  .hero-brand-image {
+    flex-basis: 64px;
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
+    padding: 0.2rem;
   }
 }
 

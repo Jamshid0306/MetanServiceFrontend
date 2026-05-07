@@ -373,6 +373,8 @@
     "ordersSubtitle": "Товары, купленные в рассрочку или оплаченные одним платежом, отображаются здесь.",
     "ordersLoading": "Загружаем заказы...",
     "ordersLoadError": "Не удалось загрузить заказы.",
+    "orderStatusInProgress": "В процессе",
+    "orderStatusApproved": "Одобрено",
     "emptyOrdersTitle": "Заказов пока нет",
     "emptyOrdersText": "После завершения покупки выбранный товар появится здесь.",
     "orderNumber": "Заказ",

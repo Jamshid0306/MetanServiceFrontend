@@ -174,10 +174,14 @@ const filteredProducts = computed(() => {
   return searchedResult;
 });
 
-const goToDetail = (id) => {
+const goToDetail = (id, options = {}) => {
   loaderStore.loader = true;
   productsStore.fetchProductDetail(id);
-  router.push({ name: "ProductDetail", params: { id } });
+  router.push({
+    name: "ProductDetail",
+    params: { id },
+    query: options.openImage ? { image: "0" } : {},
+  });
 };
 
 const formatPrice = (price) => formatPriceValue(price);
@@ -320,15 +324,13 @@ onMounted(async () => {
                   :src="normalizeImages(product.images)[0]"
                   :alt="product[`name_${locale}`]"
                   class="catalog-image"
+                  @click.stop="goToDetail(product.id, { openImage: true })"
                 />
               </div>
               <div class="catalog-copy">
                 <div class="catalog-meta">
                   <span class="catalog-id">#{{ product.id }}</span>
                 </div>
-                <h3 class="catalog-title">
-                  {{ product[`name_${locale}`] }}
-                </h3>
                 <div class="catalog-footer">
                   <p class="catalog-price">
                     {{ formatPrice(getProductDisplayPrice(product)) }}
@@ -564,7 +566,7 @@ onMounted(async () => {
 .catalog-media {
   flex: 0 0 156px;
   width: 156px;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 4 / 3;
   border-radius: 16px;
   border: 1px solid rgba(20, 35, 56, 0.08);
   background: #f3f5f7;
@@ -663,11 +665,11 @@ onMounted(async () => {
     border-left: none;
     border-right: none;
     border-top: none;
-    gap: 0.75rem;
+    gap: 0.6rem;
   }
 
   .catalog-main {
-    gap: 0.8rem;
+    gap: 0.65rem;
   }
 
   .catalog-meta {
@@ -688,11 +690,17 @@ onMounted(async () => {
 
   .catalog-price {
     font-size: 0.78rem;
-    margin-bottom: 0;
+    margin-bottom: 0.1rem;
   }
 
   .catalog-installment {
-    display: none;
+    display: inline-flex;
+    font-size: 0.66rem;
+    white-space: nowrap;
+  }
+
+  .catalog-footer {
+    margin-top: 0.2rem;
   }
 
   .catalog-btn {

@@ -11,6 +11,10 @@ import {
   Heart,
   CalendarClock,
   CreditCard,
+  Minus,
+  Plus,
+  RotateCcw,
+  Ruler,
   WalletCards,
 } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
@@ -90,6 +94,10 @@ const lastAutoFilledCreditAmount = ref("");
 const balloonProgramEnabled = ref(null);
 const orderModalOpen = ref(false);
 const fuelGuideModalOpen = ref(false);
+const imageModalOpen = ref(false);
+const activeImageIndex = ref(0);
+const imageZoom = ref(1);
+const imagePan = ref({ x: 0, y: 0 });
 const orderSubmitting = ref(false);
 const orderError = ref("");
 const orderForm = ref(createEmptyOrderForm());
@@ -206,8 +214,25 @@ const favoriteLoading = ref(false);
 
 const normalizeImages = (images) => resolveAssetUrls(images);
 const formatPrice = (price) => formatPriceValue(price);
-const formatProductRichText = (value = "") =>
-  String(value || "").replace(/\r\n/g, "\n").replace(/\n/g, "<br>");
+const escapeProductText = (value = "") =>
+  String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const formatProductRichText = (value = "") => {
+  const normalizedValue = String(value || "").replace(/\r\n/g, "\n").trim();
+  if (!normalizedValue) {
+    return "";
+  }
+
+  return normalizedValue
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${escapeProductText(paragraph).replace(/\n/g, "<br>")}</p>`)
+    .join("");
+};
 const getProductDisplayPrice = (product) =>
   getProductDefaultPrice(product, locale.value);
 const toCreditAmountInputValue = (value) => {
@@ -226,7 +251,7 @@ const fuelGuideSections = computed(() => {
   return Array.isArray(sections) ? sections : [];
 });
 const isAnyModalOpen = computed(
-  () => orderModalOpen.value || fuelGuideModalOpen.value
+  () => orderModalOpen.value || fuelGuideModalOpen.value || imageModalOpen.value
 );
 
 const getCustomerOrderFields = (profile = customerProfile.value) => {
@@ -561,6 +586,13 @@ const collectCylinderVolumes = (config = {}, fuelType = null, transmission = nul
 };
 
 const images = computed(() => normalizeImages(store.product?.images || []));
+const activeModalImage = computed(
+  () => images.value[activeImageIndex.value] || images.value[0] || ""
+);
+const imageModalTransform = computed(
+  () =>
+    `translate3d(${imagePan.value.x}px, ${imagePan.value.y}px, 0) scale(${imageZoom.value})`
+);
 const optionConfig = computed(() => normalizeProductOptions(store.product?.config_options));
 const optionPaths = computed(() => buildOptionPaths(optionConfig.value));
 const explicitSelectionPath = computed(() => {
@@ -1167,6 +1199,152 @@ const goToSlide = (index) => {
     swiperInstance.slideTo(index);
   }
 };
+
+const modalPointers = new Map();
+let pinchStartDistance = 0;
+let pinchStartZoom = 1;
+
+const clampImageZoom = (value) => Math.min(Math.max(Number(value) || 1, 1), 5);
+
+const resetImageZoom = () => {
+  imageZoom.value = 1;
+  imagePan.value = { x: 0, y: 0 };
+};
+
+const setImageZoom = (value) => {
+  imageZoom.value = clampImageZoom(value);
+  if (imageZoom.value <= 1) {
+    imagePan.value = { x: 0, y: 0 };
+  }
+};
+
+const zoomImageIn = () => setImageZoom(imageZoom.value + 0.35);
+const zoomImageOut = () => setImageZoom(imageZoom.value - 0.35);
+
+const openImageModal = (index = 0, shouldSyncRoute = true) => {
+  if (!images.value.length) {
+    return;
+  }
+
+  const safeIndex = Math.min(Math.max(Number(index) || 0, 0), images.value.length - 1);
+  activeImageIndex.value = safeIndex;
+  resetImageZoom();
+  imageModalOpen.value = true;
+  goToSlide(safeIndex);
+
+  if (shouldSyncRoute) {
+    router.replace({
+      name: "ProductDetail",
+      params: { id: route.params.id },
+      query: { ...route.query, image: String(safeIndex) },
+    });
+  }
+};
+
+const closeImageModal = () => {
+  imageModalOpen.value = false;
+  modalPointers.clear();
+  resetImageZoom();
+
+  if (route.query.image !== undefined) {
+    const nextQuery = { ...route.query };
+    delete nextQuery.image;
+    router.replace({
+      name: "ProductDetail",
+      params: { id: route.params.id },
+      query: nextQuery,
+    });
+  }
+};
+
+const openImageModalFromRoute = () => {
+  if (route.query.image === undefined || !images.value.length) {
+    return;
+  }
+
+  openImageModal(Number(route.query.image || 0), false);
+};
+
+const selectModalImage = (index) => {
+  activeImageIndex.value = Math.min(Math.max(Number(index) || 0, 0), images.value.length - 1);
+  resetImageZoom();
+  goToSlide(activeImageIndex.value);
+  if (route.query.image !== undefined) {
+    router.replace({
+      name: "ProductDetail",
+      params: { id: route.params.id },
+      query: { ...route.query, image: String(activeImageIndex.value) },
+    });
+  }
+};
+
+const getPointerDistance = () => {
+  const points = [...modalPointers.values()];
+  if (points.length < 2) {
+    return 0;
+  }
+
+  return Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+};
+
+const handleImageWheel = (event) => {
+  const direction = event.deltaY > 0 ? -0.22 : 0.22;
+  setImageZoom(imageZoom.value + direction);
+};
+
+const handleImagePointerDown = (event) => {
+  event.currentTarget.setPointerCapture?.(event.pointerId);
+  modalPointers.set(event.pointerId, {
+    x: event.clientX,
+    y: event.clientY,
+    startX: event.clientX,
+    startY: event.clientY,
+    startPanX: imagePan.value.x,
+    startPanY: imagePan.value.y,
+  });
+
+  if (modalPointers.size === 2) {
+    pinchStartDistance = getPointerDistance();
+    pinchStartZoom = imageZoom.value;
+  }
+};
+
+const handleImagePointerMove = (event) => {
+  const pointer = modalPointers.get(event.pointerId);
+  if (!pointer) {
+    return;
+  }
+
+  pointer.x = event.clientX;
+  pointer.y = event.clientY;
+
+  if (modalPointers.size === 2 && pinchStartDistance > 0) {
+    setImageZoom(pinchStartZoom * (getPointerDistance() / pinchStartDistance));
+    return;
+  }
+
+  if (modalPointers.size === 1 && imageZoom.value > 1) {
+    imagePan.value = {
+      x: pointer.startPanX + event.clientX - pointer.startX,
+      y: pointer.startPanY + event.clientY - pointer.startY,
+    };
+  }
+};
+
+const handleImagePointerUp = (event) => {
+  modalPointers.delete(event.pointerId);
+  if (modalPointers.size < 2) {
+    pinchStartDistance = 0;
+  }
+
+  if (modalPointers.size === 1) {
+    const [pointer] = modalPointers.values();
+    pointer.startX = pointer.x;
+    pointer.startY = pointer.y;
+    pointer.startPanX = imagePan.value.x;
+    pointer.startPanY = imagePan.value.y;
+  }
+};
 const observeStickyPrice = () => {
   if (priceSummaryObserver) {
     priceSummaryObserver.disconnect();
@@ -1645,9 +1823,13 @@ const selectOption = (groupKey, optionId) => {
   }
 };
 
-const goToDetail = (id) => {
+const goToDetail = (id, options = {}) => {
   useLoaderStore().loader = true;
-  router.push({ name: "ProductDetail", params: { id } });
+  router.push({
+    name: "ProductDetail",
+    params: { id },
+    query: options.openImage ? { image: "0" } : {},
+  });
 };
 
 const toggleExtraService = (serviceId) => {
@@ -1662,6 +1844,11 @@ const toggleExtraService = (serviceId) => {
 
 const handleEscape = (event) => {
   if (event.key !== "Escape") {
+    return;
+  }
+
+  if (imageModalOpen.value) {
+    closeImageModal();
     return;
   }
 
@@ -1680,7 +1867,28 @@ watch(
   async (newId) => {
     if (newId) {
       await fetchProductData(Number(newId));
+      openImageModalFromRoute();
     }
+  }
+);
+
+watch(
+  () => route.query.image,
+  () => {
+    if (route.query.image === undefined) {
+      imageModalOpen.value = false;
+      resetImageZoom();
+      return;
+    }
+
+    openImageModalFromRoute();
+  }
+);
+
+watch(
+  images,
+  () => {
+    openImageModalFromRoute();
   }
 );
 
@@ -1815,6 +2023,7 @@ watch(
 
 onMounted(async () => {
   await fetchProductData(Number(route.params.id));
+  openImageModalFromRoute();
   await loadFavorites();
 });
 
@@ -1890,6 +2099,7 @@ onBeforeUnmount(() => {
                     :src="img"
                     alt="Product"
                     class="detail-slide-image w-full rounded-2xl transition-transform duration-500"
+                    @click="openImageModal(index)"
                   />
                 </SwiperSlide>
               </Swiper>
@@ -2107,7 +2317,10 @@ onBeforeUnmount(() => {
                 v-if="group.key !== 'transmission'"
                 class="detail-option-group"
               >
-              <div class="detail-option-headline">
+              <div
+                v-if="group.key !== 'cylinder_volume'"
+                class="detail-option-headline"
+              >
                 <div class="detail-option-heading">
                   <h3 class="text-sm font-semibold text-slate-700">
                     {{ t(group.titleKey) }}
@@ -2133,17 +2346,25 @@ onBeforeUnmount(() => {
               >
                 <div
                   class="detail-select-wrap"
-                  :class="{
-                    'detail-select-wrap-active': selectedOptions[group.key],
-                    'detail-select-wrap-error':
-                      group.key === 'cylinder_volume' &&
-                      cylinderVolumeSelectHighlighted &&
-                      !selectedOptions[group.key],
-                  }"
-                >
-                  <select
-                    :value="selectedOptions[group.key] || ''"
-                    class="detail-select-input"
+	                  :class="{
+	                    'detail-select-wrap-active': selectedOptions[group.key],
+	                    'detail-select-wrap-error':
+	                      group.key === 'cylinder_volume' &&
+	                      cylinderVolumeSelectHighlighted &&
+	                      !selectedOptions[group.key],
+	                    'detail-select-wrap-with-leading-icon':
+	                      group.key === 'cylinder_volume',
+	                  }"
+	                >
+	                  <span
+	                    v-if="group.key === 'cylinder_volume'"
+	                    class="detail-select-leading-icon"
+	                  >
+	                    <Ruler class="h-5 w-5" />
+	                  </span>
+	                  <select
+	                    :value="selectedOptions[group.key] || ''"
+	                    class="detail-select-input"
                     @change="selectOption(group.key, $event.target.value)"
                   >
                     <option value="">
@@ -2161,13 +2382,16 @@ onBeforeUnmount(() => {
                 </div>
               </div>
               <div
-                v-else-if="group.key === 'cylinder_volume'"
-                class="detail-select-shell"
-              >
-                <div class="detail-select-wrap detail-select-wrap-active">
-                  <div class="detail-static-value">
-                    {{ formatSelectOptionLabel(group.key, group.options[0]) }}
-                  </div>
+	                v-else-if="group.key === 'cylinder_volume'"
+	                class="detail-select-shell"
+	              >
+	                <div class="detail-select-wrap detail-select-wrap-active detail-select-wrap-with-leading-icon">
+	                  <span class="detail-select-leading-icon">
+	                    <Ruler class="h-5 w-5" />
+	                  </span>
+	                  <div class="detail-static-value">
+	                    {{ formatSelectOptionLabel(group.key, group.options[0]) }}
+	                  </div>
                 </div>
               </div>
               <div
@@ -2478,7 +2702,7 @@ onBeforeUnmount(() => {
           class="related-card group"
         >
           <div
-            @click="goToDetail(product.id)"
+            @click="goToDetail(product.id, { openImage: true })"
             class="related-media cursor-pointer"
           >
             <span class="related-chip">#{{ product.id }}</span>
@@ -2516,6 +2740,66 @@ onBeforeUnmount(() => {
     </section>
   </div>
   <teleport to="body">
+    <div
+      v-if="imageModalOpen"
+      class="image-modal-overlay"
+      @click.self="closeImageModal"
+    >
+      <div class="image-modal-shell">
+        <div class="image-modal-head">
+          <div class="image-modal-title">
+            <span>{{ activeImageIndex + 1 }} / {{ images.length }}</span>
+            <strong>{{ store.product?.[`name_${locale}`] }}</strong>
+          </div>
+          <div class="image-modal-actions">
+            <button type="button" @click="zoomImageOut" :disabled="imageZoom <= 1">
+              <Minus class="h-5 w-5" />
+            </button>
+            <button type="button" @click="resetImageZoom">
+              <RotateCcw class="h-5 w-5" />
+            </button>
+            <button type="button" @click="zoomImageIn" :disabled="imageZoom >= 5">
+              <Plus class="h-5 w-5" />
+            </button>
+            <button type="button" @click="closeImageModal">
+              <X class="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        <div
+          class="image-modal-stage"
+          @wheel.prevent="handleImageWheel"
+          @pointerdown="handleImagePointerDown"
+          @pointermove="handleImagePointerMove"
+          @pointerup="handleImagePointerUp"
+          @pointercancel="handleImagePointerUp"
+          @dblclick="imageZoom > 1 ? resetImageZoom() : setImageZoom(2.5)"
+        >
+          <img
+            :src="activeModalImage"
+            :alt="store.product?.[`name_${locale}`] || 'Product image'"
+            class="image-modal-img"
+            :style="{ transform: imageModalTransform }"
+            draggable="false"
+          />
+        </div>
+
+        <div v-if="images.length > 1" class="image-modal-thumbs">
+          <button
+            v-for="(img, index) in images"
+            :key="img"
+            type="button"
+            class="image-modal-thumb"
+            :class="{ 'image-modal-thumb-active': index === activeImageIndex }"
+            @click="selectModalImage(index)"
+          >
+            <img :src="img" alt="" />
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div
       v-if="orderModalOpen"
       class="order-modal-overlay"
@@ -2947,8 +3231,8 @@ onBeforeUnmount(() => {
 
 .detail-gallery-stage {
   width: 100%;
-  aspect-ratio: 16 / 9;
-  height: calc(100cqw * 9 / 16 + 70px);
+  aspect-ratio: 4 / 3;
+  height: calc(100cqw * 3 / 4 + 70px);
   padding: 0;
   border-radius: 30px;
   border: 1px solid var(--detail-border);
@@ -2985,7 +3269,7 @@ onBeforeUnmount(() => {
 
 .detail-thumb {
   width: 112px;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 4 / 3;
   border-color: var(--detail-border);
   background: var(--detail-surface);
   flex-shrink: 0;
@@ -3290,11 +3574,11 @@ onBeforeUnmount(() => {
   min-width: 0;
   padding: 0.92rem 1rem;
   border-radius: 20px;
-  border: 1px solid rgba(72, 122, 93, 0.2);
-  background: linear-gradient(135deg, #eef8f1 0%, #d8efe1 100%);
+  border: 1px solid rgba(24, 48, 79, 0.24);
+  background: #ffffff;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.84),
-    0 10px 22px rgba(31, 101, 70, 0.08);
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 12px 28px rgba(24, 48, 79, 0.12);
 }
 
 .detail-credit-payment-icon {
@@ -3304,9 +3588,9 @@ onBeforeUnmount(() => {
   width: 42px;
   height: 42px;
   border-radius: 14px;
-  background: #ffffff;
-  color: #1f6546;
-  box-shadow: inset 0 0 0 1px rgba(31, 101, 70, 0.12);
+  background: #eff6ff;
+  color: #18304f;
+  box-shadow: inset 0 0 0 1px rgba(24, 48, 79, 0.14);
 }
 
 .detail-credit-inline-value {
@@ -3316,18 +3600,18 @@ onBeforeUnmount(() => {
   font-size: clamp(1.05rem, 2vw, 1.22rem);
   line-height: 1.08;
   font-weight: 800;
-  color: #184b33;
+  color: #18304f;
   font-variant-numeric: tabular-nums;
 }
 
 .detail-credit-inline-value small {
-  color: rgba(24, 75, 51, 0.7);
+  color: rgba(24, 48, 79, 0.68);
   font-size: 0.74rem;
   font-weight: 700;
 }
 
 .detail-credit-inline-value .detail-credit-inline-label {
-  color: rgba(24, 75, 51, 0.72);
+  color: rgba(24, 48, 79, 0.68);
   font-size: 0.74rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -3448,10 +3732,10 @@ onBeforeUnmount(() => {
 }
 
 .credit-plan-btn {
-  border: 1px solid rgba(72, 122, 93, 0.18);
+  border: 1px solid rgba(24, 48, 79, 0.2);
   border-radius: 14px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, #f3faf5 100%);
-  color: #2f5d45;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, #eef2f5 100%);
+  color: #18304f;
   padding: 0.55rem 0.72rem;
   min-width: 88px;
   display: flex;
@@ -3461,6 +3745,7 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   font-size: 0.82rem;
   font-weight: 700;
+  box-shadow: 0 8px 18px rgba(24, 48, 79, 0.1);
   transition:
     border-color 0.2s ease,
     background 0.2s ease,
@@ -3468,21 +3753,22 @@ onBeforeUnmount(() => {
 }
 
 .credit-plan-btn:not(.credit-plan-btn-active):hover {
-  border-color: rgba(72, 122, 93, 0.3);
-  background: #f5fbf7;
+  border-color: rgba(24, 48, 79, 0.34);
+  background: #eef2f5;
+  box-shadow: 0 10px 22px rgba(24, 48, 79, 0.16);
 }
 
 .credit-plan-btn-active {
-  background: linear-gradient(135deg, #2f7a57 0%, #1f6546 100%);
+  background: linear-gradient(135deg, #18304f 0%, #12263d 100%);
   color: #ffffff;
-  border-color: #245f42;
-  box-shadow: 0 10px 24px rgba(31, 101, 70, 0.22);
+  border-color: #18304f;
+  box-shadow: 0 12px 28px rgba(24, 48, 79, 0.32);
 }
 
 .credit-plan-btn-active:hover {
-  background: linear-gradient(135deg, #2f7a57 0%, #1f6546 100%);
+  background: linear-gradient(135deg, #18304f 0%, #12263d 100%);
   color: #ffffff;
-  border-color: #245f42;
+  border-color: #18304f;
 }
 
 .credit-plan-btn-unselected {
@@ -3634,6 +3920,29 @@ onBeforeUnmount(() => {
     linear-gradient(180deg, rgba(249, 251, 253, 0.98), rgba(238, 243, 248, 0.98));
 }
 
+.detail-select-wrap-with-leading-icon .detail-select-input,
+.detail-select-wrap-with-leading-icon .detail-static-value {
+  padding-left: 3.55rem;
+}
+
+.detail-select-leading-icon {
+  position: absolute;
+  left: 0.9rem;
+  top: 50%;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: #eef2f5;
+  color: #18304f;
+  transform: translateY(-50%);
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(24, 48, 79, 0.12);
+}
+
 .detail-select-wrap-error {
   border-color: #dc2626 !important;
   background: linear-gradient(180deg, rgba(255, 250, 250, 0.98), rgba(254, 242, 242, 0.98)) !important;
@@ -3697,6 +4006,18 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
+}
+
+.detail-option-title-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  background: #eef2f5;
+  color: #18304f;
+  box-shadow: inset 0 0 0 1px rgba(24, 48, 79, 0.12);
 }
 
 .detail-option-grid-fuel {
@@ -3998,6 +4319,144 @@ onBeforeUnmount(() => {
   justify-content: center;
   padding: 1rem;
   background: rgba(8, 15, 24, 0.44);
+}
+
+.image-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10060;
+  display: grid;
+  place-items: center;
+  background: rgba(6, 12, 24, 0.82);
+  backdrop-filter: blur(8px);
+  padding: 18px;
+}
+
+.image-modal-shell {
+  width: min(1180px, 100%);
+  height: min(860px, calc(100vh - 36px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 12px;
+}
+
+.image-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #fff;
+}
+
+.image-modal-title {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.image-modal-title span {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.image-modal-title strong {
+  max-width: min(560px, 58vw);
+  overflow: hidden;
+  color: #fff;
+  font-size: 0.98rem;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.image-modal-actions button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.image-modal-actions button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.image-modal-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.image-modal-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  touch-action: none;
+  user-select: none;
+}
+
+.image-modal-img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  transform-origin: center;
+  transition: transform 0.08s linear;
+  cursor: grab;
+}
+
+.image-modal-img:active {
+  cursor: grabbing;
+}
+
+.image-modal-thumbs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.image-modal-thumb {
+  flex: 0 0 74px;
+  width: 74px;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 0;
+  opacity: 0.7;
+  transition:
+    border-color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.image-modal-thumb-active {
+  border-color: #fff;
+  opacity: 1;
+}
+
+.image-modal-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .order-modal-panel {
@@ -4427,7 +4886,7 @@ onBeforeUnmount(() => {
 .related-media {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 4 / 3;
   border-radius: 20px;
   border: 1px solid rgba(20, 35, 56, 0.08);
   background: var(--detail-surface-muted);
@@ -4592,6 +5051,42 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
+  .image-modal-overlay {
+    padding: 10px;
+  }
+
+  .image-modal-shell {
+    height: calc(100vh - 20px);
+    gap: 10px;
+  }
+
+  .image-modal-head {
+    align-items: flex-start;
+  }
+
+  .image-modal-title strong {
+    max-width: 42vw;
+    font-size: 0.86rem;
+  }
+
+  .image-modal-actions {
+    gap: 5px;
+  }
+
+  .image-modal-actions button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .image-modal-stage {
+    border-radius: 12px;
+  }
+
+  .image-modal-thumb {
+    flex-basis: 58px;
+    width: 58px;
+  }
+
   .detail-service-option {
     grid-template-columns: auto minmax(0, 1fr) 60px;
     gap: 0.7rem;

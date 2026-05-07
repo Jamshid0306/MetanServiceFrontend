@@ -12,6 +12,7 @@ import {
   formatCustomerPhone,
   getStoredCustomerAccessToken,
   getStoredCustomerSession,
+  normalizeCustomerPhone,
   storeCustomerSession,
 } from "@/lib/customerSession";
 
@@ -22,6 +23,7 @@ const customerSession = ref(null);
 const profileLoading = ref(false);
 const profileError = ref("");
 const languageOpen = ref(false);
+const orderStatusBadge = ref(null);
 const languages = [
   { code: "uz", label: "Uzbek", flag: uzFlag },
   { code: "ru", label: "Russkiy", flag: ruFlag },
@@ -49,6 +51,7 @@ const purchaseMenuItems = computed(() => [
     key: "orders",
     label: t("profile.orders"),
     icon: "bag",
+    badge: orderStatusBadge.value,
     action: () => router.push("/profile/orders"),
   },
   {
@@ -58,6 +61,186 @@ const purchaseMenuItems = computed(() => [
     action: () => router.push("/profile/favorites"),
   },
 ]);
+
+const orderBadgeStorageKey = computed(() => {
+  const phone = normalizeCustomerPhone(customerSession.value?.phone || "");
+  return phone ? `profile_order_status_badge:${phone}` : "";
+});
+
+const getCustomerStorage = () =>
+  typeof window === "undefined" ? null : window.localStorage;
+
+const pendingOrderStatuses = new Set([
+  "created",
+  "draft",
+  "in_process",
+  "in_progress",
+  "jarayonda",
+  "new",
+  "on_review",
+  "pending",
+  "prepared",
+  "process",
+  "processing",
+  "review",
+  "under_review",
+]);
+
+const successfulOrderStatuses = new Set([
+  "active",
+  "approved",
+  "completed",
+  "success",
+  "successful",
+  "succeed",
+  "succeeded",
+  "suceed",
+  "suceeded",
+]);
+
+const cancelledOrderStatuses = new Set([
+  "canceled",
+  "cancelled",
+  "rejected",
+  "refused",
+]);
+
+const orderIsInstallment = (order = {}) =>
+  String(order?.payment_method || "").trim().toLowerCase() === "myid" ||
+  Number(order?.myid_result_code || 0) === 1 ||
+  (order?.products || []).some((product) => Boolean(product?.credit_plan));
+
+const getIcanCreditStatusValue = (order = {}) =>
+  String(order?.ican_credit?.status || "").trim().toLowerCase();
+
+const getIcanCreditStatusLabelValue = (order = {}) =>
+  String(order?.ican_credit?.status_label || "").trim().toLowerCase();
+
+const getProfileOrderStatusValue = (order = {}) => {
+  const icanStatus = getIcanCreditStatusValue(order);
+  if (orderIsInstallment(order) && icanStatus) {
+    return icanStatus;
+  }
+
+  if (orderIsInstallment(order) && order?.credit_submitted) {
+    return "pending";
+  }
+
+  return String(order?.status || "").trim().toLowerCase();
+};
+
+const getProfileOrderBadge = (order = {}) => {
+  const status = getProfileOrderStatusValue(order);
+  const statusLabel = getIcanCreditStatusLabelValue(order);
+  if (!status && !statusLabel) {
+    return null;
+  }
+
+  if (
+    successfulOrderStatuses.has(status) ||
+    statusLabel.includes("tasdiq") ||
+    statusLabel.includes("одобр") ||
+    statusLabel.includes("success")
+  ) {
+    return { label: t("profile.orderStatusApproved"), tone: "success", status };
+  }
+
+  if (
+    pendingOrderStatuses.has(status) ||
+    statusLabel.includes("jarayon") ||
+    statusLabel.includes("process") ||
+    statusLabel.includes("рассмотр")
+  ) {
+    return { label: t("profile.orderStatusInProgress"), tone: "warning", status };
+  }
+
+  if (cancelledOrderStatuses.has(status)) {
+    return { label: t("profile.creditStatusCancelled"), tone: "error", status };
+  }
+
+  return null;
+};
+
+const getOrderSortTime = (order = {}) => {
+  const date = new Date(String(order?.created_at || "").replace(" ", "T"));
+  if (!Number.isNaN(date.getTime())) {
+    return date.getTime();
+  }
+
+  const id = Number(order?.id || 0);
+  return Number.isFinite(id) ? id : 0;
+};
+
+const getLatestProfileOrder = (orders = []) => {
+  const sortedOrders = [...orders].sort((a, b) => getOrderSortTime(b) - getOrderSortTime(a));
+  return (
+    sortedOrders.find(
+      (order) =>
+        orderIsInstallment(order) &&
+        (getIcanCreditStatusValue(order) || order?.credit_submitted)
+    ) ||
+    sortedOrders[0] ||
+    null
+  );
+};
+
+const loadCachedOrderBadge = () => {
+  const storageKey = orderBadgeStorageKey.value;
+  const rawBadge = storageKey ? getCustomerStorage()?.getItem(storageKey) : "";
+  if (!rawBadge) {
+    orderStatusBadge.value = null;
+    return;
+  }
+
+  try {
+    const badge = JSON.parse(rawBadge);
+    if (badge?.label && badge?.tone) {
+      orderStatusBadge.value = badge;
+    }
+  } catch {
+    getCustomerStorage()?.removeItem(storageKey);
+  }
+};
+
+const storeOrderBadge = (badge = null) => {
+  const storageKey = orderBadgeStorageKey.value;
+  const storage = getCustomerStorage();
+  if (!storageKey || !storage) {
+    return;
+  }
+
+  if (!badge) {
+    storage.removeItem(storageKey);
+    orderStatusBadge.value = null;
+    return;
+  }
+
+  orderStatusBadge.value = badge;
+  storage.setItem(storageKey, JSON.stringify(badge));
+};
+
+const loadOrderStatusBadge = async () => {
+  const phone = normalizeCustomerPhone(customerSession.value?.phone || "");
+  if (!phone) {
+    orderStatusBadge.value = null;
+    return;
+  }
+
+  loadCachedOrderBadge();
+
+  try {
+    const response = await apiClient.get("/payments/orders", {
+      params: { phone },
+      skipAuth: true,
+      skipRetry: true,
+    });
+    const orders = Array.isArray(response.data?.orders) ? response.data.orders : [];
+    const badge = getProfileOrderBadge(getLatestProfileOrder(orders));
+    storeOrderBadge(badge);
+  } catch {
+    loadCachedOrderBadge();
+  }
+};
 
 const changeLanguage = (lang) => {
   locale.value = lang;
@@ -106,7 +289,9 @@ onMounted(async () => {
     return;
   }
 
+  loadCachedOrderBadge();
   await loadCustomerProfile();
+  await loadOrderStatusBadge();
 
   if (typeof window !== "undefined") {
     window.addEventListener(CUSTOMER_SESSION_EVENT, syncCustomerSession);
@@ -161,6 +346,13 @@ onUnmounted(() => {
             </svg>
           </span>
           <span>{{ item.label }}</span>
+          <span
+            v-if="item.badge"
+            class="profile-menu-badge"
+            :class="`is-${item.badge.tone}`"
+          >
+            {{ item.badge.label }}
+          </span>
           <span class="profile-menu-chevron">›</span>
         </button>
       </div>
@@ -315,7 +507,7 @@ onUnmounted(() => {
 
 .profile-menu-row {
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) 18px;
+  grid-template-columns: 32px minmax(0, 1fr) auto 18px;
   align-items: center;
   gap: 10px;
   width: 100%;
@@ -328,6 +520,38 @@ onUnmounted(() => {
   text-align: left;
   font-weight: 800;
   font-size: 0.92rem;
+}
+
+.profile-menu-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  max-width: 132px;
+  min-height: 26px;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-menu-badge.is-success {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.profile-menu-badge.is-warning {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.profile-menu-badge.is-error {
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
 .profile-menu-row:last-child {
@@ -392,6 +616,7 @@ onUnmounted(() => {
 }
 
 .profile-menu-chevron {
+  grid-column: 4;
   color: #c7cbd1;
   font-size: 1.35rem;
   line-height: 1;
@@ -453,6 +678,17 @@ onUnmounted(() => {
 @media (max-width: 720px) {
   .profile-page {
     padding-top: 14px;
+  }
+
+  .profile-menu-row {
+    grid-template-columns: 32px minmax(0, 1fr) auto 16px;
+    gap: 8px;
+  }
+
+  .profile-menu-badge {
+    max-width: 104px;
+    padding-inline: 8px;
+    font-size: 0.68rem;
   }
 }
 </style>

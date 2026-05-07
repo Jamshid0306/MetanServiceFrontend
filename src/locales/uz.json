@@ -373,6 +373,8 @@
     "ordersSubtitle": "Nasiyaga rasmiylashtirilgan va bir yo'la to'langan mahsulotlaringiz shu yerda turadi.",
     "ordersLoading": "Buyurtmalar yuklanmoqda...",
     "ordersLoadError": "Buyurtmalarni yuklab bo'lmadi.",
+    "orderStatusInProgress": "Jarayonda",
+    "orderStatusApproved": "Tasdiqlandi",
     "emptyOrdersTitle": "Hali buyurtma yo'q",
     "emptyOrdersText": "Mahsulot tanlab xaridni yakunlaganingizdan keyin u shu yerda ko'rinadi.",
     "orderNumber": "Buyurtma",
