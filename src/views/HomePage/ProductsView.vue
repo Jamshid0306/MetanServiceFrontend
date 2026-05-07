@@ -24,6 +24,12 @@ const normalizeImages = (images) => resolveAssetUrls(images);
 const formatPrice = (price) => formatPriceValue(price);
 const getProductDisplayPrice = (product) =>
   getProductDefaultPrice(product, locale.value);
+const getProductDisplayName = (product) =>
+  product?.[`short_name_${locale.value}`] ||
+  product?.[`name_${locale.value}`] ||
+  product?.name_ru ||
+  product?.name_uz ||
+  "";
 const INSTALLMENT_MONTHS = 12;
 const getProductInstallment = (product) =>
   getInstallmentPlan(
@@ -135,11 +141,13 @@ const filteredProducts = computed(() => {
                 alt="Image"
                 loading="lazy"
                 class="product-image"
-                @click.stop="goToDetail(product.id, { openImage: true })"
               />
             </div>
           </div>
           <div class="card-footer">
+            <h3 class="product-title">
+              {{ getProductDisplayName(product) }}
+            </h3>
             <p class="product-price">
               {{ formatPrice(getProductDisplayPrice(product)) }}
             </p>
@@ -152,7 +160,7 @@ const filteredProducts = computed(() => {
 
             <button
               @click="handleClick(product)"
-              class="add-btn relative w-full flex-1 cursor-pointer flex items-center justify-center gap-2 text-white py-2.5 rounded-xl font-medium overflow-hidden"
+              class="add-btn relative mt-[10px] w-full cursor-pointer flex items-center justify-center gap-2 text-white py-1.5 rounded-xl font-medium overflow-hidden"
             >
               <span class="transition-all duration-300 max-xl:text-[15px] max-md:text-[10px]">
                 {{ actionLabel() }}
@@ -241,17 +249,14 @@ const filteredProducts = computed(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 20px;
-  border: 1px solid rgba(20, 35, 56, 0.1);
+  border-radius: 8px;
+  border: none;
   background: #ffffff;
-  transition:
-    transform 0.2s ease,
-    border-color 0.3s ease;
+  transition: transform 0.2s ease;
 }
 
 .product-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(20, 35, 56, 0.18);
 }
 
 .card-body {
@@ -262,8 +267,10 @@ const filteredProducts = computed(() => {
 .product-media {
   position: relative;
   width: 100%;
+  margin: 0;
   aspect-ratio: 1 / 1;
-  border-bottom: 1px solid rgba(20, 35, 56, 0.08);
+  border: none;
+  border-radius: 8px;
   background: #f3f5f7;
   overflow: hidden;
 }
@@ -290,6 +297,7 @@ const filteredProducts = computed(() => {
   width: 100%;
   height: 100%;
   display: block;
+  border-radius: 8px;
   object-fit: cover;
   object-position: center;
   transition: transform 0.45s ease;
@@ -300,25 +308,27 @@ const filteredProducts = computed(() => {
 }
 
 .product-title {
-  margin-top: 12px;
+  margin: 0;
   text-align: left;
   font-size: 0.95rem;
   line-height: 1.45;
   font-weight: 700;
   color: #1b2d44;
-  min-height: 46px;
 }
 
 .card-footer {
   margin-top: auto;
   padding: 10px 12px 12px;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
 }
 
 .product-price {
   color: #142338;
   font-size: 1.02rem;
   font-weight: 800;
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.6rem;
 }
 
 .product-installment {
@@ -344,6 +354,8 @@ const filteredProducts = computed(() => {
 .add-btn {
   background: #18304f;
   border: 1px solid rgba(20, 35, 56, 0.06);
+  margin-top: 10px;
+  min-height: 34px;
   transition: transform 0.25s ease;
 }
 
@@ -373,7 +385,6 @@ const filteredProducts = computed(() => {
 @media (max-width: 1024px) {
   .product-title {
     font-size: 0.88rem;
-    min-height: 42px;
   }
 
   .product-price {
@@ -391,25 +402,87 @@ const filteredProducts = computed(() => {
 }
 
 @media (max-width: 640px) {
+  .home-products-section {
+    padding-bottom: 2.25rem;
+  }
+
+  .home-products-section :deep(.container) {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .products-grid {
+    gap: 14px 12px;
+    align-items: stretch;
+  }
+
   .product-card {
     min-height: 100%;
+    border-radius: 8px;
   }
 
   .card-footer {
-    padding: 8px 12px 14px;
+    padding: 8px 8px 10px;
   }
 
-  /* Mobil ko‘rinishda narx / oylik tolov / batafsil tugmasini yaqinlashtirish */
+  .product-media {
+    width: 100%;
+    margin: 0;
+    border-radius: 8px;
+  }
+
+  .product-chip {
+    left: 7px;
+    top: 7px;
+    padding: 3px 7px;
+    font-size: 9px;
+  }
+
+  .product-title {
+    order: 3;
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.28;
+    font-weight: 600;
+    color: #314159;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
   .product-price {
-    margin-bottom: 0.25rem;
+    order: 1;
+    margin-bottom: 0.4rem;
+    font-size: 1rem;
+    line-height: 1.1;
   }
 
   .product-installment {
-    margin-bottom: 0.35rem;
+    order: 2;
+    align-self: flex-start;
+    width: auto;
+    max-width: 100%;
+    margin-bottom: 0.45rem;
+    border-radius: 8px;
+    padding: 0.28rem 0.4rem;
+    font-size: 0.66rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .add-btn {
-    margin-top: 0.1rem;
+    order: 4;
+    min-height: 30px;
+    border-radius: 10px;
+    padding-top: 0.28rem;
+    padding-bottom: 0.28rem;
+  }
+
+  .cart-icon {
+    left: 10px;
+    width: 18px;
+    height: 18px;
   }
 }
 
@@ -420,10 +493,6 @@ const filteredProducts = computed(() => {
 
   .section-title {
     margin-bottom: 0;
-  }
-
-  .products-grid {
-    row-gap: 0;
   }
 }
 </style>

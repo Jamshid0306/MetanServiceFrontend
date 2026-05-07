@@ -61,6 +61,12 @@ const getProductOrder = (product) => {
 
 const getProductDisplayPrice = (product) =>
   getProductDefaultPrice(product, locale.value);
+const getProductDisplayName = (product) =>
+  product?.[`short_name_${locale.value}`] ||
+  product?.[`name_${locale.value}`] ||
+  product?.name_ru ||
+  product?.name_uz ||
+  "";
 
 const maxPrice = computed(() => {
   const prices = filterStore.products
@@ -324,13 +330,15 @@ onMounted(async () => {
                   :src="normalizeImages(product.images)[0]"
                   :alt="product[`name_${locale}`]"
                   class="catalog-image"
-                  @click.stop="goToDetail(product.id, { openImage: true })"
                 />
               </div>
               <div class="catalog-copy">
                 <div class="catalog-meta">
                   <span class="catalog-id">#{{ product.id }}</span>
                 </div>
+                <h3 class="catalog-title">
+                  {{ getProductDisplayName(product) }}
+                </h3>
                 <div class="catalog-footer">
                   <p class="catalog-price">
                     {{ formatPrice(getProductDisplayPrice(product)) }}
@@ -519,21 +527,18 @@ onMounted(async () => {
 
 .catalog-card {
   border-radius: 20px;
-  border: 1px solid rgba(20, 35, 56, 0.1);
+  border: none;
   background: #ffffff;
   padding: 0;
   display: flex;
   align-items: center;
   gap: 0.9rem;
-  overflow: hidden;
-  transition:
-    transform 0.3s ease,
-    border-color 0.3s ease;
+  overflow: visible;
+  transition: transform 0.3s ease;
 }
 
 .catalog-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(20, 35, 56, 0.18);
 }
 
 .catalog-main {
@@ -568,8 +573,10 @@ onMounted(async () => {
 .catalog-media {
   flex: 0 0 156px;
   width: 156px;
+  margin: 8px 0 8px 8px;
   aspect-ratio: 1 / 1;
-  border-right: 1px solid rgba(20, 35, 56, 0.08);
+  border: none;
+  border-radius: 6px;
   background: #f3f5f7;
   overflow: hidden;
 }
@@ -578,6 +585,7 @@ onMounted(async () => {
   width: 100%;
   height: 100%;
   display: block;
+  border-radius: 6px;
   object-fit: cover;
   transition: transform 0.45s ease;
 }
@@ -626,7 +634,7 @@ onMounted(async () => {
 .catalog-btn {
   flex: 0 0 auto;
   min-width: 132px;
-  height: 44px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -664,9 +672,6 @@ onMounted(async () => {
   .catalog-card {
     padding: 0;
     border-radius: 0;
-    border-left: none;
-    border-right: none;
-    border-top: none;
     gap: 0.6rem;
   }
 
@@ -681,6 +686,8 @@ onMounted(async () => {
   .catalog-media {
     width: 112px;
     flex-basis: 112px;
+    margin: 6px 0 6px 6px;
+    border-radius: 6px;
     background: #f7f7f7;
   }
 
@@ -712,9 +719,9 @@ onMounted(async () => {
     margin-left: auto;
     margin-right: 10px;
     align-self: center;
-    width: 38px;
-    min-width: 38px;
-    height: 38px;
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
     border: none;
     background: transparent;
     color: #18304f;

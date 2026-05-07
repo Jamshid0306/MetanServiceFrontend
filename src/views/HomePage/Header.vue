@@ -12,7 +12,7 @@ import heroSupport from "@/assets/images/hero-support.jpg";
 import imageOne from "@/assets/images/1.png";
 import imageTwo from "@/assets/images/2.png";
 import imageThree from "@/assets/images/3.png";
-import logoImage from "@/assets/images/logo.jpg";
+import imageFour from "@/assets/images/4.png";
 import "swiper/css";
 import "swiper/css/pagination";
 
@@ -69,7 +69,7 @@ onMounted(async () => {
 <template>
   <div
     id="header"
-    class="mx-auto mb-16 md:mb-24 mt-[72px] max-w-[1440px] px-4 sm:px-5 lg:px-6 select-none"
+    class="mx-auto mb-16 md:mb-24 max-[600px]:mb-0 mt-[72px] max-w-[1440px] px-4 sm:px-5 lg:px-6 select-none"
   >
     <section class="hero-shell">
       <Swiper
@@ -108,7 +108,7 @@ onMounted(async () => {
         <img :src="imageOne" alt="Brend rasm 1" class="hero-brand-image" />
         <img :src="imageTwo" alt="Brend rasm 2" class="hero-brand-image" />
         <img :src="imageThree" alt="Brend rasm 3" class="hero-brand-image" />
-        <img :src="logoImage" alt="Metan Service logo" class="hero-brand-image" />
+        <img :src="imageFour" alt="Metan Service logo" class="hero-brand-image" />
       </div>
     </section>
   </div>
@@ -122,7 +122,7 @@ onMounted(async () => {
   border: 1px solid rgba(20, 35, 56, 0.1);
   background: rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(10px);
-  padding: 0.75rem;
+  padding: 0.75rem 0.75rem 0;
 }
 
 .hero-swiper {
@@ -210,6 +210,7 @@ onMounted(async () => {
   width: 88px;
   height: 88px;
   aspect-ratio: 1 / 1;
+  display: block;
   border-radius: 14px;
   border: 1px solid rgba(20, 35, 56, 0.08);
   background: #f6f8fb;
@@ -241,7 +242,7 @@ onMounted(async () => {
 @media (max-width: 700px) {
   .hero-shell {
     border-radius: 22px;
-    padding: 0.6rem;
+    padding: 0.6rem 0.6rem 0;
   }
 
   .hero-swiper {
@@ -276,6 +277,25 @@ onMounted(async () => {
     height: 64px;
     border-radius: 12px;
     padding: 0.2rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .hero-shell {
+    padding-bottom: 0;
+  }
+
+  .hero-brand-strip {
+    justify-content: stretch;
+    margin-bottom: 0;
+  }
+
+  .hero-brand-image {
+    flex: 0 0 calc((100% - 1.05rem) / 4);
+    width: calc((100% - 1.05rem) / 4);
+    height: auto;
+    min-width: 0;
+    aspect-ratio: 1 / 1;
   }
 }
 

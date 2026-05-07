@@ -98,6 +98,8 @@ const imageModalOpen = ref(false);
 const activeImageIndex = ref(0);
 const imageZoom = ref(1);
 const imagePan = ref({ x: 0, y: 0 });
+const imageModalStageRef = ref(null);
+const isImageDragging = ref(false);
 const orderSubmitting = ref(false);
 const orderError = ref("");
 const orderForm = ref(createEmptyOrderForm());
@@ -1203,19 +1205,81 @@ const goToSlide = (index) => {
 const modalPointers = new Map();
 let pinchStartDistance = 0;
 let pinchStartZoom = 1;
+let pinchStartPan = { x: 0, y: 0 };
+let pinchStartFocal = { x: 0, y: 0 };
 
 const clampImageZoom = (value) => Math.min(Math.max(Number(value) || 1, 1), 5);
+const clampImagePan = (pan, zoom = imageZoom.value, stage = imageModalStageRef.value) => {
+  if (!stage || zoom <= 1) {
+    return { x: 0, y: 0 };
+  }
+
+  const rect = stage.getBoundingClientRect();
+  const maxX = (rect.width * (zoom - 1)) / 2;
+  const maxY = (rect.height * (zoom - 1)) / 2;
+
+  return {
+    x: Math.min(Math.max(pan.x, -maxX), maxX),
+    y: Math.min(Math.max(pan.y, -maxY), maxY),
+  };
+};
+
+const getStageFocalPoint = (event, stage = imageModalStageRef.value) => {
+  if (!stage) {
+    return { x: 0, y: 0 };
+  }
+
+  const rect = stage.getBoundingClientRect();
+  if (!event) {
+    return { x: 0, y: 0 };
+  }
+
+  return {
+    x: event.clientX - rect.left - rect.width / 2,
+    y: event.clientY - rect.top - rect.height / 2,
+  };
+};
+
+const getPointerFocalPoint = (stage = imageModalStageRef.value) => {
+  if (!stage || modalPointers.size < 2) {
+    return { x: 0, y: 0 };
+  }
+
+  const rect = stage.getBoundingClientRect();
+  const points = [...modalPointers.values()];
+  return {
+    x: (points[0].x + points[1].x) / 2 - rect.left - rect.width / 2,
+    y: (points[0].y + points[1].y) / 2 - rect.top - rect.height / 2,
+  };
+};
 
 const resetImageZoom = () => {
   imageZoom.value = 1;
   imagePan.value = { x: 0, y: 0 };
+  isImageDragging.value = false;
 };
 
-const setImageZoom = (value) => {
-  imageZoom.value = clampImageZoom(value);
-  if (imageZoom.value <= 1) {
+const setImageZoom = (
+  value,
+  focalPoint = { x: 0, y: 0 },
+  baseZoom = imageZoom.value,
+  basePan = imagePan.value
+) => {
+  const nextZoom = clampImageZoom(value);
+  if (nextZoom <= 1) {
+    imageZoom.value = 1;
     imagePan.value = { x: 0, y: 0 };
+    return;
   }
+
+  const safeBaseZoom = Math.max(baseZoom, 1);
+  const nextPan = {
+    x: focalPoint.x - ((focalPoint.x - basePan.x) / safeBaseZoom) * nextZoom,
+    y: focalPoint.y - ((focalPoint.y - basePan.y) / safeBaseZoom) * nextZoom,
+  };
+
+  imageZoom.value = nextZoom;
+  imagePan.value = clampImagePan(nextPan, nextZoom);
 };
 
 const zoomImageIn = () => setImageZoom(imageZoom.value + 0.35);
@@ -1244,6 +1308,7 @@ const openImageModal = (index = 0, shouldSyncRoute = true) => {
 const closeImageModal = () => {
   imageModalOpen.value = false;
   modalPointers.clear();
+  pinchStartDistance = 0;
   resetImageZoom();
 
   if (route.query.image !== undefined) {
@@ -1289,7 +1354,7 @@ const getPointerDistance = () => {
 
 const handleImageWheel = (event) => {
   const direction = event.deltaY > 0 ? -0.22 : 0.22;
-  setImageZoom(imageZoom.value + direction);
+  setImageZoom(imageZoom.value + direction, getStageFocalPoint(event, event.currentTarget));
 };
 
 const handleImagePointerDown = (event) => {
@@ -1306,6 +1371,10 @@ const handleImagePointerDown = (event) => {
   if (modalPointers.size === 2) {
     pinchStartDistance = getPointerDistance();
     pinchStartZoom = imageZoom.value;
+    pinchStartPan = { ...imagePan.value };
+    pinchStartFocal = getPointerFocalPoint(event.currentTarget);
+  } else if (imageZoom.value > 1) {
+    isImageDragging.value = true;
   }
 };
 
@@ -1319,15 +1388,20 @@ const handleImagePointerMove = (event) => {
   pointer.y = event.clientY;
 
   if (modalPointers.size === 2 && pinchStartDistance > 0) {
-    setImageZoom(pinchStartZoom * (getPointerDistance() / pinchStartDistance));
+    setImageZoom(
+      pinchStartZoom * (getPointerDistance() / pinchStartDistance),
+      pinchStartFocal,
+      pinchStartZoom,
+      pinchStartPan
+    );
     return;
   }
 
   if (modalPointers.size === 1 && imageZoom.value > 1) {
-    imagePan.value = {
+    imagePan.value = clampImagePan({
       x: pointer.startPanX + event.clientX - pointer.startX,
       y: pointer.startPanY + event.clientY - pointer.startY,
-    };
+    });
   }
 };
 
@@ -1336,6 +1410,8 @@ const handleImagePointerUp = (event) => {
   if (modalPointers.size < 2) {
     pinchStartDistance = 0;
   }
+
+  isImageDragging.value = modalPointers.size === 1 && imageZoom.value > 1;
 
   if (modalPointers.size === 1) {
     const [pointer] = modalPointers.values();
@@ -2702,7 +2778,7 @@ onBeforeUnmount(() => {
           class="related-card group"
         >
           <div
-            @click="goToDetail(product.id, { openImage: true })"
+            @click="goToDetail(product.id)"
             class="related-media cursor-pointer"
           >
             <span class="related-chip">#{{ product.id }}</span>
@@ -2768,18 +2844,20 @@ onBeforeUnmount(() => {
         </div>
 
         <div
+          ref="imageModalStageRef"
           class="image-modal-stage"
           @wheel.prevent="handleImageWheel"
           @pointerdown="handleImagePointerDown"
           @pointermove="handleImagePointerMove"
           @pointerup="handleImagePointerUp"
           @pointercancel="handleImagePointerUp"
-          @dblclick="imageZoom > 1 ? resetImageZoom() : setImageZoom(2.5)"
+          @dblclick="imageZoom > 1 ? resetImageZoom() : setImageZoom(2.5, getStageFocalPoint($event, $event.currentTarget))"
         >
           <img
             :src="activeModalImage"
             :alt="store.product?.[`name_${locale}`] || 'Product image'"
             class="image-modal-img"
+            :class="{ 'image-modal-img-dragging': isImageDragging }"
             :style="{ transform: imageModalTransform }"
             draggable="false"
           />
@@ -4418,8 +4496,13 @@ onBeforeUnmount(() => {
   height: auto;
   object-fit: contain;
   transform-origin: center;
-  transition: transform 0.08s linear;
+  transition: transform 0.16s ease-out;
+  will-change: transform;
   cursor: grab;
+}
+
+.image-modal-img-dragging {
+  transition: none;
 }
 
 .image-modal-img:active {

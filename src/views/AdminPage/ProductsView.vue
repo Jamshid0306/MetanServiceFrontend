@@ -76,6 +76,7 @@ const createInitialProduct = () => ({
   initial_payment_enabled: false,
   initial_payment_amount: "",
   name: { uz: "", ru: "" },
+  shortName: { uz: "", ru: "" },
   description: { uz: "", ru: "" },
   characteristic: { uz: "", ru: "" },
   // Display order for frontend listing.
@@ -404,6 +405,10 @@ const openUpdateModal = (product) => {
       uz: product.name_uz || "",
       ru: product.name_ru || "",
     },
+    shortName: {
+      uz: product.short_name_uz || "",
+      ru: product.short_name_ru || "",
+    },
     description: {
       uz: product.description_uz || "",
       ru: product.description_ru || "",
@@ -663,6 +668,8 @@ const addOrUpdateProduct = async () => {
   const serializedOptions = serializeProductOptions(newProduct.value.options);
   const minimumOptionPrice = getMinimumOptionPrice(serializedOptions);
   const fallbackNameEn = newProduct.value.name.ru || newProduct.value.name.uz || "";
+  const fallbackShortNameEn =
+    newProduct.value.shortName?.ru || newProduct.value.shortName?.uz || "";
   const fallbackDescriptionEn =
     newProduct.value.description?.ru || newProduct.value.description?.uz || "";
   const fallbackCharacteristicEn =
@@ -671,6 +678,9 @@ const addOrUpdateProduct = async () => {
   formData.append("name_uz", newProduct.value.name.uz || "");
   formData.append("name_ru", newProduct.value.name.ru || "");
   formData.append("name_en", fallbackNameEn);
+  formData.append("short_name_uz", newProduct.value.shortName?.uz || "");
+  formData.append("short_name_ru", newProduct.value.shortName?.ru || "");
+  formData.append("short_name_en", fallbackShortNameEn);
 
   formData.append("description_uz", newProduct.value.description?.uz || "");
   formData.append("description_ru", newProduct.value.description?.ru || "");
@@ -817,7 +827,14 @@ const filteredProducts = computed(() => {
   return products.filter((p) => {
     const nameRu = String(p.name_ru || "").toLowerCase();
     const nameUz = String(p.name_uz || "").toLowerCase();
-    return nameRu.includes(q) || nameUz.includes(q);
+    const shortNameRu = String(p.short_name_ru || "").toLowerCase();
+    const shortNameUz = String(p.short_name_uz || "").toLowerCase();
+    return (
+      nameRu.includes(q) ||
+      nameUz.includes(q) ||
+      shortNameRu.includes(q) ||
+      shortNameUz.includes(q)
+    );
   });
 });
 const totalPages = computed(() => {
@@ -981,7 +998,7 @@ const toggleProductActive = async (product) => {
               <span class="product-id-chip">#{{ product.id }}</span>
             </div>
             <div class="product-title">
-              {{ product.name_ru }}
+              {{ product.short_name_ru || product.name_ru }}
             </div>
             <div class="product-description">
               {{ product.description_ru }}
@@ -1351,6 +1368,11 @@ const toggleProductActive = async (product) => {
               <input
                 v-model="newProduct.name[currentLang]"
                 :placeholder="`Название (${currentLang.toUpperCase()})`"
+                class="editor-field"
+              />
+              <input
+                v-model="newProduct.shortName[currentLang]"
+                :placeholder="`Короткое название (${currentLang.toUpperCase()})`"
                 class="editor-field"
               />
               <textarea

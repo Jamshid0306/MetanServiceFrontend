@@ -54,6 +54,8 @@ const compactSearchText = (value = "") => normalizeSearchText(value).replace(/\s
 const getProductSearchFields = (product = {}) =>
   [
     String(product?.id || ""),
+    String(product?.short_name_uz || ""),
+    String(product?.short_name_ru || ""),
     String(product?.name_uz || ""),
     String(product?.name_ru || ""),
     String(product?.characteristic_uz || ""),
@@ -90,6 +92,7 @@ export const scoreProductSearch = (product, rawQuery, locale = "uz") => {
   const compactQuery = compactSearchText(query);
   const transliteratedQuery = normalizeSearchText(transliterateCyrillicToLatin(query));
   const compactTransliteratedQuery = compactSearchText(transliteratedQuery);
+  const preferredShortName = String(product?.[`short_name_${locale}`] || "");
   const preferredName = String(product?.[`name_${locale}`] || "");
 
   const scoreField = (field = "", weight = 1) => {
@@ -111,7 +114,10 @@ export const scoreProductSearch = (product, rawQuery, locale = "uz") => {
   };
 
   let total =
+    scoreField(preferredShortName, 2.5) +
     scoreField(preferredName, 2.2) +
+    scoreField(product?.short_name_ru, 2.1) +
+    scoreField(product?.short_name_uz, 2) +
     scoreField(product?.name_ru, 1.9) +
     scoreField(product?.name_uz, 1.8) +
     scoreField(product?.characteristic_ru, 0.7) +
