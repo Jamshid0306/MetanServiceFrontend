@@ -521,10 +521,11 @@ onMounted(async () => {
   border-radius: 20px;
   border: 1px solid rgba(20, 35, 56, 0.1);
   background: #ffffff;
-  padding: 10px 12px;
+  padding: 0;
   display: flex;
   align-items: center;
   gap: 0.9rem;
+  overflow: hidden;
   transition:
     transform 0.3s ease,
     border-color 0.3s ease;
@@ -546,6 +547,7 @@ onMounted(async () => {
 .catalog-copy {
   min-width: 0;
   flex: 1 1 auto;
+  padding: 10px 0;
 }
 
 .catalog-meta {
@@ -566,9 +568,8 @@ onMounted(async () => {
 .catalog-media {
   flex: 0 0 156px;
   width: 156px;
-  aspect-ratio: 4 / 3;
-  border-radius: 16px;
-  border: 1px solid rgba(20, 35, 56, 0.08);
+  aspect-ratio: 1 / 1;
+  border-right: 1px solid rgba(20, 35, 56, 0.08);
   background: #f3f5f7;
   overflow: hidden;
 }
@@ -577,7 +578,7 @@ onMounted(async () => {
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: contain;
+  object-fit: cover;
   transition: transform 0.45s ease;
 }
 
@@ -634,6 +635,7 @@ onMounted(async () => {
   border: 1px solid rgba(20, 35, 56, 0.08);
   background: #18304f;
   color: #ffffff;
+  margin-right: 12px;
   padding: 0 0.95rem;
   transition: transform 0.25s ease;
 }
@@ -660,7 +662,7 @@ onMounted(async () => {
   }
 
   .catalog-card {
-    padding: 12px 10px;
+    padding: 0;
     border-radius: 0;
     border-left: none;
     border-right: none;
@@ -679,8 +681,11 @@ onMounted(async () => {
   .catalog-media {
     width: 112px;
     flex-basis: 112px;
-    border-radius: 14px;
     background: #f7f7f7;
+  }
+
+  .catalog-copy {
+    padding: 8px 0;
   }
 
   .catalog-title {
@@ -705,6 +710,7 @@ onMounted(async () => {
 
   .catalog-btn {
     margin-left: auto;
+    margin-right: 10px;
     align-self: center;
     width: 38px;
     min-width: 38px;

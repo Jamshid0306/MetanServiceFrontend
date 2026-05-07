@@ -244,7 +244,6 @@ const filteredProducts = computed(() => {
   border-radius: 20px;
   border: 1px solid rgba(20, 35, 56, 0.1);
   background: #ffffff;
-  padding: 12px;
   transition:
     transform 0.2s ease,
     border-color 0.3s ease;
@@ -263,9 +262,8 @@ const filteredProducts = computed(() => {
 .product-media {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 3;
-  border-radius: 16px;
-  border: 1px solid rgba(20, 35, 56, 0.08);
+  aspect-ratio: 1 / 1;
+  border-bottom: 1px solid rgba(20, 35, 56, 0.08);
   background: #f3f5f7;
   overflow: hidden;
 }
@@ -313,8 +311,7 @@ const filteredProducts = computed(() => {
 
 .card-footer {
   margin-top: auto;
-  padding-top: 10px;
-  border-top: 1px solid rgba(20, 35, 56, 0.08);
+  padding: 10px 12px 12px;
 }
 
 .product-price {
@@ -395,12 +392,11 @@ const filteredProducts = computed(() => {
 
 @media (max-width: 640px) {
   .product-card {
-    padding: 12px 12px 14px;
     min-height: 100%;
   }
 
   .card-footer {
-    padding-top: 8px;
+    padding: 8px 12px 14px;
   }
 
   /* Mobil ko‘rinishda narx / oylik tolov / batafsil tugmasini yaqinlashtirish */
