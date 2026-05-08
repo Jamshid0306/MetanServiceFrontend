@@ -25,7 +25,7 @@ const { t } = useI18n();
           <div class="contact-cards">
             <a :href="CONTACT_PHONE_HREF" class="contact-card">
               <span class="contact-label">{{ t("phone") }}</span>
-              <span class="contact-value">{{ CONTACT_PHONE_DISPLAY }}</span>
+              <spansa class="contact-value">{{ CONTACT_PHONE_DISPLAY }}</spansa>
             </a>
 
             <a :href="CONTACT_INSTAGRAM_URL" target="_blank" rel="noopener noreferrer" class="contact-card">

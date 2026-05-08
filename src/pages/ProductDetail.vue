@@ -1207,6 +1207,8 @@ let pinchStartDistance = 0;
 let pinchStartZoom = 1;
 let pinchStartPan = { x: 0, y: 0 };
 let pinchStartFocal = { x: 0, y: 0 };
+const MODAL_SWIPE_DISTANCE = 70;
+const MODAL_SWIPE_DOMINANCE = 1.35;
 
 const clampImageZoom = (value) => Math.min(Math.max(Number(value) || 1, 1), 5);
 const clampImagePan = (pan, zoom = imageZoom.value, stage = imageModalStageRef.value) => {
@@ -1285,6 +1287,18 @@ const setImageZoom = (
 const zoomImageIn = () => setImageZoom(imageZoom.value + 0.35);
 const zoomImageOut = () => setImageZoom(imageZoom.value - 0.35);
 
+const handleImageModalBackgroundClick = (event) => {
+  if (
+    event.target.closest(".image-modal-img") ||
+    event.target.closest(".image-modal-actions") ||
+    event.target.closest(".image-modal-thumb")
+  ) {
+    return;
+  }
+
+  resetImageZoom();
+};
+
 const openImageModal = (index = 0, shouldSyncRoute = true) => {
   if (!images.value.length) {
     return;
@@ -1341,6 +1355,33 @@ const selectModalImage = (index) => {
       query: { ...route.query, image: String(activeImageIndex.value) },
     });
   }
+};
+
+const handleModalImageSwipe = (deltaX, deltaY) => {
+  if (
+    images.value.length <= 1 ||
+    Math.abs(deltaX) < MODAL_SWIPE_DISTANCE ||
+    Math.abs(deltaX) < Math.abs(deltaY) * MODAL_SWIPE_DOMINANCE
+  ) {
+    return false;
+  }
+
+  if (deltaX < 0) {
+    if (activeImageIndex.value < images.value.length - 1) {
+      selectModalImage(activeImageIndex.value + 1);
+    } else {
+      resetImageZoom();
+    }
+    return true;
+  }
+
+  if (activeImageIndex.value > 0) {
+    selectModalImage(activeImageIndex.value - 1);
+    return true;
+  }
+
+  resetImageZoom();
+  return true;
 };
 
 const getPointerDistance = () => {
@@ -1406,9 +1447,19 @@ const handleImagePointerMove = (event) => {
 };
 
 const handleImagePointerUp = (event) => {
+  const pointer = modalPointers.get(event.pointerId);
+  const wasSinglePointerGesture = pointer && modalPointers.size === 1;
+  const deltaX = pointer ? pointer.x - pointer.startX : 0;
+  const deltaY = pointer ? pointer.y - pointer.startY : 0;
+
+  event.currentTarget.releasePointerCapture?.(event.pointerId);
   modalPointers.delete(event.pointerId);
   if (modalPointers.size < 2) {
     pinchStartDistance = 0;
+  }
+
+  if (wasSinglePointerGesture && handleModalImageSwipe(deltaX, deltaY)) {
+    return;
   }
 
   isImageDragging.value = modalPointers.size === 1 && imageZoom.value > 1;
@@ -2819,9 +2870,9 @@ onBeforeUnmount(() => {
     <div
       v-if="imageModalOpen"
       class="image-modal-overlay"
-      @click.self="closeImageModal"
+      @click.self="resetImageZoom"
     >
-      <div class="image-modal-shell">
+      <div class="image-modal-shell" @click="handleImageModalBackgroundClick">
         <div class="image-modal-head">
           <div class="image-modal-title">
             <span>{{ activeImageIndex + 1 }} / {{ images.length }}</span>
@@ -2851,6 +2902,7 @@ onBeforeUnmount(() => {
           @pointermove="handleImagePointerMove"
           @pointerup="handleImagePointerUp"
           @pointercancel="handleImagePointerUp"
+          @click.self="resetImageZoom"
           @dblclick="imageZoom > 1 ? resetImageZoom() : setImageZoom(2.5, getStageFocalPoint($event, $event.currentTarget))"
         >
           <img
@@ -4484,9 +4536,11 @@ onBeforeUnmount(() => {
   place-items: center;
   overflow: hidden;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
   touch-action: none;
   user-select: none;
+  cursor: zoom-out;
 }
 
 .image-modal-img {
@@ -4948,7 +5002,6 @@ onBeforeUnmount(() => {
   padding: 14px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   opacity: 0;
   transform: translateY(20px) scale(0.95);
   transition:
@@ -5022,6 +5075,10 @@ onBeforeUnmount(() => {
   font-size: 1rem;
   font-weight: 800;
   text-align: left;
+}
+
+.related-card > .flex {
+  margin-top: auto;
 }
 
 .related-cart-icon {

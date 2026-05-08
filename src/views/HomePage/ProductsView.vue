@@ -354,7 +354,7 @@ const filteredProducts = computed(() => {
 .add-btn {
   background: #18304f;
   border: 1px solid rgba(20, 35, 56, 0.06);
-  margin-top: 10px;
+  margin-top: auto;
   min-height: 34px;
   transition: transform 0.25s ease;
 }
