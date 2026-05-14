@@ -49,6 +49,20 @@ const displaySlides = computed(() => {
   return heroSlides.value;
 });
 
+const heroSwiperBreakpoints = computed(() => {
+  if (displaySlides.value.length <= 1) {
+    return {
+      0: { slidesPerView: 1, spaceBetween: 0 },
+    };
+  }
+
+  return {
+    0: { slidesPerView: 1.08, spaceBetween: 10 },
+    700: { slidesPerView: 1.12, spaceBetween: 14 },
+    1100: { slidesPerView: 1.16, spaceBetween: 18 },
+  };
+});
+
 onMounted(async () => {
   try {
     const res = await apiClient.get("/hero-slides");
@@ -75,11 +89,15 @@ onMounted(async () => {
       <Swiper
         v-if="displaySlides.length"
         :modules="[Autoplay, Pagination]"
-        :loop="displaySlides.length > 1"
+        :loop="true"
         :speed="850"
+        :centered-slides="displaySlides.length > 1"
+        :slides-per-view="displaySlides.length > 1 ? 1.08 : 1"
+        :space-between="displaySlides.length > 1 ? 10 : 0"
+        :breakpoints="heroSwiperBreakpoints"
         :autoplay="{ delay: 3200, disableOnInteraction: false }"
         :pagination="{ clickable: true }"
-        class="hero-swiper reveal-up"
+        class="hero-swiper"
       >
         <SwiperSlide
           v-for="slide in displaySlides"
@@ -97,14 +115,14 @@ onMounted(async () => {
           <img v-else :src="slide.src" :alt="slide.alt" class="hero-image" />
         </SwiperSlide>
       </Swiper>
-      <div v-else class="hero-empty reveal-up">
+      <div v-else class="hero-empty">
         <p>Hero banner hali qo‘shilmagan</p>
       </div>
-      <div class="hero-payment-note reveal-up">
+      <div class="hero-payment-note">
         <span>Mahsulotlarni muddatli to‘lov yoki 100% to‘lov orqali xarid qilishingiz mumkin.</span>
       </div>
 
-      <div class="hero-brand-strip reveal-up" aria-label="Brend rasmlari">
+      <div class="hero-brand-strip" aria-label="Brend rasmlari">
         <img :src="imageOne" alt="Brend rasm 1" class="hero-brand-image" />
         <img :src="imageTwo" alt="Brend rasm 2" class="hero-brand-image" />
         <img :src="imageThree" alt="Brend rasm 3" class="hero-brand-image" />
@@ -140,6 +158,7 @@ onMounted(async () => {
   position: relative;
   aspect-ratio: 16 / 6;
   min-height: 245px;
+  overflow: hidden;
 }
 
 .hero-slide::after {
@@ -206,9 +225,9 @@ onMounted(async () => {
 }
 
 .hero-brand-image {
-  flex: 0 0 88px;
-  width: 88px;
-  height: 88px;
+  flex: 0 0 78px;
+  width: 78px;
+  height: 78px;
   aspect-ratio: 1 / 1;
   display: block;
   border-radius: 14px;
@@ -216,21 +235,6 @@ onMounted(async () => {
   background: #f6f8fb;
   object-fit: contain;
   padding: 0.35rem;
-}
-
-.reveal-up {
-  animation: riseIn 0.6s ease-out both;
-}
-
-@keyframes riseIn {
-  from {
-    opacity: 0;
-    transform: translateY(18px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 @media (max-width: 1100px) {
@@ -272,9 +276,9 @@ onMounted(async () => {
   }
 
   .hero-brand-image {
-    flex-basis: 64px;
-    width: 64px;
-    height: 64px;
+    flex-basis: 60px;
+    width: 60px;
+    height: 60px;
     border-radius: 12px;
     padding: 0.2rem;
   }
@@ -286,14 +290,14 @@ onMounted(async () => {
   }
 
   .hero-brand-strip {
-    justify-content: stretch;
+    justify-content: center;
     margin-bottom: 0;
   }
 
   .hero-brand-image {
-    flex: 0 0 calc((100% - 1.05rem) / 4);
-    width: calc((100% - 1.05rem) / 4);
-    height: auto;
+    flex: 0 0 60px;
+    width: 60px;
+    height: 60px;
     min-width: 0;
     aspect-ratio: 1 / 1;
   }

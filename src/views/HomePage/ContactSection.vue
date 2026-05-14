@@ -17,7 +17,7 @@ const { t } = useI18n();
   <section id="contact" class="contact-section py-14 md:py-20">
     <div class="container mx-auto px-4">
       <div class="contact-shell">
-        <div class="contact-content reveal-up">
+        <div class="contact-content">
           <p class="contact-kicker">{{ t("nav.contact") }}</p>
           <h2 class="contact-title">{{ t("contact_title") }}</h2>
           <p class="contact-address">{{ t("footer.address") }}</p>
@@ -45,7 +45,7 @@ const { t } = useI18n();
           </div>
         </div>
 
-        <div class="map-wrap reveal-right">
+        <div class="map-wrap">
           <iframe
             :src="CONTACT_MAP_EMBED_URL"
             class="map-frame"
@@ -162,36 +162,6 @@ const { t } = useI18n();
   height: 100%;
   min-height: 360px;
   border: 0;
-}
-
-.reveal-up {
-  animation: riseIn 0.72s ease-out both;
-}
-
-.reveal-right {
-  animation: slideIn 0.82s ease-out both;
-}
-
-@keyframes riseIn {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(18px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
 }
 
 @media (max-width: 980px) {

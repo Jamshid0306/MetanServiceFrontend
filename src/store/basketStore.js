@@ -28,7 +28,7 @@ export const useBasketStore = defineStore("basket", {
         });
       });
 
-      this.basket = normalized;
+      this.basket = normalized.slice(-1);
     },
     updateQuantity(key, quantity) {
       const item = this.basket.find((p) => resolveBasketKey(p) === key);
@@ -38,20 +38,13 @@ export const useBasketStore = defineStore("basket", {
     },
     addToBasket(product) {
       const basketKey = resolveBasketKey(product);
-      const existing = this.basket.find((p) => resolveBasketKey(p) === basketKey);
-      if (existing) {
-        Object.assign(existing, {
+      this.basket = [
+        {
           ...product,
           basket_key: basketKey,
           quantity: 1,
-        });
-      } else {
-        this.basket.push({
-          ...product,
-          basket_key: basketKey,
-          quantity: 1,
-        });
-      }
+        },
+      ];
     },
     updateCreditPlan(key, creditPlan) {
       const item = this.basket.find((p) => resolveBasketKey(p) === key);
@@ -73,22 +66,21 @@ export const useBasketStore = defineStore("basket", {
       );
 
       if (targetIndex !== -1) {
-        this.basket[targetIndex] = {
+        this.basket = [{
           ...this.basket[targetIndex],
           ...product,
           basket_key: basketKey,
           quantity: 1,
-        };
-        this.basket.splice(sourceIndex, 1);
+        }];
         return;
       }
 
-      this.basket[sourceIndex] = {
+      this.basket = [{
         ...this.basket[sourceIndex],
         ...product,
         basket_key: basketKey,
         quantity: 1,
-      };
+      }];
     },
 
     removeFromBasket(key) {

@@ -2,7 +2,7 @@
   <footer id="site-footer" class="footer-shell relative overflow-hidden pt-16 pb-8">
     <div class="container mx-auto px-6 relative z-10">
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div class="lg:col-span-12 footer-card animate-fade-in-up">
+        <div class="lg:col-span-12 footer-card">
           <h2 class="footer-title">{{ t("footer.contacts") }}</h2>
 
           <p class="footer-contact-subtitle">{{ t("contact_title") }}</p>
@@ -340,27 +340,6 @@ const { t } = useI18n();
   transform: translateY(-1px);
   border-color: rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.06);
-}
-
-.animation-delay-200 {
-  animation-delay: 0.2s;
-}
-.animation-delay-400 {
-  animation-delay: 0.4s;
-}
-
-@keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.animate-fade-in-up {
-  animation: fade-in-up 0.8s ease-out forwards;
 }
 
 </style>

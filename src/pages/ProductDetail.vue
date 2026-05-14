@@ -15,6 +15,7 @@ import {
   Plus,
   RotateCcw,
   Ruler,
+  Share2,
   WalletCards,
 } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
@@ -113,6 +114,8 @@ const creditTariffSelectHighlighted = ref(false);
 let swiperInstance = null;
 let priceSummaryObserver = null;
 const SITE_URL = "https://urganch-metan-servis.uz";
+const MOBILE_STICKY_PRICE_BREAKPOINT = 1024;
+const MOBILE_STICKY_PRICE_TOP = 8;
 
 const upsertSeoMeta = (attr, key, content) => {
   if (!content || typeof document === "undefined") return;
@@ -733,7 +736,7 @@ const optionGroups = computed(() => {
     ? collectCylinderVolumes(optionConfig.value, null, firstTransmission)
     : [];
 
-  if (visibleCylinderVolumes.length > 1) {
+  if (visibleCylinderVolumes.length) {
     groups.push({
       key: "cylinder_volume",
       titleKey: "productOptions.cylinderVolume",
@@ -753,6 +756,8 @@ const optionGroups = computed(() => {
 });
 
 const orderedOptionGroups = computed(() => optionGroups.value);
+const getSelectedOptionValue = (group) =>
+  selectedOptions.value?.[group.key] || "";
 const transmissionGroup = computed(() =>
   hasTransmissionGroup.value
     ? {
@@ -780,11 +785,7 @@ const isProductOptionSelectionComplete = computed(() => {
     return !hasTransmissionGroup.value || balloonProgramEnabled.value !== null;
   }
 
-  if (
-    !keys.every(
-      (key) => selectionHasValue(resolved, key) || selectionHasValue(raw, key)
-    )
-  ) {
+  if (!keys.every((key) => selectionHasValue(raw, key))) {
     return false;
   }
 
@@ -966,7 +967,7 @@ const onInstallmentModeClick = () => {
   paymentScheduleMode.value = "installment";
   nextTick(() => {
     creditTariffsSectionRef.value?.scrollIntoView({
-      behavior: "smooth",
+      behavior: "auto",
       block: "center",
     });
     requestAnimationFrame(focusFirstCreditPlanButton);
@@ -1044,17 +1045,6 @@ const configuredBasketItem = computed(() =>
       })()
     : null
 );
-const isConfiguredProductInBasket = computed(() => {
-  const item = configuredBasketItem.value;
-  if (!item) {
-    return false;
-  }
-  const productId = Number(item.id || 0);
-  if (!Number.isFinite(productId) || productId <= 0) {
-    return false;
-  }
-  return basketStore.basket.some((basketItem) => Number(basketItem?.id || 0) === productId);
-});
 const currentProductId = computed(() => Number(store.product?.id || route.params.id || 0));
 const isCurrentProductFavorite = computed(() =>
   favoriteProductIds.value.includes(currentProductId.value)
@@ -1134,6 +1124,43 @@ const toggleFavorite = async () => {
     favoriteLoading.value = false;
   }
 };
+
+const getProductShareUrl = () => {
+  const productId = currentProductId.value;
+  if (Number.isFinite(productId) && productId > 0) {
+    return `${SITE_URL}/product/${productId}`;
+  }
+
+  return typeof window !== "undefined" ? window.location.href : SITE_URL;
+};
+
+const handleProductShare = async () => {
+  const url = getProductShareUrl();
+
+  try {
+    if (navigator.share) {
+      await navigator.share({
+        url,
+      });
+      return;
+    }
+
+    await navigator.clipboard.writeText(url);
+    notification.value = {
+      show: true,
+      message: "Product linki nusxalandi",
+    };
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      return;
+    }
+
+    notification.value = {
+      show: true,
+      message: "Product linkini ulashib bo'lmadi",
+    };
+  }
+};
 const currentOrderTotal = computed(() => {
   const numericPrice = parseNumericPrice(combinedSelectedPrice.value);
   return numericPrice === null ? 0 : numericPrice;
@@ -1207,8 +1234,10 @@ let pinchStartDistance = 0;
 let pinchStartZoom = 1;
 let pinchStartPan = { x: 0, y: 0 };
 let pinchStartFocal = { x: 0, y: 0 };
+let suppressNextImageModalClick = false;
 const MODAL_SWIPE_DISTANCE = 70;
 const MODAL_SWIPE_DOMINANCE = 1.35;
+const MODAL_TAP_TOLERANCE = 8;
 
 const clampImageZoom = (value) => Math.min(Math.max(Number(value) || 1, 1), 5);
 const clampImagePan = (pan, zoom = imageZoom.value, stage = imageModalStageRef.value) => {
@@ -1288,6 +1317,11 @@ const zoomImageIn = () => setImageZoom(imageZoom.value + 0.35);
 const zoomImageOut = () => setImageZoom(imageZoom.value - 0.35);
 
 const handleImageModalBackgroundClick = (event) => {
+  if (suppressNextImageModalClick) {
+    suppressNextImageModalClick = false;
+    return;
+  }
+
   if (
     event.target.closest(".image-modal-img") ||
     event.target.closest(".image-modal-actions") ||
@@ -1296,7 +1330,7 @@ const handleImageModalBackgroundClick = (event) => {
     return;
   }
 
-  resetImageZoom();
+  closeImageModal();
 };
 
 const openImageModal = (index = 0, shouldSyncRoute = true) => {
@@ -1323,6 +1357,7 @@ const closeImageModal = () => {
   imageModalOpen.value = false;
   modalPointers.clear();
   pinchStartDistance = 0;
+  suppressNextImageModalClick = false;
   resetImageZoom();
 
   if (route.query.image !== undefined) {
@@ -1344,9 +1379,15 @@ const openImageModalFromRoute = () => {
   openImageModal(Number(route.query.image || 0), false);
 };
 
-const selectModalImage = (index) => {
+const selectModalImage = (index, options = {}) => {
+  const shouldResetZoom = options.resetZoom !== false;
+
   activeImageIndex.value = Math.min(Math.max(Number(index) || 0, 0), images.value.length - 1);
-  resetImageZoom();
+  if (shouldResetZoom) {
+    resetImageZoom();
+  } else {
+    imagePan.value = clampImagePan(imagePan.value);
+  }
   goToSlide(activeImageIndex.value);
   if (route.query.image !== undefined) {
     router.replace({
@@ -1359,6 +1400,7 @@ const selectModalImage = (index) => {
 
 const handleModalImageSwipe = (deltaX, deltaY) => {
   if (
+    imageZoom.value > 1 ||
     images.value.length <= 1 ||
     Math.abs(deltaX) < MODAL_SWIPE_DISTANCE ||
     Math.abs(deltaX) < Math.abs(deltaY) * MODAL_SWIPE_DOMINANCE
@@ -1368,19 +1410,19 @@ const handleModalImageSwipe = (deltaX, deltaY) => {
 
   if (deltaX < 0) {
     if (activeImageIndex.value < images.value.length - 1) {
-      selectModalImage(activeImageIndex.value + 1);
+      selectModalImage(activeImageIndex.value + 1, { resetZoom: false });
     } else {
-      resetImageZoom();
+      closeImageModal();
     }
     return true;
   }
 
   if (activeImageIndex.value > 0) {
-    selectModalImage(activeImageIndex.value - 1);
+    selectModalImage(activeImageIndex.value - 1, { resetZoom: false });
     return true;
   }
 
-  resetImageZoom();
+  closeImageModal();
   return true;
 };
 
@@ -1451,6 +1493,7 @@ const handleImagePointerUp = (event) => {
   const wasSinglePointerGesture = pointer && modalPointers.size === 1;
   const deltaX = pointer ? pointer.x - pointer.startX : 0;
   const deltaY = pointer ? pointer.y - pointer.startY : 0;
+  const moved = Math.hypot(deltaX, deltaY) > MODAL_TAP_TOLERANCE;
 
   event.currentTarget.releasePointerCapture?.(event.pointerId);
   modalPointers.delete(event.pointerId);
@@ -1459,7 +1502,12 @@ const handleImagePointerUp = (event) => {
   }
 
   if (wasSinglePointerGesture && handleModalImageSwipe(deltaX, deltaY)) {
+    suppressNextImageModalClick = true;
     return;
+  }
+
+  if (moved) {
+    suppressNextImageModalClick = true;
   }
 
   isImageDragging.value = modalPointers.size === 1 && imageZoom.value > 1;
@@ -1472,6 +1520,25 @@ const handleImagePointerUp = (event) => {
     pointer.startPanY = imagePan.value.y;
   }
 };
+
+const isMobileStickyPriceViewport = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia(`(max-width: ${MOBILE_STICKY_PRICE_BREAKPOINT}px)`).matches;
+
+const updateMobileStickyPrice = () => {
+  if (!isMobileStickyPriceViewport() || !summaryRef.value) {
+    return false;
+  }
+
+  const rect = summaryRef.value.getBoundingClientRect();
+  stickyPriceVisible.value = rect.top <= MOBILE_STICKY_PRICE_TOP;
+  return true;
+};
+
+const handleStickyPriceScroll = () => {
+  updateMobileStickyPrice();
+};
+
 const observeStickyPrice = () => {
   if (priceSummaryObserver) {
     priceSummaryObserver.disconnect();
@@ -1484,6 +1551,10 @@ const observeStickyPrice = () => {
     !summaryRef.value
   ) {
     stickyPriceVisible.value = false;
+    return;
+  }
+
+  if (updateMobileStickyPrice()) {
     return;
   }
 
@@ -1573,11 +1644,6 @@ const closeFuelGuideModal = () => {
 };
 
 const handleAddToBasket = () => {
-  if (isConfiguredProductInBasket.value) {
-    router.push({ name: "Basket" });
-    return;
-  }
-
   if (detailAnimating.value) {
     return;
   }
@@ -1609,7 +1675,7 @@ const handleAddToBasket = () => {
       transmissionSelectHighlighted.value = false;
       nextTick(() => {
         document.getElementById("detail-cylinder-volume-select")?.scrollIntoView({
-          behavior: "smooth",
+          behavior: "auto",
           block: "center",
         });
       });
@@ -1618,7 +1684,7 @@ const handleAddToBasket = () => {
       transmissionSelectHighlighted.value = true;
       nextTick(() => {
         document.getElementById("detail-transmission-options")?.scrollIntoView({
-          behavior: "smooth",
+          behavior: "auto",
           block: "center",
         });
       });
@@ -1627,7 +1693,7 @@ const handleAddToBasket = () => {
       transmissionSelectHighlighted.value = false;
       nextTick(() => {
         document.getElementById("detail-product-options")?.scrollIntoView({
-          behavior: "smooth",
+          behavior: "auto",
           block: "center",
         });
       });
@@ -1646,7 +1712,7 @@ const handleAddToBasket = () => {
     creditTariffSelectHighlighted.value = false;
     nextTick(() => {
       document.getElementById("detail-payment-mode")?.scrollIntoView({
-        behavior: "smooth",
+        behavior: "auto",
         block: "center",
       });
     });
@@ -1659,7 +1725,7 @@ const handleAddToBasket = () => {
     paymentModeSelectHighlighted.value = false;
     nextTick(() => {
       creditTariffsSectionRef.value?.scrollIntoView({
-        behavior: "smooth",
+        behavior: "auto",
         block: "center",
       });
       requestAnimationFrame(focusFirstCreditPlanButton);
@@ -1672,7 +1738,7 @@ const handleAddToBasket = () => {
     balloonProgramSelectHighlighted.value = true;
     nextTick(() => {
       document.getElementById("detail-balloon-program")?.scrollIntoView({
-        behavior: "smooth",
+        behavior: "auto",
         block: "center",
       });
     });
@@ -1859,21 +1925,6 @@ const fetchProductData = async (id) => {
 
   await nextTick();
   observeStickyPrice();
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("animate-show");
-          observer.unobserve(entry.target);
-        }
-      });
-    },
-    { threshold: 0.2 }
-  );
-
-  relatedProductRefs.value.forEach((el) => {
-    if (el) observer.observe(el);
-  });
 };
 
 const setBalloonProgramEnabled = (enabled) => {
@@ -2159,6 +2210,8 @@ onMounted(() => {
     swiperInstance = swiperRef.value.swiper;
   }
   window.addEventListener("keydown", handleEscape);
+  window.addEventListener("scroll", handleStickyPriceScroll, { passive: true });
+  window.addEventListener("resize", observeStickyPrice);
 });
 
 onBeforeUnmount(() => {
@@ -2170,6 +2223,8 @@ onBeforeUnmount(() => {
     priceSummaryObserver = null;
   }
   window.removeEventListener("keydown", handleEscape);
+  window.removeEventListener("scroll", handleStickyPriceScroll);
+  window.removeEventListener("resize", observeStickyPrice);
 });
 </script>
 
@@ -2179,7 +2234,7 @@ onBeforeUnmount(() => {
     class="detail-page container mx-auto mt-[100px] px-6"
   >
     <div
-      class="detail-topbar mb-[20px] flex justify-center items-center relative animate-fade-in-down"
+      class="detail-topbar mb-[20px] flex justify-center items-center relative"
     >
       <button
         type="button"
@@ -2209,7 +2264,7 @@ onBeforeUnmount(() => {
       </div>
     </transition>
 
-    <div class="detail-layout animate-slide-in-up">
+    <div class="detail-layout">
       <div class="detail-main">
         <div class="detail-gallery-column">
           <div class="detail-gallery">
@@ -2242,7 +2297,7 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <section class="detail-copy-section detail-copy-section-desktop animate-fade-in-up">
+          <section class="detail-copy-section detail-copy-section-desktop">
             <div class="detail-tabs flex gap-4 mt-4 mb-2">
               <span
                 @click="activeTab = 'description'"
@@ -2270,12 +2325,12 @@ onBeforeUnmount(() => {
               <span
                 v-if="activeTab !== 'characteristic'"
                 v-html="formatProductRichText(store.product[`description_${locale}`])"
-                class="detail-content animate-fade-in"
+                class="detail-content"
               ></span>
               <span
                 v-if="activeTab === 'characteristic'"
                 v-html="formatProductRichText(store.product[`characteristic_${locale}`])"
-                class="detail-content animate-fade-in"
+                class="detail-content"
               ></span>
             </div>
           </section>
@@ -2464,21 +2519,18 @@ onBeforeUnmount(() => {
                 </div>
               </div>
               <div
-                v-if="
-                  group.key === 'cylinder_volume' &&
-                  group.options.length > 1
-                "
+                v-if="group.key === 'cylinder_volume'"
                 id="detail-cylinder-volume-select"
                 class="detail-select-shell"
               >
                 <div
                   class="detail-select-wrap"
 	                  :class="{
-	                    'detail-select-wrap-active': selectedOptions[group.key],
+	                    'detail-select-wrap-active': getSelectedOptionValue(group),
 	                    'detail-select-wrap-error':
 	                      group.key === 'cylinder_volume' &&
 	                      cylinderVolumeSelectHighlighted &&
-	                      !selectedOptions[group.key],
+	                      !getSelectedOptionValue(group),
 	                    'detail-select-wrap-with-leading-icon':
 	                      group.key === 'cylinder_volume',
 	                  }"
@@ -2490,7 +2542,7 @@ onBeforeUnmount(() => {
 	                    <Ruler class="h-5 w-5" />
 	                  </span>
 	                  <select
-	                    :value="selectedOptions[group.key] || ''"
+	                    :value="getSelectedOptionValue(group)"
 	                    class="detail-select-input"
                     @change="selectOption(group.key, $event.target.value)"
                   >
@@ -2506,19 +2558,6 @@ onBeforeUnmount(() => {
                     </option>
                   </select>
                   <span class="detail-select-icon" aria-hidden="true">⌄</span>
-                </div>
-              </div>
-              <div
-	                v-else-if="group.key === 'cylinder_volume'"
-	                class="detail-select-shell"
-	              >
-	                <div class="detail-select-wrap detail-select-wrap-active detail-select-wrap-with-leading-icon">
-	                  <span class="detail-select-leading-icon">
-	                    <Ruler class="h-5 w-5" />
-	                  </span>
-	                  <div class="detail-static-value">
-	                    {{ formatSelectOptionLabel(group.key, group.options[0]) }}
-	                  </div>
                 </div>
               </div>
               <div
@@ -2730,26 +2769,30 @@ onBeforeUnmount(() => {
               </button>
               <button
                 type="button"
+                class="detail-share-btn"
+                aria-label="Product linkini ulashish"
+                @click="handleProductShare"
+              >
+                <Share2 class="h-5 w-5" />
+              </button>
+              <button
+                type="button"
                 @click="handleAddToBasket"
                 class="detail-add-btn relative flex flex-1 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-2xl py-4 font-medium text-white transition-all duration-300 active:scale-95"
               >
                 <span
                   :class="
-                    detailAnimating && !isConfiguredProductInBasket
+                    detailAnimating
                       ? 'opacity-0 scale-90'
                       : 'opacity-100 scale-100'
                   "
                   class="transition-all duration-300"
                 >
-                  {{
-                    isConfiguredProductInBasket
-                      ? $t("go_to_basket")
-                      : $t("add_to_cart")
-                  }}
+                  {{ $t("add_to_cart") }}
                 </span>
                 <ShoppingCart
                   :class="
-                    detailAnimating && !isConfiguredProductInBasket
+                    detailAnimating
                       ? 'translate-x-44 opacity-0'
                       : 'translate-x-0 opacity-100'
                   "
@@ -2757,7 +2800,7 @@ onBeforeUnmount(() => {
                 />
                 <Check
                   :class="
-                    detailShowCheck && !isConfiguredProductInBasket
+                    detailShowCheck
                       ? 'opacity-100 scale-100'
                       : 'opacity-0 scale-50'
                   "
@@ -2771,7 +2814,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <section class="detail-copy-section detail-copy-section-mobile animate-fade-in-up">
+    <section class="detail-copy-section detail-copy-section-mobile">
       <div class="detail-tabs flex gap-4 mt-4 mb-2">
         <span
           @click="activeTab = 'description'"
@@ -2799,19 +2842,19 @@ onBeforeUnmount(() => {
         <span
           v-if="activeTab !== 'characteristic'"
           v-html="formatProductRichText(store.product[`description_${locale}`])"
-          class="detail-content animate-fade-in"
+          class="detail-content"
         ></span>
         <span
           v-if="activeTab === 'characteristic'"
           v-html="formatProductRichText(store.product[`characteristic_${locale}`])"
-          class="detail-content animate-fade-in"
+          class="detail-content"
         ></span>
       </div>
     </section>
 
     <section
       v-if="relatedProducts.length"
-      class="related-section animate-fade-in-up"
+      class="related-section"
     >
       <div class="related-section-head">
         <h3 class="related-heading text-3xl font-bold">
@@ -2824,8 +2867,6 @@ onBeforeUnmount(() => {
         <div
           v-for="(product, index) in relatedProducts"
           :key="product.id"
-          :ref="(el) => (relatedProductRefs[index] = el)"
-          :style="{ 'transition-delay': `${index * 100}ms` }"
           class="related-card group"
         >
           <div
@@ -2870,7 +2911,7 @@ onBeforeUnmount(() => {
     <div
       v-if="imageModalOpen"
       class="image-modal-overlay"
-      @click.self="resetImageZoom"
+      @click.self="handleImageModalBackgroundClick"
     >
       <div class="image-modal-shell" @click="handleImageModalBackgroundClick">
         <div class="image-modal-head">
@@ -2902,7 +2943,7 @@ onBeforeUnmount(() => {
           @pointermove="handleImagePointerMove"
           @pointerup="handleImagePointerUp"
           @pointercancel="handleImagePointerUp"
-          @click.self="resetImageZoom"
+          @click.self.stop="handleImageModalBackgroundClick"
           @dblclick="imageZoom > 1 ? resetImageZoom() : setImageZoom(2.5, getStageFocalPoint($event, $event.currentTarget))"
         >
           <img
@@ -3388,7 +3429,7 @@ onBeforeUnmount(() => {
   display: block;
   border: 1px solid rgba(20, 35, 56, 0.06);
   background: var(--detail-surface);
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
 }
 
@@ -3398,13 +3439,13 @@ onBeforeUnmount(() => {
 }
 
 .detail-thumb {
-  width: 112px;
+  width: 84px;
   aspect-ratio: 4 / 3;
   border-color: var(--detail-border);
   background: var(--detail-surface);
   flex-shrink: 0;
   opacity: 0.82;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
 }
 
@@ -4318,7 +4359,8 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
 }
 
 .detail-service-copy strong {
@@ -4365,7 +4407,8 @@ onBeforeUnmount(() => {
   min-width: 220px;
 }
 
-.detail-favorite-btn {
+.detail-favorite-btn,
+.detail-share-btn {
   display: grid;
   place-items: center;
   width: 56px;
@@ -4385,6 +4428,12 @@ onBeforeUnmount(() => {
 .detail-favorite-btn:hover {
   border-color: #fecaca;
   color: #dc2626;
+  transform: translateY(-1px);
+}
+
+.detail-share-btn:hover {
+  border-color: #bfdbfe;
+  color: #2563eb;
   transform: translateY(-1px);
 }
 
@@ -4593,7 +4642,8 @@ onBeforeUnmount(() => {
 .image-modal-thumb img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
 }
 
 .order-modal-panel {
@@ -5002,21 +5052,11 @@ onBeforeUnmount(() => {
   padding: 14px;
   display: flex;
   flex-direction: column;
-  opacity: 0;
-  transform: translateY(20px) scale(0.95);
-  transition:
-    opacity 0.7s ease-out,
-    transform 0.7s ease-out,
-    border-color 0.3s ease;
+  transition: border-color 0.3s ease;
 }
 
 .related-card:hover {
   border-color: var(--detail-border-strong);
-}
-
-.related-card.animate-show {
-  opacity: 1;
-  transform: translateY(0) scale(1);
 }
 
 .related-media {
@@ -5048,7 +5088,7 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
   transition: transform 0.45s ease;
 }
@@ -5085,49 +5125,6 @@ onBeforeUnmount(() => {
   left: 12px;
 }
 
-.animate-fade-in-down {
-  animation: fadeInDown 0.8s ease-out forwards;
-}
-
-.animate-slide-in-up {
-  animation: slideInUp 0.8s ease-out forwards;
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.6s ease-out forwards;
-}
-
-@keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slideInUp {
-  from {
-    opacity: 0;
-    transform: translateY(40px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 @media (max-width: 1024px) {
   .detail-page {
     margin-top: 0;
@@ -5146,7 +5143,8 @@ onBeforeUnmount(() => {
   }
 
   .detail-price-sticky {
-    top: 84px;
+    top: max(8px, env(safe-area-inset-top));
+    z-index: 999;
   }
 
   .related-title {
@@ -5286,7 +5284,9 @@ onBeforeUnmount(() => {
   }
 
   .detail-price-sticky {
-    top: 74px;
+    top: max(8px, env(safe-area-inset-top));
+    z-index: 999;
+    width: calc(100vw - 1rem);
     padding: 0.82rem 0.9rem;
     border-radius: 18px;
   }

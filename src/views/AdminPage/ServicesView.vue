@@ -536,7 +536,8 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
 }
 
 .service-edit-btn {
@@ -893,7 +894,8 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
 }
 
 .service-image-empty {

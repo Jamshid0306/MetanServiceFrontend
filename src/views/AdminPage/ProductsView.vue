@@ -1762,7 +1762,8 @@ const toggleProductActive = async (product) => {
 .product-gallery-image {
   width: 100%;
   height: 172px;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
 }
 
 .product-copy {
@@ -2319,7 +2320,8 @@ const toggleProductActive = async (product) => {
 .editor-image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
   pointer-events: none;
 }
 

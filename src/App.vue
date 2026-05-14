@@ -668,17 +668,6 @@ watch(
   text-overflow: ellipsis;
 }
 
-.contact-panel-enter-active,
-.contact-panel-leave-active {
-  transition: all 0.25s ease;
-}
-
-.contact-panel-enter-from,
-.contact-panel-leave-to {
-  opacity: 0;
-  transform: translateY(8px) scale(0.98);
-}
-
 @media (max-width: 640px) {
   .app-mobile-dock {
     padding-inline: 0.55rem;

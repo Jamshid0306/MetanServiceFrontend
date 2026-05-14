@@ -310,11 +310,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <transition-group
-          tag="div"
-          name="fade-slide"
-          class="flex flex-col gap-3 sm:gap-4"
-        >
+        <div class="flex flex-col gap-3 sm:gap-4">
           <div
             v-for="product in filteredProducts"
             :key="product.id"
@@ -364,7 +360,7 @@ onMounted(async () => {
               <ArrowRight class="catalog-cart-icon" />
             </button>
           </div>
-        </transition-group>
+        </div>
       </main>
     </div>
 
@@ -586,7 +582,8 @@ onMounted(async () => {
   height: 100%;
   display: block;
   border-radius: 6px;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
   transition: transform 0.45s ease;
 }
 
@@ -739,18 +736,4 @@ onMounted(async () => {
   }
 }
 
-.fade-slide-enter-active,
-.fade-slide-leave-active {
-  transition: all 0.4s ease;
-}
-
-.fade-slide-enter-from {
-  opacity: 0;
-  transform: translateY(20px) scale(0.95);
-}
-
-.fade-slide-leave-to {
-  opacity: 0;
-  transform: translateY(-20px) scale(0.95);
-}
 </style>

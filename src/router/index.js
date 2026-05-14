@@ -164,25 +164,84 @@ const routes = [
   },
 ];
 
+const forceInstantScrollToTop = () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+};
+
+const rememberedScrollPositions = new Map();
+
+const rememberScrollPosition = (route) => {
+  if (typeof window === "undefined" || !route?.fullPath) {
+    return;
+  }
+
+  rememberedScrollPositions.set(route.fullPath, {
+    left: window.scrollX || 0,
+    top: window.scrollY || 0,
+  });
+};
+
+const getRememberedScrollPosition = (route) => {
+  if (!route?.fullPath) {
+    return null;
+  }
+
+  return rememberedScrollPositions.get(route.fullPath) || null;
+};
+
+const restoreScrollAfterRender = (position) =>
+  new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        resolve({ ...position, behavior: "auto" });
+      });
+    });
+  });
+
+if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
+  window.history.scrollRestoration = "manual";
+}
+
 const router = createRouter({
   history: createWebHistory(),
   routes,
   scrollBehavior(to, from, savedPosition) {
+    if (to.name === "ProductDetail") {
+      return { top: 0, left: 0, behavior: "auto" };
+    }
+
+    if (from.name === "ProductDetail") {
+      const rememberedPosition = getRememberedScrollPosition(to);
+      if (rememberedPosition) {
+        return restoreScrollAfterRender(rememberedPosition);
+      }
+    }
+
     if (savedPosition) {
-      return savedPosition;
-    } else if (to.hash) {
+      return { ...savedPosition, behavior: "auto" };
+    }
+
+    if (to.hash) {
       const el = document.querySelector(to.hash);
       if (el) {
         const top = el.getBoundingClientRect().top + window.scrollY - 82;
-        return { top, behavior: "smooth" };
+        return { top, behavior: "auto" };
       }
     }
-    return { top: 0, behavior: "smooth" };
+    return { top: 0, behavior: "auto" };
   },
 });
 
 // Router guards
 router.beforeEach((to, from, next) => {
+  if (to.name === "ProductDetail") {
+    rememberScrollPosition(from);
+    forceInstantScrollToTop();
+  }
   isLoading.value = true;
   next();
 });

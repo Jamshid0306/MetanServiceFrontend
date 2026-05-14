@@ -87,9 +87,7 @@ const goToProduct = (id) =>
     </div>
 
     <div class="min-h-[50vh]">
-      <transition-group
-        name="list"
-        tag="div"
+      <div
         v-if="basketStore.basket.length"
         class="grid gap-6"
       >
@@ -145,7 +143,7 @@ const goToProduct = (id) =>
             </button>
           </div>
         </div>
-      </transition-group>
+      </div>
 
       <div v-else class="basket-empty text-center py-28 text-gray-400 animate-fade">
         <p class="text-xl mb-4">{{ t("empty") }}</p>
@@ -161,12 +159,6 @@ const goToProduct = (id) =>
         class="basket-summary-grid mt-10 animate-fade"
         v-if="basketStore.basket.length"
       >
-        <div class="basket-total-row flex justify-between items-center gap-6">
-          <p class="basket-total text-2xl font-bold">
-            {{ t("allBasket") }}: {{ formatPrice(totalPrice) }}
-          </p>
-        </div>
-
         <div class="basket-checkout-card">
           <button
             type="button"
@@ -291,33 +283,15 @@ const goToProduct = (id) =>
   cursor: not-allowed;
 }
 
-.list-enter-active,
-.list-leave-active {
-  transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1);
-}
-.list-enter-from {
-  opacity: 0;
-  transform: translateY(25px) scale(0.95);
-}
-.list-enter-to {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-.list-leave-from {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-.list-leave-to {
-  opacity: 0;
-  transform: translateY(-20px) scale(0.95);
-}
-.list-move {
-  transition: transform 0.45s cubic-bezier(0.25, 1, 0.5, 1);
-}
-
 @media (max-width: 640px) {
+  .basket-page {
+    margin-top: 0 !important;
+    padding-top: 20px !important;
+  }
+
   .basket-header {
     gap: 0.8rem;
+    margin-top: 0;
   }
 
   .basket-title {

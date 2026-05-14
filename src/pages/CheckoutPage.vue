@@ -1498,7 +1498,7 @@ const scrollToFirstMyIdIdentityError = () => {
     }
 
     firstInvalid.scrollIntoView({
-      behavior: "smooth",
+      behavior: "auto",
       block: "center",
     });
 
@@ -1527,7 +1527,7 @@ const scrollToFirstCreditExtraContactError = () => {
     }
 
     firstInvalid.scrollIntoView({
-      behavior: "smooth",
+      behavior: "auto",
       block: "center",
     });
 
@@ -3033,21 +3033,6 @@ onBeforeUnmount(() => {
   background: #21442c;
 }
 
-.checkout-step-panel {
-  animation: checkoutStepEnter 0.22s ease both;
-}
-
-@keyframes checkoutStepEnter {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 .checkout-products {
   display: grid;
   gap: 12px;
@@ -3075,7 +3060,8 @@ onBeforeUnmount(() => {
 .checkout-product-image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
 }
 
 .checkout-product-copy {

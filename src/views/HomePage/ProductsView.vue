@@ -122,7 +122,7 @@ const filteredProducts = computed(() => {
 <template>
   <div class="home-products-section py-12">
     <div class="container mx-auto px-6">
-      <h2 class="section-title animate-fade-in-down">
+      <h2 class="section-title">
         {{ t("products.title") }}
       </h2>
       <div
@@ -277,7 +277,7 @@ const filteredProducts = computed(() => {
 
 @media screen and (max-width: 640px) {
   .product-image {
-    object-fit: cover;
+    object-fit: contain;
   }
 }
 
@@ -298,7 +298,7 @@ const filteredProducts = computed(() => {
   height: 100%;
   display: block;
   border-radius: 8px;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
   transition: transform 0.45s ease;
 }
@@ -366,20 +366,6 @@ const filteredProducts = computed(() => {
 
 .cart-icon {
   left: 14px;
-}
-
-.animate-fade-in-down {
-  animation: fadeInDown 1s ease-out forwards;
-}
-@keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 @media (max-width: 1024px) {
