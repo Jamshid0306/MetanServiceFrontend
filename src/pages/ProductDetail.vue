@@ -1441,6 +1441,7 @@ const handleImageWheel = (event) => {
 };
 
 const handleImagePointerDown = (event) => {
+  event.preventDefault();
   event.currentTarget.setPointerCapture?.(event.pointerId);
   modalPointers.set(event.pointerId, {
     x: event.clientX,
@@ -1452,6 +1453,7 @@ const handleImagePointerDown = (event) => {
   });
 
   if (modalPointers.size === 2) {
+    isImageDragging.value = true;
     pinchStartDistance = getPointerDistance();
     pinchStartZoom = imageZoom.value;
     pinchStartPan = { ...imagePan.value };
@@ -1462,6 +1464,7 @@ const handleImagePointerDown = (event) => {
 };
 
 const handleImagePointerMove = (event) => {
+  event.preventDefault();
   const pointer = modalPointers.get(event.pointerId);
   if (!pointer) {
     return;
@@ -1471,6 +1474,7 @@ const handleImagePointerMove = (event) => {
   pointer.y = event.clientY;
 
   if (modalPointers.size === 2 && pinchStartDistance > 0) {
+    isImageDragging.value = true;
     setImageZoom(
       pinchStartZoom * (getPointerDistance() / pinchStartDistance),
       pinchStartFocal,
@@ -1489,6 +1493,7 @@ const handleImagePointerMove = (event) => {
 };
 
 const handleImagePointerUp = (event) => {
+  event.preventDefault();
   const pointer = modalPointers.get(event.pointerId);
   const wasSinglePointerGesture = pointer && modalPointers.size === 1;
   const deltaX = pointer ? pointer.x - pointer.startX : 0;
@@ -4600,6 +4605,8 @@ onBeforeUnmount(() => {
   object-fit: contain;
   transform-origin: center;
   transition: transform 0.16s ease-out;
+  touch-action: none;
+  user-select: none;
   will-change: transform;
   cursor: grab;
 }
