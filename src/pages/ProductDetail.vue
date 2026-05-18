@@ -15,7 +15,6 @@ import {
   Plus,
   RotateCcw,
   Ruler,
-  Share2,
   WalletCards,
 } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
@@ -1045,6 +1044,15 @@ const configuredBasketItem = computed(() =>
       })()
     : null
 );
+const configuredBasketKey = computed(() => configuredBasketItem.value?.basket_key || "");
+const isCurrentBasketItemAdded = computed(() => {
+  const key = configuredBasketKey.value;
+  if (!key) {
+    return false;
+  }
+
+  return basketStore.basket.some((item) => item?.basket_key === key);
+});
 const currentProductId = computed(() => Number(store.product?.id || route.params.id || 0));
 const isCurrentProductFavorite = computed(() =>
   favoriteProductIds.value.includes(currentProductId.value)
@@ -1653,6 +1661,11 @@ const handleAddToBasket = () => {
     return;
   }
 
+  if (isCurrentBasketItemAdded.value) {
+    router.push({ name: "Basket" });
+    return;
+  }
+
   balloonProgramSelectHighlighted.value = false;
   transmissionSelectHighlighted.value = false;
 
@@ -1665,22 +1678,18 @@ const handleAddToBasket = () => {
     const raw = selectedOptions.value;
     const needsCylinder =
       requiredOptionGroupKeys.value.includes("cylinder_volume") &&
-      !selectionHasValue(resolved, "cylinder_volume") &&
       !selectionHasValue(raw, "cylinder_volume");
     const needsTransmission =
       hasTransmissionGroup.value &&
       balloonProgramEnabled.value === true &&
       !selectionHasValue(resolved, "transmission") &&
       !selectionHasValue(raw, "transmission");
-    const cylGroup = orderedOptionGroups.value.find((g) => g.key === "cylinder_volume");
-    const multiCylinder = Boolean(cylGroup && cylGroup.options.length > 1);
-
-    if (needsCylinder && multiCylinder) {
+    if (needsCylinder) {
       cylinderVolumeSelectHighlighted.value = true;
       transmissionSelectHighlighted.value = false;
       nextTick(() => {
         document.getElementById("detail-cylinder-volume-select")?.scrollIntoView({
-          behavior: "auto",
+          behavior: "smooth",
           block: "center",
         });
       });
@@ -1689,7 +1698,7 @@ const handleAddToBasket = () => {
       transmissionSelectHighlighted.value = true;
       nextTick(() => {
         document.getElementById("detail-transmission-options")?.scrollIntoView({
-          behavior: "auto",
+          behavior: "smooth",
           block: "center",
         });
       });
@@ -1698,7 +1707,7 @@ const handleAddToBasket = () => {
       transmissionSelectHighlighted.value = false;
       nextTick(() => {
         document.getElementById("detail-product-options")?.scrollIntoView({
-          behavior: "auto",
+          behavior: "smooth",
           block: "center",
         });
       });
@@ -1717,7 +1726,7 @@ const handleAddToBasket = () => {
     creditTariffSelectHighlighted.value = false;
     nextTick(() => {
       document.getElementById("detail-payment-mode")?.scrollIntoView({
-        behavior: "auto",
+        behavior: "smooth",
         block: "center",
       });
     });
@@ -1730,7 +1739,7 @@ const handleAddToBasket = () => {
     paymentModeSelectHighlighted.value = false;
     nextTick(() => {
       creditTariffsSectionRef.value?.scrollIntoView({
-        behavior: "auto",
+        behavior: "smooth",
         block: "center",
       });
       requestAnimationFrame(focusFirstCreditPlanButton);
@@ -1743,7 +1752,7 @@ const handleAddToBasket = () => {
     balloonProgramSelectHighlighted.value = true;
     nextTick(() => {
       document.getElementById("detail-balloon-program")?.scrollIntoView({
-        behavior: "auto",
+        behavior: "smooth",
         block: "center",
       });
     });
@@ -2345,6 +2354,15 @@ onBeforeUnmount(() => {
           <div ref="summaryRef" class="detail-summary detail-section">
             <div class="detail-summary-head">
               <span class="detail-product-id">ID {{ store.product?.id }}</span>
+              <button
+                type="button"
+                class="detail-share-btn detail-summary-share-btn"
+                :aria-label="t('share_product')"
+                @click="handleProductShare"
+              >
+                <i class="fa-light fa-share-from-square" aria-hidden="true"></i>
+                <span>{{ t("share") }}</span>
+              </button>
             </div>
             <h1
               class="detail-name text-4xl font-bold text-gray-900 tracking-tight leading-snug"
@@ -2527,6 +2545,10 @@ onBeforeUnmount(() => {
                 v-if="group.key === 'cylinder_volume'"
                 id="detail-cylinder-volume-select"
                 class="detail-select-shell"
+                :class="{
+                  'detail-select-shell-error':
+                    cylinderVolumeSelectHighlighted && !getSelectedOptionValue(group),
+                }"
               >
                 <div
                   class="detail-select-wrap"
@@ -2774,14 +2796,6 @@ onBeforeUnmount(() => {
               </button>
               <button
                 type="button"
-                class="detail-share-btn"
-                aria-label="Product linkini ulashish"
-                @click="handleProductShare"
-              >
-                <Share2 class="h-5 w-5" />
-              </button>
-              <button
-                type="button"
                 @click="handleAddToBasket"
                 class="detail-add-btn relative flex flex-1 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-2xl py-4 font-medium text-white transition-all duration-300 active:scale-95"
               >
@@ -2793,7 +2807,7 @@ onBeforeUnmount(() => {
                   "
                   class="transition-all duration-300"
                 >
-                  {{ $t("add_to_cart") }}
+                  {{ isCurrentBasketItemAdded ? $t("go_to_basket") : $t("add_to_cart") }}
                 </span>
                 <ShoppingCart
                   :class="
@@ -3394,11 +3408,12 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 1rem;
   min-width: 0;
+  justify-items: center;
 }
 
 .detail-gallery {
   container-type: inline-size;
-  width: 100%;
+  width: min(100%, 520px);
   min-width: 0;
   justify-content: flex-start;
   align-items: stretch;
@@ -3407,12 +3422,12 @@ onBeforeUnmount(() => {
 
 .detail-gallery-stage {
   width: 100%;
-  aspect-ratio: 4 / 3;
-  height: calc(100cqw * 3 / 4 + 70px);
+  aspect-ratio: 1 / 1;
+  height: auto;
   padding: 0;
-  border-radius: 30px;
-  border: 1px solid var(--detail-border);
-  background: var(--detail-surface-muted);
+  border-radius: 0;
+  border: none;
+  background: transparent;
   overflow: hidden;
 }
 
@@ -3428,13 +3443,19 @@ onBeforeUnmount(() => {
   height: 100%;
 }
 
+.detail-swiper :deep(.swiper-slide) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .detail-slide-image {
   width: 100%;
   height: 100%;
   display: block;
-  border: 1px solid rgba(20, 35, 56, 0.06);
-  background: var(--detail-surface);
-  object-fit: contain;
+  border: none;
+  background: transparent;
+  object-fit: cover;
   object-position: center;
 }
 
@@ -3446,16 +3467,16 @@ onBeforeUnmount(() => {
 .detail-thumb {
   width: 84px;
   aspect-ratio: 4 / 3;
-  border-color: var(--detail-border);
-  background: var(--detail-surface);
+  border-color: transparent;
+  background: transparent;
   flex-shrink: 0;
   opacity: 0.82;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
 }
 
 .detail-thumb:hover {
-  border-color: var(--detail-border-strong);
+  border-color: transparent;
   opacity: 1;
 }
 
@@ -3921,24 +3942,31 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   font-size: 0.82rem;
   font-weight: 700;
-  box-shadow: 0 8px 18px rgba(24, 48, 79, 0.1);
+  box-shadow:
+    0 12px 26px rgba(15, 23, 42, 0.12),
+    0 2px 6px rgba(15, 23, 42, 0.06);
   transition:
     border-color 0.2s ease,
     background 0.2s ease,
-    color 0.2s ease;
+    color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .credit-plan-btn:not(.credit-plan-btn-active):hover {
   border-color: rgba(24, 48, 79, 0.34);
   background: #eef2f5;
-  box-shadow: 0 10px 22px rgba(24, 48, 79, 0.16);
+  box-shadow:
+    0 15px 30px rgba(15, 23, 42, 0.16),
+    0 3px 8px rgba(15, 23, 42, 0.08);
 }
 
 .credit-plan-btn-active {
   background: linear-gradient(135deg, #18304f 0%, #12263d 100%);
   color: #ffffff;
   border-color: #18304f;
-  box-shadow: 0 12px 28px rgba(24, 48, 79, 0.32);
+  box-shadow:
+    0 16px 34px rgba(24, 48, 79, 0.34),
+    0 3px 8px rgba(15, 23, 42, 0.12);
 }
 
 .credit-plan-btn-active:hover {
@@ -4022,11 +4050,15 @@ onBeforeUnmount(() => {
   padding: 0.7rem 1rem;
   font-weight: 600;
   cursor: pointer;
+  box-shadow:
+    0 12px 26px rgba(15, 23, 42, 0.1),
+    0 2px 6px rgba(15, 23, 42, 0.06);
   transition:
     border-color 0.2s ease,
     background 0.2s ease,
     color 0.2s ease,
-    font-weight 0.15s ease;
+    font-weight 0.15s ease,
+    box-shadow 0.2s ease;
 }
 
 .balloon-program-toggle-label {
@@ -4039,6 +4071,9 @@ onBeforeUnmount(() => {
   border-color: rgba(24, 48, 79, 0.24);
   background: var(--detail-surface-muted);
   color: var(--detail-ink);
+  box-shadow:
+    0 15px 30px rgba(15, 23, 42, 0.14),
+    0 3px 8px rgba(15, 23, 42, 0.08);
 }
 
 .balloon-program-toggle-btn-active {
@@ -4046,6 +4081,9 @@ onBeforeUnmount(() => {
   background: var(--detail-accent);
   color: #ffffff;
   font-weight: 800;
+  box-shadow:
+    0 16px 34px rgba(24, 48, 79, 0.32),
+    0 3px 8px rgba(15, 23, 42, 0.12);
 }
 
 .balloon-program-toggle-btn-active:hover {
@@ -4063,6 +4101,14 @@ onBeforeUnmount(() => {
 
 .detail-select-shell {
   width: 100%;
+}
+
+.detail-select-shell-error {
+  border-radius: 22px;
+  background: rgba(254, 242, 242, 0.8);
+  box-shadow:
+    0 0 0 4px rgba(220, 38, 38, 0.14),
+    0 16px 30px rgba(220, 38, 38, 0.12);
 }
 
 .detail-select-wrap {
@@ -4440,6 +4486,26 @@ onBeforeUnmount(() => {
   border-color: #bfdbfe;
   color: #2563eb;
   transform: translateY(-1px);
+}
+
+.detail-summary-share-btn {
+  display: inline-flex;
+  width: auto;
+  min-width: 112px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border-radius: 12px;
+  padding: 0 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.detail-summary-share-btn i {
+  font-size: 1rem;
+  line-height: 1;
 }
 
 .detail-favorite-btn-active {

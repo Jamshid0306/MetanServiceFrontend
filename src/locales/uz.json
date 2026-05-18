@@ -29,6 +29,8 @@
   "phone": "Telefon",
   "message": "Xabar",
   "send": "Yuborish",
+  "share": "Ulashish",
+  "share_product": "Product linkini ulashish",
   "sending": "Yuborilmoqda...",
   "success_message": "Xabaringiz muvaffaqiyatli yuborildi!",
   "please_fill_all_fields": "Iltimos, barcha maydonlarni to'ldiring va telefon raqam to‘g‘ri bo‘lsin",

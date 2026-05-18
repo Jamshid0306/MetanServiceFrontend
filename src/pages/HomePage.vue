@@ -4,7 +4,7 @@ import ProductsView from "../views/HomePage/ProductsView.vue";
 import ContactSection from "../views/HomePage/ContactSection.vue";
 </script>
 <template>
-  <div class="home-shell relative overflow-hidden">
+  <div class="home-shell relative">
     <div class="relative z-10">
       <Header />
     </div>
