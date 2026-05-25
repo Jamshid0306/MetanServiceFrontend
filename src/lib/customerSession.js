@@ -1,6 +1,7 @@
 const CUSTOMER_SESSION_STORAGE_KEY = "customer_profile";
 const CUSTOMER_ACCESS_TOKEN_STORAGE_KEY = "customer_access_token";
 export const CUSTOMER_SESSION_EVENT = "customer-session-updated";
+const TOKEN_EXPIRY_SKEW_MS = 30 * 1000;
 
 export const normalizeCustomerPhone = (value = "") => {
   const digits = String(value || "").replace(/\D/g, "");
@@ -81,6 +82,39 @@ export const toCustomerSession = (customer = {}) => {
 const getCustomerStorage = () =>
   typeof window === "undefined" ? null : window.localStorage;
 
+const decodeJwtPayload = (token = "") => {
+  if (!token || typeof window === "undefined") {
+    return null;
+  }
+
+  const parts = String(token).split(".");
+  if (parts.length < 2) {
+    return null;
+  }
+
+  try {
+    const normalized = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    return JSON.parse(window.atob(padded));
+  } catch {
+    return null;
+  }
+};
+
+const isUsableCustomerToken = (token = "") => {
+  const payload = decodeJwtPayload(token);
+  if (!payload || String(payload.type || "").trim().toLowerCase() !== "customer") {
+    return false;
+  }
+
+  const expiresAt = Number(payload.exp || 0);
+  if (expiresAt && expiresAt * 1000 <= Date.now() + TOKEN_EXPIRY_SKEW_MS) {
+    return false;
+  }
+
+  return true;
+};
+
 export const getStoredCustomerSession = () => {
   const rawValue = getCustomerStorage()?.getItem(CUSTOMER_SESSION_STORAGE_KEY);
   if (!rawValue) {
@@ -101,6 +135,35 @@ export const getStoredCustomerSession = () => {
 
 export const getStoredCustomerAccessToken = () =>
   getCustomerStorage()?.getItem(CUSTOMER_ACCESS_TOKEN_STORAGE_KEY) || "";
+
+export const getUsableCustomerAccessToken = () => {
+  const token = String(getStoredCustomerAccessToken() || "").trim();
+  if (!token) {
+    return "";
+  }
+
+  if (!isUsableCustomerToken(token)) {
+    clearCustomerSession();
+    return "";
+  }
+
+  return token;
+};
+
+export const getCustomerAuthConfig = () => {
+  const accessToken = getUsableCustomerAccessToken();
+  if (!accessToken) {
+    return null;
+  }
+
+  return {
+    skipAuth: true,
+    skipAuthRefresh: true,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  };
+};
 
 export const storeCustomerAccessToken = (token = "") => {
   const storage = getCustomerStorage();

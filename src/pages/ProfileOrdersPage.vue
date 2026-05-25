@@ -84,6 +84,13 @@ const getIcanCreditStatusValue = (order = {}) =>
 
 const approvedCreditStatuses = new Set(["active", "approved"]);
 const successfulCreditStatuses = new Set(["active", "approved", "completed"]);
+const successfulOrderStatuses = new Set([
+  ...successfulCreditStatuses,
+  "success",
+  "successful",
+  "succeed",
+  "succeeded",
+]);
 const cancelledCreditStatuses = new Set([
   "canceled",
   "cancelled",
@@ -147,6 +154,78 @@ const getOrderStatusValue = (order = {}) => {
   }
 
   return String(order?.status || "").trim().toLowerCase();
+};
+
+const getOrderStatusLabel = (order = {}) => {
+  const status = getOrderStatusValue(order);
+
+  if (orderIsInstallment(order) && getIcanCreditStatusValue(order)) {
+    return getIcanCreditStatusLabel(order);
+  }
+
+  if (successfulOrderStatuses.has(status)) {
+    return t("profile.orderStatusApproved");
+  }
+
+  if (cancelledCreditStatuses.has(status)) {
+    return t("profile.creditStatusCancelled");
+  }
+
+  if (pendingCreditStatuses.has(status) || status === "prepared") {
+    return t("profile.orderStatusInProgress");
+  }
+
+  return t("checkoutPage.statusUnknown");
+};
+
+const getOrderStatusClass = (order = {}) => {
+  const status = getOrderStatusValue(order);
+
+  if (successfulOrderStatuses.has(status)) {
+    return "is-success";
+  }
+
+  if (cancelledCreditStatuses.has(status)) {
+    return "is-error";
+  }
+
+  if (
+    pendingCreditStatuses.has(status) ||
+    status === "prepared" ||
+    (orderIsInstallment(order) && order?.credit_submitted)
+  ) {
+    return "is-warning";
+  }
+
+  return "is-muted";
+};
+
+const getOrderCancelReason = (order = {}) => {
+  if (!cancelledCreditStatuses.has(getOrderStatusValue(order))) {
+    return "";
+  }
+
+  const icanCredit = order?.ican_credit || {};
+  const candidates = [
+    icanCredit.cancel_reason,
+    icanCredit.comment,
+    icanCredit.reason,
+    order?.cancel_reason,
+    order?.cancelReason,
+    order?.cancellation_reason,
+    order?.cancellationReason,
+    order?.myid_result_note,
+    order?.status_note,
+  ];
+
+  for (const value of candidates) {
+    const reason = String(value || "").trim();
+    if (reason) {
+      return reason;
+    }
+  }
+
+  return "";
 };
 
 const formatMoney = (value) => {
@@ -517,7 +596,19 @@ onMounted(() => {
               <strong>{{ paymentLabel(order) }}</strong>
             </div>
             <div class="profile-order-status">
+              <span
+                class="profile-order-status-badge"
+                :class="getOrderStatusClass(order)"
+              >
+                {{ getOrderStatusLabel(order) }}
+              </span>
               <small class="profile-order-id-badge">{{ t("profile.orderNumber") }} #{{ order.id }}</small>
+              <p
+                v-if="getOrderCancelReason(order)"
+                class="profile-order-cancel-reason"
+              >
+                {{ t("profile.creditCancelReason") }}: {{ getOrderCancelReason(order) }}
+              </p>
             </div>
           </header>
 
@@ -836,6 +927,57 @@ onMounted(() => {
   font-weight: 900;
   white-space: nowrap;
   box-shadow: 0 8px 18px rgba(20, 35, 56, 0.12);
+}
+
+.profile-order-head .profile-order-status-badge {
+  width: max-content;
+  max-width: 100%;
+  border-radius: 999px;
+  border: 1px solid rgba(20, 35, 56, 0.12);
+  background: #eef2f6;
+  color: #18304f;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1.1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.profile-order-head .profile-order-status-badge.is-success {
+  border-color: #86efac;
+  background: #dcfce7;
+  color: #14532d;
+}
+
+.profile-order-head .profile-order-status-badge.is-warning {
+  border-color: #f59e0b;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.profile-order-head .profile-order-status-badge.is-error {
+  border-color: #fca5a5;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.profile-order-head .profile-order-status-badge.is-muted {
+  background: #eef2f6;
+  color: #18304f;
+}
+
+.profile-order-cancel-reason {
+  max-width: 320px;
+  border-radius: 8px;
+  border: 1px solid #fca5a5;
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 0.5rem 0.62rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .profile-order-products {

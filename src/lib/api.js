@@ -1,4 +1,5 @@
 import axios from "axios";
+import { clearCustomerSession } from "@/lib/customerSession";
 
 const trimTrailingSlash = (value = "") => value.replace(/\/+$/, "");
 const REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 15000);
@@ -229,14 +230,20 @@ apiClient.interceptors.response.use(
     const originalRequest = error?.config;
     const requestUrl = String(originalRequest?.url || "");
     const isUnauthorized = Number(error?.response?.status) === 401;
+    const isCustomerAuthRequest = requestUrl.includes("/customers/me");
     const shouldTryRefresh =
       isUnauthorized &&
       originalRequest &&
       !originalRequest._retriedWithRefresh &&
       !originalRequest.skipAuthRefresh &&
+      !requestUrl.includes("/customers/") &&
       !requestUrl.includes("/admin/login") &&
       !requestUrl.includes("/admin/refresh") &&
       Boolean(getStoredRefreshToken());
+
+    if (isUnauthorized && isCustomerAuthRequest) {
+      clearCustomerSession();
+    }
 
     if (shouldTryRefresh) {
       originalRequest._retriedWithRefresh = true;

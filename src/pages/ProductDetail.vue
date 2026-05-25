@@ -31,7 +31,7 @@ import {
   ensureUzbekistanPhoneInput,
   formatCustomerPhone,
   formatUzbekistanPhoneInput,
-  getStoredCustomerAccessToken,
+  getCustomerAuthConfig,
   getStoredCustomerSession,
   normalizeCustomerPhone,
   storeCustomerSession,
@@ -1059,21 +1059,6 @@ const isCurrentProductFavorite = computed(() =>
   favoriteProductIds.value.includes(currentProductId.value)
 );
 
-const getCustomerAuthConfig = () => {
-  const accessToken = getStoredCustomerAccessToken();
-  if (!accessToken) {
-    return null;
-  }
-
-  return {
-    skipAuth: true,
-    skipAuthRefresh: true,
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  };
-};
-
 const applyFavoriteResponse = (payload = {}) => {
   const favorites = Array.isArray(payload?.favorites)
     ? payload.favorites
@@ -1099,7 +1084,13 @@ const loadFavorites = async () => {
   try {
     const response = await apiClient.get("/customers/me/favorites", authConfig);
     applyFavoriteResponse(response.data || {});
-  } catch {
+  } catch (error) {
+    if ([401, 403].includes(Number(error?.response?.status))) {
+      customerProfile.value = null;
+      favoriteProductIds.value = [];
+      return;
+    }
+
     favoriteProductIds.value = Array.isArray(customerProfile.value?.favorites)
       ? customerProfile.value.favorites
       : [];
@@ -1125,6 +1116,13 @@ const toggleFavorite = async () => {
       : await apiClient.post("/customers/me/favorites", { product_id: productId }, authConfig);
     applyFavoriteResponse(response.data || {});
   } catch (error) {
+    if ([401, 403].includes(Number(error?.response?.status))) {
+      customerProfile.value = null;
+      favoriteProductIds.value = [];
+      router.push({ path: "/login", query: { redirect: route.fullPath } });
+      return;
+    }
+
     notification.value = {
       show: true,
       message: getApiErrorMessage(error, t("profile.loadError")),

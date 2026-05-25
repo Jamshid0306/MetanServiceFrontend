@@ -4,7 +4,9 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { apiClient, getApiErrorMessage, resolveAssetUrl } from "@/lib/api";
 import {
-  getStoredCustomerAccessToken,
+  clearCustomerSession,
+  getCustomerAuthConfig,
+  getUsableCustomerAccessToken,
   getStoredCustomerSession,
   storeCustomerSession,
 } from "@/lib/customerSession";
@@ -16,21 +18,6 @@ const favoriteProducts = ref([]);
 const loading = ref(false);
 const errorMessage = ref("");
 
-const authConfig = () => {
-  const accessToken = getStoredCustomerAccessToken();
-  if (!accessToken) {
-    return null;
-  }
-
-  return {
-    skipAuth: true,
-    skipAuthRefresh: true,
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  };
-};
-
 const productName = (product = {}) =>
   product?.[`name_${locale.value}`] || product?.name_uz || product?.name_ru || "";
 
@@ -40,7 +27,7 @@ const productPrice = (product = {}) =>
 const productImage = (product = {}) => resolveAssetUrl(product?.images?.[0]) || "";
 
 const loadFavorites = async () => {
-  const config = authConfig();
+  const config = getCustomerAuthConfig();
   if (!config) {
     router.push("/login");
     return;
@@ -66,6 +53,12 @@ const loadFavorites = async () => {
       .filter((item) => item.status === "fulfilled" && item.value?.data)
       .map((item) => item.value.data);
   } catch (error) {
+    if ([401, 403].includes(Number(error?.response?.status))) {
+      clearCustomerSession();
+      router.push("/login");
+      return;
+    }
+
     errorMessage.value = getApiErrorMessage(error, t("profile.favoritesLoadError"));
     favoriteProducts.value = [];
   } finally {
@@ -74,7 +67,7 @@ const loadFavorites = async () => {
 };
 
 const removeFavorite = async (productId) => {
-  const config = authConfig();
+  const config = getCustomerAuthConfig();
   if (!config) {
     router.push("/login");
     return;
@@ -90,16 +83,23 @@ const removeFavorite = async (productId) => {
       (product) => Number(product.id) !== Number(productId)
     );
   } catch (error) {
+    if ([401, 403].includes(Number(error?.response?.status))) {
+      clearCustomerSession();
+      router.push("/login");
+      return;
+    }
+
     errorMessage.value = getApiErrorMessage(error, t("profile.favoritesLoadError"));
   }
 };
 
 onMounted(() => {
-  customerSession.value = getStoredCustomerSession();
-  if (!customerSession.value && !getStoredCustomerAccessToken()) {
+  if (!getUsableCustomerAccessToken()) {
     router.push("/login");
     return;
   }
+
+  customerSession.value = getStoredCustomerSession();
   loadFavorites();
 });
 </script>

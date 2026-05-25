@@ -10,8 +10,9 @@ import {
   CUSTOMER_SESSION_EVENT,
   clearCustomerSession,
   formatCustomerPhone,
-  getStoredCustomerAccessToken,
+  getCustomerAuthConfig,
   getStoredCustomerSession,
+  getUsableCustomerAccessToken,
   normalizeCustomerPhone,
   storeCustomerSession,
 } from "@/lib/customerSession";
@@ -257,8 +258,8 @@ const logoutCustomer = () => {
 };
 
 const loadCustomerProfile = async () => {
-  const accessToken = getStoredCustomerAccessToken();
-  if (!accessToken) {
+  const authConfig = getCustomerAuthConfig();
+  if (!authConfig) {
     return;
   }
 
@@ -266,16 +267,17 @@ const loadCustomerProfile = async () => {
   profileError.value = "";
 
   try {
-    const response = await apiClient.get("/customers/me", {
-      skipAuth: true,
-      skipAuthRefresh: true,
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
+    const response = await apiClient.get("/customers/me", authConfig);
     customerSession.value = response.data || null;
     storeCustomerSession(response.data || null);
   } catch (error) {
+    if ([401, 403].includes(Number(error?.response?.status))) {
+      clearCustomerSession();
+      customerSession.value = null;
+      router.push("/login");
+      return;
+    }
+
     profileError.value = getApiErrorMessage(error, t("profile.loadError"));
   } finally {
     profileLoading.value = false;
@@ -284,7 +286,7 @@ const loadCustomerProfile = async () => {
 
 onMounted(async () => {
   syncCustomerSession();
-  if (!customerSession.value && !getStoredCustomerAccessToken()) {
+  if (!getUsableCustomerAccessToken()) {
     router.push("/login");
     return;
   }

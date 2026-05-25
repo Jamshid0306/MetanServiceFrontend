@@ -12,6 +12,7 @@ import {
   CUSTOMER_SESSION_EVENT,
   clearCustomerSession,
   getStoredCustomerSession,
+  getUsableCustomerAccessToken,
 } from "@/lib/customerSession";
 import { matchesProductSearch, scoreProductSearch } from "@/lib/productSearch";
 import { CONTACT_PHONE_HREF } from "@/constants/contact";
@@ -54,7 +55,9 @@ const customerDisplayName = computed(() => {
 });
 const isProfileRoute = computed(() => route.path.startsWith("/profile"));
 const syncCustomerProfile = () => {
-  customerProfile.value = getStoredCustomerSession();
+  customerProfile.value = getUsableCustomerAccessToken()
+    ? getStoredCustomerSession()
+    : null;
 };
 
 const getProductOrder = (product) => {

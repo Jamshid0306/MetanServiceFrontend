@@ -17,8 +17,10 @@ import {
   CONTACT_PHONE_HREF,
 } from "./constants/contact";
 import {
+  CUSTOMER_SESSION_EVENT,
   clearCustomerSession,
   getStoredCustomerSession,
+  getUsableCustomerAccessToken,
 } from "./lib/customerSession";
 
 const route = useRoute();
@@ -31,21 +33,25 @@ const customerProfile = ref(null);
 const routeTransitionRunning = ref(false);
 
 onMounted(() => {
-  customerProfile.value = getStoredCustomerSession();
+  syncCustomerProfile();
 
   if (typeof window !== "undefined") {
     window.addEventListener("storage", syncCustomerProfile);
+    window.addEventListener(CUSTOMER_SESSION_EVENT, syncCustomerProfile);
   }
 });
 
 onUnmounted(() => {
   if (typeof window !== "undefined") {
     window.removeEventListener("storage", syncCustomerProfile);
+    window.removeEventListener(CUSTOMER_SESSION_EVENT, syncCustomerProfile);
   }
 });
 
 const syncCustomerProfile = () => {
-  customerProfile.value = getStoredCustomerSession();
+  customerProfile.value = getUsableCustomerAccessToken()
+    ? getStoredCustomerSession()
+    : null;
 };
 
 const toggleExpand = () => {
