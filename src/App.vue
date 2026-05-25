@@ -4,6 +4,7 @@ import { useRoute, useRouter, RouterLink } from "vue-router";
 import { useI18n } from "vue-i18n";
 import Nav from "./components/Nav.vue";
 import Loader from "./components/Loader.vue";
+import { routeTransitionName } from "./router";
 import { useLoaderStore } from "./store/loaderStore";
 import { useBasketStore } from "./store/basketStore";
 import InstagramIcon from "./components/icons/InstagramIcon.vue";
@@ -27,6 +28,7 @@ const expanded = ref(false);
 const loaderStore = useLoaderStore();
 const basketStore = useBasketStore();
 const customerProfile = ref(null);
+const routeTransitionRunning = ref(false);
 
 onMounted(() => {
   customerProfile.value = getStoredCustomerSession();
@@ -106,9 +108,22 @@ const showPublicLayout = computed(
 const showPublicExtras = computed(
   () => showPublicLayout.value && !isAuthRoute.value && !isCheckoutRoute.value
 );
+const showFooter = computed(
+  () => showPublicExtras.value && !routeTransitionRunning.value
+);
 const showLoader = computed(
   () => loaderStore.loader && !isAuthRoute.value && !isLoaderDisabledRoute.value
 );
+
+const handleRouteTransitionStart = () => {
+  if (routeTransitionName.value) {
+    routeTransitionRunning.value = true;
+  }
+};
+
+const handleRouteTransitionEnd = () => {
+  routeTransitionRunning.value = false;
+};
 
 watch(
   () => route.fullPath,
@@ -129,8 +144,25 @@ watch(
     >
       <Nav />
     </div>
-    <RouterView />
-    <Footer v-if="showPublicExtras" />
+    <div class="app-route-shell">
+      <RouterView v-slot="{ Component, route: currentRoute }">
+        <Transition
+          :name="routeTransitionName"
+          @before-enter="handleRouteTransitionStart"
+          @after-enter="handleRouteTransitionEnd"
+          @enter-cancelled="handleRouteTransitionEnd"
+          @leave-cancelled="handleRouteTransitionEnd"
+        >
+          <div
+            :key="currentRoute.fullPath"
+            class="app-route-view"
+          >
+            <component :is="Component" />
+          </div>
+        </Transition>
+      </RouterView>
+    </div>
+    <Footer v-if="showFooter" />
     <Loader v-if="showLoader" />
 
     <div v-if="showPublicExtras" class="app-mobile-dock lg:hidden">
@@ -310,6 +342,80 @@ watch(
 @media (max-width: 1023px) {
   .app-nav-shell-mobile-hidden {
     display: none;
+  }
+}
+
+.app-route-shell {
+  position: relative;
+  min-height: 100dvh;
+  overflow-x: clip;
+  background: #f7f8fa;
+}
+
+.app-route-view {
+  display: block;
+  width: 100%;
+}
+
+.product-route-forward-enter-active,
+.product-route-forward-leave-active,
+.product-route-back-enter-active,
+.product-route-back-leave-active {
+  transition:
+    transform 0.72s cubic-bezier(0.2, 0.86, 0.22, 1),
+    opacity 0.72s ease;
+  will-change: transform, opacity;
+}
+
+.product-route-forward-enter-active,
+.product-route-back-leave-active {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  height: 100dvh;
+  overflow-y: auto;
+  background: #f7f8fa;
+  box-shadow: -18px 0 42px rgba(15, 23, 42, 0.16);
+  -webkit-overflow-scrolling: touch;
+}
+
+.product-route-back-enter-active {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.product-route-forward-leave-active {
+  position: relative;
+  z-index: 0;
+}
+
+.product-route-forward-enter-from {
+  transform: translate3d(112%, 0, 0);
+  opacity: 1;
+}
+
+.product-route-forward-leave-to {
+  transform: translate3d(-22%, 0, 0) scale(0.98);
+  opacity: 0.82;
+}
+
+.product-route-back-enter-from {
+  transform: translate3d(-22%, 0, 0) scale(0.98);
+  opacity: 0.82;
+}
+
+.product-route-back-leave-to {
+  transform: translate3d(112%, 0, 0);
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-route-forward-enter-active,
+  .product-route-forward-leave-active,
+  .product-route-back-enter-active,
+  .product-route-back-leave-active {
+    transition: none;
   }
 }
 

@@ -77,6 +77,7 @@ const detailAnimating = ref(false);
 const detailShowCheck = ref(false);
 const activeTab = ref("description");
 const relatedProductRefs = ref([]);
+const relatedProducts = ref([]);
 const swiperRef = ref(null);
 const summaryRef = ref(null);
 const notification = ref({ show: false, message: "" });
@@ -1226,10 +1227,33 @@ const orderProductsPayload = computed(() => {
     },
   ];
 });
-const relatedProducts = computed(() => {
-  const list = Array.isArray(store.products) ? store.products : [];
-  return list.filter((p) => p.id !== store.product?.id).slice(0, 4);
-});
+let relatedProductsRequestId = 0;
+
+const fetchRelatedProducts = async (productId) => {
+  const currentRequestId = ++relatedProductsRequestId;
+  relatedProducts.value = [];
+
+  try {
+    const response = await apiClient.get("/products/random", {
+      params: {
+        limit: 4,
+        exclude_id: productId,
+      },
+    });
+
+    if (currentRequestId !== relatedProductsRequestId) {
+      return;
+    }
+
+    relatedProducts.value = Array.isArray(response.data?.products)
+      ? response.data.products
+      : [];
+  } catch {
+    if (currentRequestId === relatedProductsRequestId) {
+      relatedProducts.value = [];
+    }
+  }
+};
 
 const goToSlide = (index) => {
   if (swiperInstance) {
@@ -1924,10 +1948,7 @@ const fetchProductData = async (id) => {
     return;
   }
 
-  if (!store.products.length) {
-    await store.fetchProducts(200, 0);
-  }
-
+  fetchRelatedProducts(productId);
   selectedOptions.value = {};
   selectedExtraServiceIds.value = [];
   balloonProgramEnabled.value = resolveDefaultBalloonProgramEnabled();
@@ -2881,7 +2902,7 @@ onBeforeUnmount(() => {
         </h3>
       </div>
       <div
-        class="related-grid grid grid-cols-1 mb-[30px] sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8"
+        class="related-grid grid grid-cols-2 mb-[30px] md:grid-cols-3 lg:grid-cols-4 gap-8"
       >
         <div
           v-for="(product, index) in relatedProducts"
@@ -5262,6 +5283,77 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
+  .related-section {
+    margin-top: 1.6rem;
+    padding-top: 1rem;
+  }
+
+  .related-section-head {
+    margin-bottom: 0.8rem;
+  }
+
+  .related-heading {
+    font-size: 1.35rem;
+    line-height: 1.2;
+  }
+
+  .related-grid {
+    gap: 14px 12px;
+    align-items: stretch;
+  }
+
+  .related-card {
+    min-height: 100%;
+    border-radius: 8px;
+    padding: 8px;
+  }
+
+  .related-media {
+    aspect-ratio: 1 / 1;
+    border-radius: 8px;
+  }
+
+  .related-chip {
+    left: 7px;
+    top: 7px;
+    padding: 3px 7px;
+    font-size: 9px;
+  }
+
+  .related-title {
+    min-height: 34px;
+    margin-top: 8px;
+    font-size: 0.78rem;
+    line-height: 1.28;
+    font-weight: 600;
+    color: #314159;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .related-price {
+    margin-top: 6px;
+    margin-bottom: 8px;
+    font-size: 1rem;
+    line-height: 1.1;
+  }
+
+  .related-btn {
+    min-height: 30px;
+    border-radius: 10px;
+    padding-top: 0.28rem;
+    padding-bottom: 0.28rem;
+    font-size: 0.72rem;
+  }
+
+  .related-cart-icon {
+    left: 10px;
+    width: 18px;
+    height: 18px;
+  }
+
   .image-modal-overlay {
     padding: 10px;
   }

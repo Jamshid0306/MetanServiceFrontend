@@ -3,6 +3,7 @@ import HomePage from "@/pages/HomePage.vue";
 import { ref } from "vue";
 
 export const isLoading = ref(false);
+export const routeTransitionName = ref("");
 
 const SITE_URL = "https://urganch-metan-servis.uz";
 const SITE_NAME = "Urganch Metan Service";
@@ -173,6 +174,7 @@ const forceInstantScrollToTop = () => {
 };
 
 const rememberedScrollPositions = new Map();
+const productListingRouteNames = new Set(["Home", "Products"]);
 
 const rememberScrollPosition = (route) => {
   if (typeof window === "undefined" || !route?.fullPath) {
@@ -238,6 +240,14 @@ const router = createRouter({
 
 // Router guards
 router.beforeEach((to, from, next) => {
+  if (to.name === "ProductDetail" && productListingRouteNames.has(from.name)) {
+    routeTransitionName.value = "product-route-forward";
+  } else if (from.name === "ProductDetail" && productListingRouteNames.has(to.name)) {
+    routeTransitionName.value = "product-route-back";
+  } else {
+    routeTransitionName.value = "";
+  }
+
   if (to.name === "ProductDetail") {
     rememberScrollPosition(from);
     forceInstantScrollToTop();
