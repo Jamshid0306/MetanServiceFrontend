@@ -11,9 +11,6 @@ import {
   Heart,
   CalendarClock,
   CreditCard,
-  Minus,
-  Plus,
-  RotateCcw,
   Ruler,
   WalletCards,
 } from "lucide-vue-next";
@@ -79,6 +76,7 @@ const activeTab = ref("description");
 const relatedProductRefs = ref([]);
 const relatedProducts = ref([]);
 const swiperRef = ref(null);
+const galleryThumbsRef = ref(null);
 const summaryRef = ref(null);
 const notification = ref({ show: false, message: "" });
 const selectedOptions = ref({});
@@ -97,6 +95,7 @@ const orderModalOpen = ref(false);
 const fuelGuideModalOpen = ref(false);
 const imageModalOpen = ref(false);
 const activeImageIndex = ref(0);
+const imageModalTransitionName = ref("image-modal-slide-next");
 const imageZoom = ref(1);
 const imagePan = ref({ x: 0, y: 0 });
 const imageModalStageRef = ref(null);
@@ -970,7 +969,6 @@ const onInstallmentModeClick = () => {
       behavior: "auto",
       block: "center",
     });
-    requestAnimationFrame(focusFirstCreditPlanButton);
   });
 };
 
@@ -1253,9 +1251,45 @@ const fetchRelatedProducts = async (productId) => {
   }
 };
 
+const getSafeImageIndex = (index = 0) => {
+  const maxIndex = Math.max(images.value.length - 1, 0);
+  const numericIndex = Number(index);
+  if (!Number.isFinite(numericIndex)) {
+    return 0;
+  }
+  return Math.min(Math.max(numericIndex, 0), maxIndex);
+};
+
+const scrollActiveGalleryThumbIntoView = (behavior = "smooth") => {
+  nextTick(() => {
+    const activeThumb = galleryThumbsRef.value?.querySelector(".detail-thumb-active");
+    activeThumb?.scrollIntoView({
+      behavior,
+      block: "nearest",
+      inline: "center",
+    });
+  });
+};
+
+const setActiveGalleryImage = (index, options = {}) => {
+  activeImageIndex.value = getSafeImageIndex(index);
+  scrollActiveGalleryThumbIntoView(options.behavior || "smooth");
+};
+
+const handleGallerySwiper = (swiper) => {
+  swiperInstance = swiper;
+  setActiveGalleryImage(swiper?.activeIndex || 0, { behavior: "auto" });
+};
+
+const handleGallerySlideChange = (swiper) => {
+  setActiveGalleryImage(swiper?.activeIndex || 0);
+};
+
 const goToSlide = (index) => {
+  const safeIndex = getSafeImageIndex(index);
+  setActiveGalleryImage(safeIndex);
   if (swiperInstance) {
-    swiperInstance.slideTo(index);
+    swiperInstance.slideTo(safeIndex);
   }
 };
 
@@ -1411,13 +1445,26 @@ const openImageModalFromRoute = () => {
 
 const selectModalImage = (index, options = {}) => {
   const shouldResetZoom = options.resetZoom !== false;
+  const safeIndex = Math.min(Math.max(Number(index) || 0, 0), images.value.length - 1);
+  const currentIndex = activeImageIndex.value;
 
-  activeImageIndex.value = Math.min(Math.max(Number(index) || 0, 0), images.value.length - 1);
+  if (safeIndex === currentIndex) {
+    if (shouldResetZoom) {
+      resetImageZoom();
+    }
+    return;
+  }
+
+  imageModalTransitionName.value =
+    options.direction ||
+    (safeIndex > currentIndex ? "image-modal-slide-next" : "image-modal-slide-prev");
+
   if (shouldResetZoom) {
     resetImageZoom();
   } else {
     imagePan.value = clampImagePan(imagePan.value);
   }
+  activeImageIndex.value = safeIndex;
   goToSlide(activeImageIndex.value);
   if (route.query.image !== undefined) {
     router.replace({
@@ -1440,7 +1487,10 @@ const handleModalImageSwipe = (deltaX, deltaY) => {
 
   if (deltaX < 0) {
     if (activeImageIndex.value < images.value.length - 1) {
-      selectModalImage(activeImageIndex.value + 1, { resetZoom: false });
+      selectModalImage(activeImageIndex.value + 1, {
+        direction: "image-modal-slide-next",
+        resetZoom: false,
+      });
     } else {
       closeImageModal();
     }
@@ -1448,7 +1498,10 @@ const handleModalImageSwipe = (deltaX, deltaY) => {
   }
 
   if (activeImageIndex.value > 0) {
-    selectModalImage(activeImageIndex.value - 1, { resetZoom: false });
+    selectModalImage(activeImageIndex.value - 1, {
+      direction: "image-modal-slide-prev",
+      resetZoom: false,
+    });
     return true;
   }
 
@@ -1951,6 +2004,7 @@ const fetchProductData = async (id) => {
   selectedExtraServiceIds.value = [];
   balloonProgramEnabled.value = resolveDefaultBalloonProgramEnabled();
   setDefaultCreditMonthsForProduct();
+  activeImageIndex.value = 0;
   activeTab.value = "description";
   fuelGuideModalOpen.value = false;
   closeOrderModal();
@@ -2307,7 +2361,8 @@ onBeforeUnmount(() => {
                 class="detail-swiper w-full rounded-2xl bg-white"
                 space-between="10"
                 slides-per-view="1"
-                :onSwiper="(swiper) => (swiperInstance = swiper)"
+                :onSwiper="handleGallerySwiper"
+                :onSlideChange="handleGallerySlideChange"
               >
                 <SwiperSlide v-for="(img, index) in images" :key="index">
                   <img
@@ -2319,12 +2374,13 @@ onBeforeUnmount(() => {
                 </SwiperSlide>
               </Swiper>
             </div>
-            <div class="detail-thumbs flex gap-2 overflow-x-auto mt-2">
+            <div ref="galleryThumbsRef" class="detail-thumbs flex gap-2 overflow-x-auto mt-2">
               <img
                 v-for="(img, index) in images"
                 :key="index"
                 :src="img"
                 class="detail-thumb cursor-pointer rounded-xl border transition-all duration-300"
+                :class="{ 'detail-thumb-active': activeImageIndex === index }"
                 @click="goToSlide(index)"
               />
             </div>
@@ -2958,15 +3014,6 @@ onBeforeUnmount(() => {
             <strong>{{ store.product?.[`name_${locale}`] }}</strong>
           </div>
           <div class="image-modal-actions">
-            <button type="button" @click="zoomImageOut" :disabled="imageZoom <= 1">
-              <Minus class="h-5 w-5" />
-            </button>
-            <button type="button" @click="resetImageZoom">
-              <RotateCcw class="h-5 w-5" />
-            </button>
-            <button type="button" @click="zoomImageIn" :disabled="imageZoom >= 5">
-              <Plus class="h-5 w-5" />
-            </button>
             <button type="button" @click="closeImageModal">
               <X class="h-5 w-5" />
             </button>
@@ -2984,14 +3031,21 @@ onBeforeUnmount(() => {
           @click.self.stop="handleImageModalBackgroundClick"
           @dblclick="imageZoom > 1 ? resetImageZoom() : setImageZoom(2.5, getStageFocalPoint($event, $event.currentTarget))"
         >
-          <img
-            :src="activeModalImage"
-            :alt="store.product?.[`name_${locale}`] || 'Product image'"
-            class="image-modal-img"
-            :class="{ 'image-modal-img-dragging': isImageDragging }"
-            :style="{ transform: imageModalTransform }"
-            draggable="false"
-          />
+          <Transition :name="imageModalTransitionName">
+            <div
+              :key="`${activeImageIndex}-${activeModalImage}`"
+              class="image-modal-frame"
+            >
+              <img
+                :src="activeModalImage"
+                :alt="store.product?.[`name_${locale}`] || 'Product image'"
+                class="image-modal-img"
+                :class="{ 'image-modal-img-dragging': isImageDragging }"
+                :style="{ transform: imageModalTransform }"
+                draggable="false"
+              />
+            </div>
+          </Transition>
         </div>
 
         <div v-if="images.length > 1" class="image-modal-thumbs">
@@ -3486,7 +3540,7 @@ onBeforeUnmount(() => {
 .detail-thumb {
   width: 84px;
   aspect-ratio: 4 / 3;
-  border-color: transparent;
+  border: 2px solid transparent;
   background: transparent;
   flex-shrink: 0;
   opacity: 0.82;
@@ -3495,8 +3549,20 @@ onBeforeUnmount(() => {
 }
 
 .detail-thumb:hover {
-  border-color: transparent;
+  border-color: rgba(24, 48, 79, 0.24);
   opacity: 1;
+}
+
+.detail-thumb-active {
+  border-color: #18304f;
+  opacity: 1;
+  box-shadow:
+    0 0 0 2px rgba(24, 48, 79, 0.12),
+    0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+.detail-thumb-active:hover {
+  border-color: #18304f;
 }
 
 .detail-info {
@@ -3767,9 +3833,13 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 0.35rem;
   width: 100%;
+  overflow: visible;
+  isolation: isolate;
 }
 
 .detail-credit-plan-switcher .credit-plan-btn {
+  position: relative;
+  z-index: 0;
   min-width: 0;
   width: 100%;
   padding: 0.52rem 0.2rem;
@@ -3997,6 +4067,36 @@ onBeforeUnmount(() => {
 .credit-plan-btn-unselected {
   border-color: #ef4444;
   background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+  box-shadow:
+    0 0 0 1px rgba(239, 68, 68, 0.16),
+    0 8px 18px rgba(239, 68, 68, 0.14);
+}
+
+.detail-credit-plan-switcher .credit-plan-btn {
+  box-shadow:
+    0 12px 26px rgba(15, 23, 42, 0.12),
+    0 2px 6px rgba(15, 23, 42, 0.06);
+}
+
+.detail-credit-plan-switcher .credit-plan-btn:hover,
+.detail-credit-plan-switcher .credit-plan-btn:focus-visible,
+.detail-credit-plan-switcher .credit-plan-btn-active {
+  z-index: 1;
+}
+
+.detail-credit-plan-switcher .credit-plan-btn:not(.credit-plan-btn-active):not(.credit-plan-btn-unselected):hover {
+  box-shadow:
+    0 15px 30px rgba(15, 23, 42, 0.16),
+    0 3px 8px rgba(15, 23, 42, 0.08);
+}
+
+.detail-credit-plan-switcher .credit-plan-btn-active {
+  box-shadow:
+    0 16px 34px rgba(24, 48, 79, 0.34),
+    0 3px 8px rgba(15, 23, 42, 0.12);
+}
+
+.detail-credit-plan-switcher .credit-plan-btn-unselected {
   box-shadow:
     0 0 0 1px rgba(239, 68, 68, 0.16),
     0 8px 18px rgba(239, 68, 68, 0.14);
@@ -4680,6 +4780,42 @@ onBeforeUnmount(() => {
   touch-action: none;
   user-select: none;
   cursor: zoom-out;
+}
+
+.image-modal-frame {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.image-modal-slide-next-enter-active,
+.image-modal-slide-next-leave-active,
+.image-modal-slide-prev-enter-active,
+.image-modal-slide-prev-leave-active {
+  transition:
+    transform 0.28s cubic-bezier(0.2, 0.82, 0.2, 1),
+    opacity 0.28s ease;
+}
+
+.image-modal-slide-next-enter-from {
+  transform: translate3d(9%, 0, 0);
+  opacity: 0;
+}
+
+.image-modal-slide-next-leave-to {
+  transform: translate3d(-9%, 0, 0);
+  opacity: 0;
+}
+
+.image-modal-slide-prev-enter-from {
+  transform: translate3d(-9%, 0, 0);
+  opacity: 0;
+}
+
+.image-modal-slide-prev-leave-to {
+  transform: translate3d(9%, 0, 0);
+  opacity: 0;
 }
 
 .image-modal-img {

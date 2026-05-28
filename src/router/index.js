@@ -165,14 +165,6 @@ const routes = [
   },
 ];
 
-const forceInstantScrollToTop = () => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-};
-
 const rememberedScrollPositions = new Map();
 const productListingRouteNames = new Set(["Home", "Products"]);
 
@@ -213,6 +205,9 @@ const router = createRouter({
   routes,
   scrollBehavior(to, from, savedPosition) {
     if (to.name === "ProductDetail") {
+      if (productListingRouteNames.has(from.name)) {
+        return false;
+      }
       return { top: 0, left: 0, behavior: "auto" };
     }
 
@@ -250,7 +245,6 @@ router.beforeEach((to, from, next) => {
 
   if (to.name === "ProductDetail") {
     rememberScrollPosition(from);
-    forceInstantScrollToTop();
   }
   isLoading.value = true;
   next();

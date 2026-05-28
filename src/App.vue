@@ -121,6 +121,39 @@ const showLoader = computed(
   () => loaderStore.loader && !isAuthRoute.value && !isLoaderDisabledRoute.value
 );
 
+const isProductForwardTransition = () => routeTransitionName.value === "product-route-forward";
+
+const freezeLeavingRouteAtCurrentScroll = (el) => {
+  if (!isProductForwardTransition() || typeof window === "undefined" || !el) {
+    return;
+  }
+
+  const scrollTop = window.scrollY || 0;
+  const scrollLeft = window.scrollX || 0;
+  el.style.position = "fixed";
+  el.style.top = `-${scrollTop}px`;
+  el.style.left = `-${scrollLeft}px`;
+  el.style.right = "auto";
+  el.style.width = "100%";
+  el.style.zIndex = "0";
+  el.style.background = "#f7f8fa";
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+};
+
+const clearFrozenRouteStyles = (el) => {
+  if (!el) {
+    return;
+  }
+
+  el.style.position = "";
+  el.style.top = "";
+  el.style.left = "";
+  el.style.right = "";
+  el.style.width = "";
+  el.style.zIndex = "";
+  el.style.background = "";
+};
+
 const handleRouteTransitionStart = () => {
   if (routeTransitionName.value) {
     routeTransitionRunning.value = true;
@@ -128,8 +161,21 @@ const handleRouteTransitionStart = () => {
 };
 
 const handleRouteTransitionEnd = () => {
+  if (isProductForwardTransition() && typeof window !== "undefined") {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }
   routeTransitionRunning.value = false;
 };
+
+const handleRouteLeaveCancelled = (el) => {
+  clearFrozenRouteStyles(el);
+  handleRouteTransitionEnd();
+};
+
+const getRouteViewKey = (currentRoute) =>
+  currentRoute?.name === "ProductDetail"
+    ? currentRoute.path
+    : currentRoute.fullPath;
 
 watch(
   () => route.fullPath,
@@ -154,13 +200,15 @@ watch(
       <RouterView v-slot="{ Component, route: currentRoute }">
         <Transition
           :name="routeTransitionName"
+          @before-leave="freezeLeavingRouteAtCurrentScroll"
+          @after-leave="clearFrozenRouteStyles"
           @before-enter="handleRouteTransitionStart"
           @after-enter="handleRouteTransitionEnd"
           @enter-cancelled="handleRouteTransitionEnd"
-          @leave-cancelled="handleRouteTransitionEnd"
+          @leave-cancelled="handleRouteLeaveCancelled"
         >
           <div
-            :key="currentRoute.fullPath"
+            :key="getRouteViewKey(currentRoute)"
             class="app-route-view"
           >
             <component :is="Component" />
@@ -368,8 +416,8 @@ watch(
 .product-route-back-enter-active,
 .product-route-back-leave-active {
   transition:
-    transform 0.72s cubic-bezier(0.2, 0.86, 0.22, 1),
-    opacity 0.72s ease;
+    transform 0.52s cubic-bezier(0.2, 0.86, 0.22, 1),
+    opacity 0.52s ease;
   will-change: transform, opacity;
 }
 
@@ -402,13 +450,13 @@ watch(
 }
 
 .product-route-forward-leave-to {
-  transform: translate3d(-22%, 0, 0) scale(0.98);
-  opacity: 0.82;
+  transform: translate3d(-14%, 0, 0);
+  opacity: 1;
 }
 
 .product-route-back-enter-from {
-  transform: translate3d(-22%, 0, 0) scale(0.98);
-  opacity: 0.82;
+  transform: translate3d(-14%, 0, 0);
+  opacity: 1;
 }
 
 .product-route-back-leave-to {
@@ -430,7 +478,7 @@ watch(
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 997;
+  z-index: 1300;
   padding: 0 0.75rem calc(0.75rem + env(safe-area-inset-bottom));
   pointer-events: none;
 }

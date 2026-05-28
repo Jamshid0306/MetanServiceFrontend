@@ -1,10 +1,14 @@
 <script setup>
+import { computed } from "vue";
+import { useRoute } from "vue-router";
 import Header from "../views/HomePage/Header.vue";
 import ProductsView from "../views/HomePage/ProductsView.vue";
-import ContactSection from "../views/HomePage/ContactSection.vue";
+
+const route = useRoute();
+const hasSearchQuery = computed(() => String(route.query.search || "").trim().length > 0);
 </script>
 <template>
-  <div class="home-shell relative">
+  <div v-if="!hasSearchQuery" class="home-shell relative">
     <div class="relative z-10">
       <Header />
     </div>

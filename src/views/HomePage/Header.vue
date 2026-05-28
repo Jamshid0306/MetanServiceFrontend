@@ -39,9 +39,14 @@ const fallbackSlides = [
 const heroSlides = ref([]);
 const hasFetchedSlides = ref(false);
 const loadFailed = ref(false);
+const isHeroLoading = computed(() => !hasFetchedSlides.value && !loadFailed.value);
 
 const displaySlides = computed(() => {
-  if (!hasFetchedSlides.value || loadFailed.value) {
+  if (isHeroLoading.value) {
+    return [];
+  }
+
+  if (loadFailed.value) {
     return fallbackSlides;
   }
 
@@ -136,7 +141,13 @@ onMounted(async () => {
     class="hero-header mx-auto mb-16 md:mb-24 max-[600px]:mb-0 mt-[72px] select-none"
   >
     <section class="hero-shell">
-      <div v-if="swiperSlides.length" class="hero-swiper-area">
+      <div v-if="isHeroLoading" class="hero-swiper-area hero-skeleton-area" aria-hidden="true">
+        <div class="hero-skeleton-card">
+          <span class="hero-skeleton-line hero-skeleton-line-wide"></span>
+          <span class="hero-skeleton-line hero-skeleton-line-short"></span>
+        </div>
+      </div>
+      <div v-else-if="swiperSlides.length" class="hero-swiper-area">
         <Swiper
           :key="heroSwiperKey"
           :modules="[Autoplay]"
@@ -267,6 +278,63 @@ onMounted(async () => {
   pointer-events: none;
 }
 
+.hero-skeleton-area {
+  border-radius: 22px;
+  overflow: hidden;
+}
+
+.hero-skeleton-card {
+  position: relative;
+  display: flex;
+  height: clamp(245px, 28vw, 420px);
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.8rem;
+  border-radius: 20px;
+  overflow: hidden;
+  padding: clamp(1rem, 3vw, 2rem);
+  background:
+    linear-gradient(90deg, #eef2f6 0%, #f8fafc 46%, #e7edf3 100%);
+  background-size: 220% 100%;
+  animation: hero-skeleton-shimmer 1.15s ease-in-out infinite;
+}
+
+.hero-skeleton-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to top, rgba(15, 23, 42, 0.08), transparent 48%),
+    linear-gradient(to right, rgba(15, 23, 42, 0.06), transparent 34%);
+}
+
+.hero-skeleton-line {
+  position: relative;
+  z-index: 1;
+  display: block;
+  height: 0.9rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.hero-skeleton-line-wide {
+  width: min(62%, 520px);
+}
+
+.hero-skeleton-line-short {
+  width: min(38%, 320px);
+}
+
+@keyframes hero-skeleton-shimmer {
+  0% {
+    background-position: 120% 0;
+  }
+
+  100% {
+    background-position: -120% 0;
+  }
+}
+
 .hero-image {
   width: 100%;
   height: 100%;
@@ -382,6 +450,10 @@ onMounted(async () => {
   }
 
   .hero-slide {
+    height: clamp(170px, 42vw, 240px);
+  }
+
+  .hero-skeleton-card {
     height: clamp(170px, 42vw, 240px);
   }
 

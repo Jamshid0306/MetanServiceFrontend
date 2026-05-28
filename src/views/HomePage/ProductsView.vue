@@ -4,7 +4,6 @@ import { useProductsStore } from "../../store/productsStore";
 import { ArrowRight } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
-import { useLoaderStore } from "@/store/loaderStore";
 import { useCreditTariffsStore } from "@/store/creditTariffsStore";
 import { resolveAssetUrls } from "@/lib/api";
 import {
@@ -19,7 +18,6 @@ const router = useRouter();
 const { t, locale } = useI18n();
 const productsStore = useProductsStore();
 const creditTariffsStore = useCreditTariffsStore();
-const loaderStore = useLoaderStore();
 const normalizeImages = (images) => resolveAssetUrls(images);
 const formatPrice = (price) => formatPriceValue(price);
 const getProductDisplayPrice = (product) =>
@@ -48,19 +46,10 @@ const formatInstallmentLabel = (product) => {
 };
 
 onMounted(async () => {
-  const shouldShowLoader = !productsStore.products.length;
-  if (shouldShowLoader) {
-    loaderStore.loader = true;
-  }
-
   await Promise.all([
     productsStore.fetchProducts(1000, 0),
     creditTariffsStore.fetchTariffs(),
   ]);
-
-  if (shouldShowLoader) {
-    loaderStore.loader = false;
-  }
 });
 const handleClick = (product) => {
   // Product card ichidagi tugma bosilganda: faqat detailga kirish.
@@ -117,10 +106,19 @@ const filteredProducts = computed(() => {
         Number(a?.id ?? 0) - Number(b?.id ?? 0)
     );
 });
+
+const showProductSkeletons = computed(
+  () => productsStore.loading && !filteredProducts.value.length
+);
+
+const productSkeletonItems = Array.from({ length: 8 }, (_, index) => index);
 </script>
 
 <template>
-  <div class="home-products-section py-12">
+  <div
+    class="home-products-section py-12"
+    :class="{ 'home-products-section-search': homeSearchQuery }"
+  >
     <div class="container mx-auto px-6">
       <h2 class="section-title">
         {{ t("products.title") }}
@@ -169,9 +167,25 @@ const filteredProducts = computed(() => {
             </button>
           </div>
         </div>
+        <template v-if="showProductSkeletons">
+          <div
+            v-for="item in productSkeletonItems"
+            :key="`product-skeleton-${item}`"
+            class="product-card product-card-skeleton"
+            aria-hidden="true"
+          >
+            <div class="product-skeleton-media"></div>
+            <div class="card-footer product-skeleton-footer">
+              <span class="product-skeleton-line product-skeleton-line-title"></span>
+              <span class="product-skeleton-line product-skeleton-line-price"></span>
+              <span class="product-skeleton-line product-skeleton-line-badge"></span>
+              <span class="product-skeleton-button"></span>
+            </div>
+          </div>
+        </template>
       </div>
       <div
-        v-if="homeSearchQuery && !filteredProducts.length"
+        v-if="homeSearchQuery && !filteredProducts.length && !showProductSkeletons"
         class="home-products-empty"
       >
         {{ t("nav.no_results") }}
@@ -191,6 +205,16 @@ const filteredProducts = computed(() => {
 <style scoped>
 .home-products-section {
   background: transparent;
+}
+
+.home-products-section.home-products-section-search {
+  padding-top: 6.5rem;
+}
+
+@media (max-width: 640px) {
+  .home-products-section.home-products-section-search {
+    padding-top: 5.75rem;
+  }
 }
 
 .section-title {
@@ -257,6 +281,68 @@ const filteredProducts = computed(() => {
 
 .product-card:hover {
   transform: translateY(-2px);
+}
+
+.product-card-skeleton {
+  pointer-events: none;
+}
+
+.product-card-skeleton:hover {
+  transform: none;
+}
+
+.product-skeleton-media,
+.product-skeleton-line,
+.product-skeleton-button {
+  display: block;
+  background:
+    linear-gradient(90deg, #eef2f6 0%, #f8fafc 46%, #e7edf3 100%);
+  background-size: 220% 100%;
+  animation: product-skeleton-shimmer 1.15s ease-in-out infinite;
+}
+
+.product-skeleton-media {
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+}
+
+.product-skeleton-footer {
+  gap: 0.55rem;
+}
+
+.product-skeleton-line {
+  height: 0.78rem;
+  border-radius: 999px;
+}
+
+.product-skeleton-line-title {
+  width: 82%;
+}
+
+.product-skeleton-line-price {
+  width: 58%;
+  height: 1rem;
+}
+
+.product-skeleton-line-badge {
+  width: 74%;
+}
+
+.product-skeleton-button {
+  width: 100%;
+  height: 34px;
+  margin-top: auto;
+  border-radius: 10px;
+}
+
+@keyframes product-skeleton-shimmer {
+  0% {
+    background-position: 120% 0;
+  }
+
+  100% {
+    background-position: -120% 0;
+  }
 }
 
 .card-body {
