@@ -177,7 +177,7 @@ const pinEnteringDetailRoute = (el) => {
   el.style.height = "100dvh";
   el.style.overflowY = "auto";
   el.style.background = "#f7f8fa";
-  el.style.boxShadow = "-18px 0 42px rgba(15, 23, 42, 0.16)";
+  el.style.boxShadow = "18px 0 42px rgba(15, 23, 42, 0.16)";
   el.style.webkitOverflowScrolling = "touch";
 };
 
@@ -474,8 +474,8 @@ watch(
 .product-route-back-enter-active,
 .product-route-back-leave-active {
   transition:
-    transform 0.44s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.44s ease;
+    transform 0.64s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.64s ease;
   will-change: transform, opacity;
 }
 
@@ -487,7 +487,7 @@ watch(
   height: 100dvh;
   overflow-y: auto;
   background: #f7f8fa;
-  box-shadow: -18px 0 42px rgba(15, 23, 42, 0.16);
+  box-shadow: 18px 0 42px rgba(15, 23, 42, 0.16);
   -webkit-overflow-scrolling: touch;
 }
 
