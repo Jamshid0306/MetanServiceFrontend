@@ -101,6 +101,7 @@ const routes = [
       keywords:
         "metan mahsulot tafsiloti, metan uskunasi, CNG ehtiyot qism, gaz uskunasi, Urganch Metan Service",
       type: "product",
+      disableGlobalLoader: true,
     },
   },
   {

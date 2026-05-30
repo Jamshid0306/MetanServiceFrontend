@@ -70,6 +70,12 @@ const resolveDefaultBalloonProgramEnabled = () => {
 const basketStore = useBasketStore();
 const { t, locale, tm } = useI18n();
 const route = useRoute();
+const routeProductId = computed(() => Number(route.params.id));
+const isCurrentProductReady = computed(
+  () =>
+    Number.isFinite(routeProductId.value) &&
+    Number(store.product?.id) === routeProductId.value
+);
 const detailAnimating = ref(false);
 const detailShowCheck = ref(false);
 const activeTab = ref("description");
@@ -2317,7 +2323,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div
-    v-if="store.product"
+    v-if="isCurrentProductReady"
     class="detail-page container mx-auto mt-[100px] px-6"
   >
     <div
@@ -3001,6 +3007,62 @@ onBeforeUnmount(() => {
       </div>
     </section>
   </div>
+  <div
+    v-else
+    class="detail-page container mx-auto mt-[100px] px-6"
+    aria-busy="true"
+  >
+    <div
+      class="detail-topbar mb-[20px] flex justify-center items-center relative"
+    >
+      <button
+        type="button"
+        @click="$router.back()"
+        class="detail-back cursor-pointer"
+        :aria-label="t('nav.back')"
+      >
+        <LeftArrow :size="24" />
+      </button>
+
+      <h2 class="detail-page-title text-center text-2xl font-bold sm:text-3xl">
+        {{ t("product.about") }}
+      </h2>
+    </div>
+
+    <div class="detail-layout detail-loading-layout" aria-hidden="true">
+      <div class="detail-main">
+        <div class="detail-gallery-column">
+          <div class="detail-gallery">
+            <div class="detail-gallery-stage">
+              <div class="detail-image-skeleton"></div>
+            </div>
+            <div class="detail-loading-thumbs">
+              <span
+                v-for="item in 4"
+                :key="`detail-thumb-skeleton-${item}`"
+                class="detail-thumb-skeleton"
+              ></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-info">
+          <div class="detail-summary detail-section detail-summary-loading">
+            <div class="detail-summary-head">
+              <span class="detail-skeleton-line detail-skeleton-id"></span>
+              <span class="detail-skeleton-line detail-skeleton-share"></span>
+            </div>
+            <span class="detail-title-skeleton detail-title-skeleton-wide"></span>
+            <span class="detail-title-skeleton detail-title-skeleton-short"></span>
+            <div class="detail-price-box">
+              <span class="detail-skeleton-line detail-skeleton-label"></span>
+              <span class="detail-skeleton-line detail-skeleton-price"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
   <teleport to="body">
     <div
       v-if="imageModalOpen"
@@ -3563,6 +3625,93 @@ onBeforeUnmount(() => {
 
 .detail-thumb-active:hover {
   border-color: #18304f;
+}
+
+.detail-loading-layout {
+  min-height: min(720px, calc(100dvh - 160px));
+}
+
+.detail-image-skeleton,
+.detail-thumb-skeleton,
+.detail-title-skeleton,
+.detail-skeleton-line {
+  display: block;
+  background:
+    linear-gradient(90deg, #eef2f6 0%, #f8fafc 46%, #e7edf3 100%);
+  background-size: 220% 100%;
+  animation: detail-skeleton-shimmer 1.15s ease-in-out infinite;
+}
+
+.detail-image-skeleton {
+  width: 100%;
+  height: 100%;
+  border-radius: 20px;
+}
+
+.detail-loading-thumbs {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 0.5rem;
+  overflow: hidden;
+}
+
+.detail-thumb-skeleton {
+  width: 84px;
+  aspect-ratio: 4 / 3;
+  flex: 0 0 auto;
+  border-radius: 12px;
+}
+
+.detail-summary-loading {
+  pointer-events: none;
+}
+
+.detail-title-skeleton {
+  height: clamp(1.7rem, 2.8vw, 2.4rem);
+  border-radius: 999px;
+}
+
+.detail-title-skeleton-wide {
+  width: min(86%, 560px);
+}
+
+.detail-title-skeleton-short {
+  width: min(58%, 380px);
+}
+
+.detail-skeleton-id {
+  width: 5.5rem;
+  height: 2rem;
+  border-radius: 999px;
+}
+
+.detail-skeleton-share {
+  width: 6.8rem;
+  height: 2.2rem;
+  border-radius: 999px;
+}
+
+.detail-skeleton-label {
+  width: 9rem;
+  height: 0.8rem;
+  border-radius: 999px;
+}
+
+.detail-skeleton-price {
+  width: min(62%, 300px);
+  height: 2.4rem;
+  border-radius: 999px;
+}
+
+@keyframes detail-skeleton-shimmer {
+  0% {
+    background-position: 120% 0;
+  }
+
+  100% {
+    background-position: -120% 0;
+  }
 }
 
 .detail-info {

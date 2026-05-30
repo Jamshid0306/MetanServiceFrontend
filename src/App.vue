@@ -122,12 +122,39 @@ const showLoader = computed(
 );
 
 const isProductForwardTransition = () => routeTransitionName.value === "product-route-forward";
+const isProductBackTransition = () => routeTransitionName.value === "product-route-back";
+const isProductRouteTransition = () =>
+  isProductForwardTransition() || isProductBackTransition();
+let pinnedRouteShell = null;
 
-const freezeLeavingRouteAtCurrentScroll = (el) => {
-  if (!isProductForwardTransition() || typeof window === "undefined" || !el) {
+const pinRouteShellHeight = (el) => {
+  if (typeof window === "undefined" || !el?.parentElement) {
     return;
   }
 
+  pinnedRouteShell = el.parentElement;
+  const currentHeight = pinnedRouteShell.getBoundingClientRect().height;
+  const routeHeight = el.getBoundingClientRect().height;
+  const viewportBottom = (window.scrollY || 0) + window.innerHeight;
+  const minHeight = Math.ceil(Math.max(currentHeight, routeHeight, viewportBottom));
+  pinnedRouteShell.style.minHeight = `${minHeight}px`;
+};
+
+const clearPinnedRouteShellHeight = () => {
+  if (!pinnedRouteShell) {
+    return;
+  }
+
+  pinnedRouteShell.style.minHeight = "";
+  pinnedRouteShell = null;
+};
+
+const freezeLeavingRouteAtCurrentScroll = (el) => {
+  if (!isProductRouteTransition() || typeof window === "undefined" || !el) {
+    return;
+  }
+
+  pinRouteShellHeight(el);
   const scrollTop = window.scrollY || 0;
   const scrollLeft = window.scrollX || 0;
   el.style.position = "fixed";
@@ -135,9 +162,23 @@ const freezeLeavingRouteAtCurrentScroll = (el) => {
   el.style.left = `-${scrollLeft}px`;
   el.style.right = "auto";
   el.style.width = "100%";
-  el.style.zIndex = "0";
+  el.style.zIndex = isProductBackTransition() ? "1200" : "0";
   el.style.background = "#f7f8fa";
-  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+};
+
+const pinEnteringDetailRoute = (el) => {
+  if (!isProductForwardTransition() || !el) {
+    return;
+  }
+
+  el.style.position = "fixed";
+  el.style.inset = "0";
+  el.style.zIndex = "1200";
+  el.style.height = "100dvh";
+  el.style.overflowY = "auto";
+  el.style.background = "#f7f8fa";
+  el.style.boxShadow = "-18px 0 42px rgba(15, 23, 42, 0.16)";
+  el.style.webkitOverflowScrolling = "touch";
 };
 
 const clearFrozenRouteStyles = (el) => {
@@ -152,24 +193,41 @@ const clearFrozenRouteStyles = (el) => {
   el.style.width = "";
   el.style.zIndex = "";
   el.style.background = "";
+  el.style.inset = "";
+  el.style.height = "";
+  el.style.overflowY = "";
+  el.style.boxShadow = "";
+  el.style.webkitOverflowScrolling = "";
 };
 
-const handleRouteTransitionStart = () => {
+const handleRouteTransitionStart = (el) => {
   if (routeTransitionName.value) {
     routeTransitionRunning.value = true;
   }
+
+  pinEnteringDetailRoute(el);
 };
 
-const handleRouteTransitionEnd = () => {
+const handleRouteTransitionEnd = (el) => {
   if (isProductForwardTransition() && typeof window !== "undefined") {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    requestAnimationFrame(() => {
+      clearFrozenRouteStyles(el);
+      clearPinnedRouteShellHeight();
+      routeTransitionRunning.value = false;
+    });
+    return;
   }
+
+  clearFrozenRouteStyles(el);
+  clearPinnedRouteShellHeight();
   routeTransitionRunning.value = false;
 };
 
 const handleRouteLeaveCancelled = (el) => {
   clearFrozenRouteStyles(el);
-  handleRouteTransitionEnd();
+  clearPinnedRouteShellHeight();
+  routeTransitionRunning.value = false;
 };
 
 const getRouteViewKey = (currentRoute) =>
@@ -416,8 +474,8 @@ watch(
 .product-route-back-enter-active,
 .product-route-back-leave-active {
   transition:
-    transform 0.52s cubic-bezier(0.2, 0.86, 0.22, 1),
-    opacity 0.52s ease;
+    transform 0.44s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.44s ease;
   will-change: transform, opacity;
 }
 
@@ -434,8 +492,7 @@ watch(
 }
 
 .product-route-back-enter-active {
-  position: absolute;
-  inset: 0;
+  position: relative;
   z-index: 1;
 }
 
@@ -450,12 +507,12 @@ watch(
 }
 
 .product-route-forward-leave-to {
-  transform: translate3d(-14%, 0, 0);
+  transform: translate3d(0, 0, 0);
   opacity: 1;
 }
 
 .product-route-back-enter-from {
-  transform: translate3d(-14%, 0, 0);
+  transform: translate3d(0, 0, 0);
   opacity: 1;
 }
 
