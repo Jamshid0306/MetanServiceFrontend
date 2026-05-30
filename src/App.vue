@@ -32,6 +32,12 @@ const basketStore = useBasketStore();
 const customerProfile = ref(null);
 const routeTransitionRunning = ref(false);
 
+const syncCustomerProfile = () => {
+  customerProfile.value = getUsableCustomerAccessToken()
+    ? getStoredCustomerSession()
+    : null;
+};
+
 onMounted(() => {
   syncCustomerProfile();
 
@@ -47,12 +53,6 @@ onUnmounted(() => {
     window.removeEventListener(CUSTOMER_SESSION_EVENT, syncCustomerProfile);
   }
 });
-
-const syncCustomerProfile = () => {
-  customerProfile.value = getUsableCustomerAccessToken()
-    ? getStoredCustomerSession()
-    : null;
-};
 
 const toggleExpand = () => {
   expanded.value = !expanded.value;
@@ -71,15 +71,18 @@ const toggleProfile = () => {
 
 const logoutCustomer = () => {
   clearCustomerSession();
+
   if (typeof window !== "undefined") {
     window.localStorage.removeItem("customer_access_token");
   }
+
   syncCustomerProfile();
   router.push("/login");
 };
 
 const profileDisplayName = computed(() => {
   const name = String(customerProfile.value?.name || "").trim();
+
   if (!name) {
     return t("nav.login");
   }
@@ -90,13 +93,18 @@ const profileDisplayName = computed(() => {
 
 const profileSecondaryText = computed(() => {
   const phone = String(customerProfile.value?.phone || "").trim();
+
   if (phone) {
     return `+${phone}`;
   }
+
   return t("auth.userAccess");
 });
 
-const isHomeRoute = computed(() => route.path === "/" && route.hash !== "#contact");
+const isHomeRoute = computed(
+  () => route.path === "/" && route.hash !== "#contact"
+);
+const isProductDetailRoute = computed(() => route.name === "ProductDetail");
 const isProductsRoute = computed(
   () => route.path.startsWith("/products") || route.path.startsWith("/product")
 );
@@ -104,27 +112,47 @@ const isBasketRoute = computed(() => route.path.startsWith("/basket"));
 const isProfileRoute = computed(() => route.path.startsWith("/profile"));
 const isCheckoutRoute = computed(() => route.path.startsWith("/checkout"));
 const basketCount = computed(() => basketStore.basket.length);
+
 const isAuthRoute = computed(() =>
   ["Login", "Register", "ForgotPassword"].includes(String(route.name || ""))
 );
-const isLoaderDisabledRoute = computed(() => Boolean(route.meta?.disableGlobalLoader));
+
+const isLoaderDisabledRoute = computed(() =>
+  Boolean(route.meta?.disableGlobalLoader)
+);
+
 const showPublicLayout = computed(
   () => route.path !== "/admin" && !isAuthRoute.value
 );
+
+const showNavSmooth = computed(
+  () => showPublicLayout.value && !isProductDetailRoute.value
+);
+
 const showPublicExtras = computed(
   () => showPublicLayout.value && !isAuthRoute.value && !isCheckoutRoute.value
 );
+
 const showFooter = computed(
-  () => showPublicExtras.value && !routeTransitionRunning.value
+  () =>
+    showPublicExtras.value &&
+    !routeTransitionRunning.value &&
+    !isProductDetailRoute.value
 );
+
 const showLoader = computed(
   () => loaderStore.loader && !isAuthRoute.value && !isLoaderDisabledRoute.value
 );
 
-const isProductForwardTransition = () => routeTransitionName.value === "product-route-forward";
-const isProductBackTransition = () => routeTransitionName.value === "product-route-back";
+const isProductForwardTransition = () =>
+  routeTransitionName.value === "product-route-forward";
+
+const isProductBackTransition = () =>
+  routeTransitionName.value === "product-route-back";
+
 const isProductRouteTransition = () =>
   isProductForwardTransition() || isProductBackTransition();
+
 let pinnedRouteShell = null;
 
 const pinRouteShellHeight = (el) => {
@@ -133,10 +161,14 @@ const pinRouteShellHeight = (el) => {
   }
 
   pinnedRouteShell = el.parentElement;
+
   const currentHeight = pinnedRouteShell.getBoundingClientRect().height;
   const routeHeight = el.getBoundingClientRect().height;
   const viewportBottom = (window.scrollY || 0) + window.innerHeight;
-  const minHeight = Math.ceil(Math.max(currentHeight, routeHeight, viewportBottom));
+  const minHeight = Math.ceil(
+    Math.max(currentHeight, routeHeight, viewportBottom)
+  );
+
   pinnedRouteShell.style.minHeight = `${minHeight}px`;
 };
 
@@ -155,8 +187,10 @@ const freezeLeavingRouteAtCurrentScroll = (el) => {
   }
 
   pinRouteShellHeight(el);
+
   const scrollTop = window.scrollY || 0;
   const scrollLeft = window.scrollX || 0;
+
   el.style.position = "fixed";
   el.style.top = `-${scrollTop}px`;
   el.style.left = `-${scrollLeft}px`;
@@ -177,7 +211,7 @@ const pinEnteringDetailRoute = (el) => {
   el.style.height = "100dvh";
   el.style.overflowY = "auto";
   el.style.background = "#f7f8fa";
-  el.style.boxShadow = "18px 0 42px rgba(15, 23, 42, 0.16)";
+  el.style.boxShadow = "-18px 0 46px rgba(15, 23, 42, 0.18)";
   el.style.webkitOverflowScrolling = "touch";
 };
 
@@ -205,23 +239,50 @@ const handleRouteTransitionStart = (el) => {
     routeTransitionRunning.value = true;
   }
 
+  if (isProductRouteTransition()) {
+    loaderStore.loader = true;
+  }
+
   pinEnteringDetailRoute(el);
 };
 
 const handleRouteTransitionEnd = (el) => {
-  if (isProductForwardTransition() && typeof window !== "undefined") {
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  if (typeof window !== "undefined" && isProductForwardTransition()) {
     requestAnimationFrame(() => {
       clearFrozenRouteStyles(el);
       clearPinnedRouteShellHeight();
-      routeTransitionRunning.value = false;
+
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          routeTransitionRunning.value = false;
+          loaderStore.loader = false;
+        });
+      });
     });
+
+    return;
+  }
+
+  if (isProductBackTransition()) {
+    requestAnimationFrame(() => {
+      clearFrozenRouteStyles(el);
+      clearPinnedRouteShellHeight();
+
+      requestAnimationFrame(() => {
+        routeTransitionRunning.value = false;
+        loaderStore.loader = false;
+      });
+    });
+
     return;
   }
 
   clearFrozenRouteStyles(el);
   clearPinnedRouteShellHeight();
   routeTransitionRunning.value = false;
+  loaderStore.loader = false;
 };
 
 const handleRouteLeaveCancelled = (el) => {
@@ -244,16 +305,18 @@ watch(
 );
 </script>
 
-
 <template>
   <div>
-    <div
-      v-if="showPublicLayout"
-      class="app-nav-shell"
-      :class="{ 'app-nav-shell-mobile-hidden': !isHomeRoute }"
-    >
-      <Nav />
-    </div>
+    <Transition name="app-nav-fade">
+      <div
+        v-if="showNavSmooth"
+        class="app-nav-shell"
+        :class="{ 'app-nav-shell-mobile-hidden': !isHomeRoute }"
+      >
+        <Nav />
+      </div>
+    </Transition>
+
     <div class="app-route-shell">
       <RouterView v-slot="{ Component, route: currentRoute }">
         <Transition
@@ -265,27 +328,38 @@ watch(
           @enter-cancelled="handleRouteTransitionEnd"
           @leave-cancelled="handleRouteLeaveCancelled"
         >
-          <div
-            :key="getRouteViewKey(currentRoute)"
-            class="app-route-view"
-          >
+          <div :key="getRouteViewKey(currentRoute)" class="app-route-view">
             <component :is="Component" />
           </div>
         </Transition>
       </RouterView>
     </div>
+
     <Footer v-if="showFooter" />
     <Loader v-if="showLoader" />
 
-    <div v-if="showPublicExtras" class="app-mobile-dock lg:hidden">
+    <div
+      v-if="showPublicExtras && !isProductDetailRoute"
+      class="app-mobile-dock lg:hidden"
+    >
       <div class="app-mobile-dock-inner">
         <RouterLink
           to="/"
           class="app-mobile-dock-link"
           :class="{ 'app-mobile-dock-link-active': isHomeRoute }"
         >
-          <svg class="app-mobile-dock-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 10.5L12 3l9 7.5M5.25 9.75V21h13.5V9.75" />
+          <svg
+            class="app-mobile-dock-icon"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.8"
+              d="M3 10.5L12 3l9 7.5M5.25 9.75V21h13.5V9.75"
+            />
           </svg>
           <span>{{ t("nav.main") }}</span>
         </RouterLink>
@@ -295,8 +369,18 @@ watch(
           class="app-mobile-dock-link"
           :class="{ 'app-mobile-dock-link-active': isProductsRoute }"
         >
-          <svg class="app-mobile-dock-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 7.5h16M4 12h16M4 16.5h16" />
+          <svg
+            class="app-mobile-dock-icon"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.8"
+              d="M4 7.5h16M4 12h16M4 16.5h16"
+            />
           </svg>
           <span>{{ t("products.allProducts") }}</span>
         </RouterLink>
@@ -306,8 +390,15 @@ watch(
           class="app-mobile-dock-link app-mobile-dock-link-basket"
           :class="{ 'app-mobile-dock-link-active': isBasketRoute }"
         >
-          <span v-if="basketCount" class="app-mobile-dock-badge">{{ basketCount }}</span>
-          <svg class="app-mobile-dock-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <span v-if="basketCount" class="app-mobile-dock-badge">{{
+            basketCount
+          }}</span>
+          <svg
+            class="app-mobile-dock-icon"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -346,18 +437,20 @@ watch(
       </div>
     </div>
 
-    <div v-if="showPublicExtras" class="quick-contact">
+    <div v-if="showPublicExtras && !isProductDetailRoute" class="quick-contact">
       <transition name="contact-panel">
         <div v-if="expanded" class="contact-panel">
           <p class="contact-panel-title">Urganch Metan Service</p>
           <p class="contact-panel-subtitle">Support xizmati</p>
 
-          <a
-            :href="CONTACT_PHONE_HREF"
-            class="contact-link"
-          >
+          <a :href="CONTACT_PHONE_HREF" class="contact-link">
             <span class="contact-link-icon contact-link-icon-phone">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+              >
                 <path
                   fill="currentColor"
                   d="M19.95 21q-3.125 0-6.175-1.35t-5.475-3.775t-3.775-5.475T3.175 4.225q0-.45.3-.75t.75-.3H8.1q.375 0 .688.25t.387.625l.6 2.725q.075.4-.025.675t-.35.525L7.05 10.3q.575 1.025 1.313 1.95T10 14q.825.825 1.75 1.563t1.95 1.312l2.325-2.35q.25-.25.55-.338t.625-.012l2.7.55q.4.075.65.388t.25.687v3.875q0 .45-.3.75t-.75.3"
@@ -444,13 +537,28 @@ watch(
             />
           </svg>
         </span>
-        <span class="quick-toggle-text">{{ expanded ? "Close" : "Contact" }}</span>
+        <span class="quick-toggle-text">{{
+          expanded ? "Close" : "Contact"
+        }}</span>
       </button>
     </div>
   </div>
 </template>
 
 <style scoped>
+.app-nav-fade-enter-active,
+.app-nav-fade-leave-active {
+  transition:
+    opacity 0.42s ease,
+    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.app-nav-fade-enter-from,
+.app-nav-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-18px);
+}
+
 @media (max-width: 1023px) {
   .app-nav-shell-mobile-hidden {
     display: none;
@@ -474,9 +582,12 @@ watch(
 .product-route-back-enter-active,
 .product-route-back-leave-active {
   transition:
-    transform 0.64s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.64s ease;
-  will-change: transform, opacity;
+    transform 0.78s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.78s ease,
+    filter 0.78s ease;
+  will-change: transform, opacity, filter;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
 }
 
 .product-route-forward-enter-active,
@@ -487,7 +598,7 @@ watch(
   height: 100dvh;
   overflow-y: auto;
   background: #f7f8fa;
-  box-shadow: 18px 0 42px rgba(15, 23, 42, 0.16);
+  box-shadow: -18px 0 46px rgba(15, 23, 42, 0.18);
   -webkit-overflow-scrolling: touch;
 }
 
@@ -502,32 +613,33 @@ watch(
 }
 
 .product-route-forward-enter-from {
-  transform: translate3d(112%, 0, 0);
+  transform: translate3d(100%, 0, 0) scale(0.985);
+  opacity: 0.92;
+  filter: blur(2px);
+}
+
+.product-route-forward-enter-to {
+  transform: translate3d(0, 0, 0) scale(1);
   opacity: 1;
+  filter: blur(0);
 }
 
 .product-route-forward-leave-to {
   transform: translate3d(0, 0, 0);
   opacity: 1;
+  filter: blur(0);
 }
 
 .product-route-back-enter-from {
   transform: translate3d(0, 0, 0);
   opacity: 1;
+  filter: blur(0);
 }
 
 .product-route-back-leave-to {
-  transform: translate3d(112%, 0, 0);
-  opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .product-route-forward-enter-active,
-  .product-route-forward-leave-active,
-  .product-route-back-enter-active,
-  .product-route-back-leave-active {
-    transition: none;
-  }
+  transform: translate3d(100%, 0, 0) scale(0.985);
+  opacity: 0.92;
+  filter: blur(2px);
 }
 
 .app-mobile-dock {
@@ -628,123 +740,6 @@ watch(
   font-size: 0.7rem;
   font-weight: 800;
   line-height: 1;
-}
-
-.mobile-profile-panel {
-  pointer-events: auto;
-  width: min(100%, 540px);
-  margin: 0 auto 0.55rem;
-  border: 1px solid rgba(20, 35, 56, 0.12);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 -10px 30px rgba(15, 23, 42, 0.12);
-  backdrop-filter: blur(18px);
-  padding: 0.85rem;
-}
-
-.mobile-profile-head {
-  display: flex;
-  align-items: center;
-  gap: 0.72rem;
-}
-
-.mobile-profile-avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #18304f 0%, #365c87 100%);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1rem;
-  font-weight: 800;
-  flex-shrink: 0;
-}
-
-.mobile-profile-copy {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.mobile-profile-copy strong {
-  color: #142338;
-  font-size: 0.95rem;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.mobile-profile-copy small {
-  margin-top: 0.12rem;
-  color: #64748b;
-  font-size: 0.78rem;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.mobile-profile-meta {
-  display: grid;
-  gap: 0.4rem;
-  margin-top: 0.8rem;
-}
-
-.mobile-profile-meta p {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.8rem;
-  padding: 0.65rem 0.8rem;
-  border-radius: 14px;
-  background: #f6f8fb;
-}
-
-.mobile-profile-meta span {
-  color: #64748b;
-  font-size: 0.76rem;
-  font-weight: 700;
-}
-
-.mobile-profile-meta strong {
-  color: #142338;
-  font-size: 0.82rem;
-  font-weight: 800;
-  text-align: right;
-  word-break: break-word;
-}
-
-.mobile-profile-logout {
-  width: 100%;
-  margin-top: 0.8rem;
-  min-height: 44px;
-  border-radius: 16px;
-  border: 1px solid rgba(20, 48, 79, 0.14);
-  background: #18304f;
-  color: #fff;
-  font-size: 0.84rem;
-  font-weight: 800;
-}
-
-.mobile-profile-orders {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  margin-top: 0.65rem;
-  min-height: 42px;
-  border-radius: 8px;
-  border: 1px solid rgba(20, 48, 79, 0.14);
-  background: #ffffff;
-  color: #18304f;
-  font-size: 0.84rem;
-  font-weight: 800;
-}
-
-.mobile-profile-orders + .mobile-profile-logout {
-  margin-top: 0.55rem;
 }
 
 .quick-contact {
@@ -851,14 +846,8 @@ watch(
   flex-shrink: 0;
 }
 
-.contact-link-icon-phone {
-  background: #eef2f6;
-}
-
-.contact-link-icon-inst {
-  background: #eef2f6;
-}
-
+.contact-link-icon-phone,
+.contact-link-icon-inst,
 .contact-link-icon-map {
   background: #eef2f6;
 }

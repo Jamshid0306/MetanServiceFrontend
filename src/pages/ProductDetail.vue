@@ -20,6 +20,7 @@ import { useRoute, useRouter } from "vue-router";
 import "swiper/css";
 import LeftArrow from "@/components/icons/LeftArrow.vue";
 import clickLogo from "@/assets/images/click.png";
+import Loader from "@/components/Loader.vue";
 import { useLoaderStore } from "@/store/loaderStore";
 import { useCreditTariffsStore } from "@/store/creditTariffsStore";
 import Notification from "@/components/Notification.vue";
@@ -76,6 +77,8 @@ const isCurrentProductReady = computed(
     Number.isFinite(routeProductId.value) &&
     Number(store.product?.id) === routeProductId.value
 );
+const productDetailLoading = ref(false);
+const showProductDetailLoader = computed(() => productDetailLoading.value);
 const detailAnimating = ref(false);
 const detailShowCheck = ref(false);
 const activeTab = ref("description");
@@ -1988,36 +1991,65 @@ const submitProductOrder = async () => {
   }
 };
 
+const loaderStore = useLoaderStore();
+let productDataRequestId = 0;
+
+const finishProductDataLoading = (requestId) => {
+  if (requestId !== productDataRequestId) {
+    return;
+  }
+
+  productDetailLoading.value = false;
+  setTimeout(() => {
+  loaderStore.loader = false;
+}, 550);
+};
+
 const fetchProductData = async (id) => {
-  const productId = Number(id);
-  if (!Number.isFinite(productId) || productId <= 0) {
-    store.product = null;
-    router.replace({ name: "NotFound" });
-    return;
+  const requestId = ++productDataRequestId;
+  productDetailLoading.value = true;
+  loaderStore.loader = true;
+
+  try {
+    const productId = Number(id);
+
+    if (!Number.isFinite(productId) || productId <= 0) {
+      store.product = null;
+      router.replace({ name: "NotFound" });
+      return;
+    }
+
+    const [productExists] = await Promise.all([
+      store.fetchProductDetail(productId),
+      creditTariffsStore.fetchTariffs(),
+    ]);
+
+    if (!productExists) {
+      router.replace({ name: "NotFound" });
+      return;
+    }
+
+    fetchRelatedProducts(productId);
+
+    selectedOptions.value = {};
+    selectedExtraServiceIds.value = [];
+    balloonProgramEnabled.value = resolveDefaultBalloonProgramEnabled();
+    setDefaultCreditMonthsForProduct();
+
+    activeImageIndex.value = 0;
+    activeTab.value = "description";
+
+    await nextTick();
+    observeStickyPrice();
+  } finally {
+    const finishLoading = () => finishProductDataLoading(requestId);
+
+    if (typeof window !== "undefined") {
+      window.setTimeout(finishLoading, 200);
+    } else {
+      finishLoading();
+    }
   }
-
-  const [productExists] = await Promise.all([
-    store.fetchProductDetail(productId),
-    creditTariffsStore.fetchTariffs(),
-  ]);
-  if (!productExists) {
-    router.replace({ name: "NotFound" });
-    return;
-  }
-
-  fetchRelatedProducts(productId);
-  selectedOptions.value = {};
-  selectedExtraServiceIds.value = [];
-  balloonProgramEnabled.value = resolveDefaultBalloonProgramEnabled();
-  setDefaultCreditMonthsForProduct();
-  activeImageIndex.value = 0;
-  activeTab.value = "description";
-  fuelGuideModalOpen.value = false;
-  closeOrderModal();
-  stickyPriceVisible.value = false;
-
-  await nextTick();
-  observeStickyPrice();
 };
 
 const setBalloonProgramEnabled = (enabled) => {
@@ -2095,6 +2127,7 @@ const selectOption = (groupKey, optionId) => {
 };
 
 const goToDetail = (id, options = {}) => {
+  productDetailLoading.value = true;
   useLoaderStore().loader = true;
   router.push({
     name: "ProductDetail",
@@ -2308,6 +2341,10 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  productDataRequestId += 1;
+  productDetailLoading.value = false;
+  loaderStore.loader = false;
+
   if (typeof document !== "undefined") {
     document.body.style.overflow = "";
   }
@@ -2322,6 +2359,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <Loader v-if="showProductDetailLoader" />
+
   <div
     v-if="isCurrentProductReady"
     class="detail-page container mx-auto mt-[100px] px-6"
