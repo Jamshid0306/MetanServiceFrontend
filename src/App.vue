@@ -246,20 +246,26 @@ const handleRouteTransitionStart = (el) => {
   pinEnteringDetailRoute(el);
 };
 
+const finishLoaderAfterScroll = () => {
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        routeTransitionRunning.value = false;
+        loaderStore.loader = false;
+      }, 120);
+    });
+  });
+};
+
 const handleRouteTransitionEnd = (el) => {
   if (typeof window !== "undefined" && isProductForwardTransition()) {
     requestAnimationFrame(() => {
       clearFrozenRouteStyles(el);
       clearPinnedRouteShellHeight();
 
-      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          routeTransitionRunning.value = false;
-          loaderStore.loader = false;
-        });
-      });
+      finishLoaderAfterScroll();
     });
 
     return;
