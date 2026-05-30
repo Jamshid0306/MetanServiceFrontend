@@ -254,7 +254,7 @@ const finishLoaderAfterScroll = () => {
       setTimeout(() => {
         routeTransitionRunning.value = false;
         loaderStore.loader = false;
-      }, 120);
+      }, 220);
     });
   });
 };
@@ -264,7 +264,6 @@ const handleRouteTransitionEnd = (el) => {
     requestAnimationFrame(() => {
       clearFrozenRouteStyles(el);
       clearPinnedRouteShellHeight();
-
       finishLoaderAfterScroll();
     });
 

@@ -2005,10 +2005,21 @@ const finishProductDataLoading = (requestId) => {
 }, 550);
 };
 
+const waitForRenderReady = async () => {
+  await nextTick();
+
+  if (typeof window === "undefined") return;
+
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  await new Promise((resolve) => setTimeout(resolve, 180));
+};
+
 const fetchProductData = async (id) => {
-  const requestId = ++productDataRequestId;
-  productDetailLoading.value = true;
   loaderStore.loader = true;
+  productDetailLoading.value = true;
 
   try {
     const productId = Number(id);
@@ -2035,20 +2046,17 @@ const fetchProductData = async (id) => {
     selectedExtraServiceIds.value = [];
     balloonProgramEnabled.value = resolveDefaultBalloonProgramEnabled();
     setDefaultCreditMonthsForProduct();
-
     activeImageIndex.value = 0;
     activeTab.value = "description";
+    fuelGuideModalOpen.value = false;
+    closeOrderModal();
+    stickyPriceVisible.value = false;
 
-    await nextTick();
+    await waitForRenderReady();
     observeStickyPrice();
   } finally {
-    const finishLoading = () => finishProductDataLoading(requestId);
-
-    if (typeof window !== "undefined") {
-      window.setTimeout(finishLoading, 200);
-    } else {
-      finishLoading();
-    }
+    productDetailLoading.value = false;
+    loaderStore.loader = false;
   }
 };
 
